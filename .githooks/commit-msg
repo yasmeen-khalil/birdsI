@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Keeps commit messages technical: no tool attribution trailers, no
+# addresses other than the repo's configured author.
+set -euo pipefail
+
+msg_file="$1"
+red=$'\033[31m'
+reset=$'\033[0m'
+fail=0
+
+if grep -qiE '^(Co-Authored-By|Signed-off-by|Generated-by):' "$msg_file"; then
+  echo "${red}blocked${reset}: commit message contains an attribution trailer"
+  fail=1
+fi
+if grep -qiE 'generated with|🤖' "$msg_file"; then
+  echo "${red}blocked${reset}: commit message contains a generator note"
+  fail=1
+fi
+
+local_file="$(git rev-parse --show-toplevel)/.githooks/local-patterns"
+if [ -f "$local_file" ]; then
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    [[ "$line" == \#* ]] && continue
+    if grep -qE "$line" "$msg_file"; then
+      echo "${red}blocked${reset}: commit message matches a private pattern"
+      fail=1
+      break
+    fi
+  done < "$local_file"
+fi
+
+[ "$fail" -ne 0 ] && exit 1
+exit 0

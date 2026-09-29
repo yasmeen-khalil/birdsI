@@ -1,0 +1,49 @@
+{
+  "name": "birdsi",
+  "version": "0.1.0",
+  "description": "birdsI from the terminal: scan a codebase, read findings in plain words, approve fixes. Also runs the birdsI MCP server.",
+  "license": "MPL-2.0",
+  "author": "yasmeen-khalil",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yasmeen-khalil/birdsI"
+  },
+  "homepage": "https://github.com/yasmeen-khalil/birdsI",
+  "keywords": [
+    "audit",
+    "security",
+    "dependencies",
+    "code review",
+    "mcp",
+    "cli"
+  ],
+  "type": "module",
+  "bin": {
+    "birdsi": "./dist/birdsi.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev": "tsx src/birdsi.ts",
+    "build": "esbuild src/birdsi.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/birdsi.js --banner:js=\"#!/usr/bin/env node\nimport { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" && chmod +x dist/birdsi.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.31",
+    "commander": "^15",
+    "ignore": "^7",
+    "tar": "^7",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@birdsi/shared": "*",
+    "esbuild": "^0.25",
+    "tsx": "^4"
+  }
+}

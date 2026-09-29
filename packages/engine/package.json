@@ -1,0 +1,29 @@
+{
+  "name": "@birdsi/engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The birdsI scan engine: source adapters, inventory, checks, model calls, fixes.",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@birdsi/shared": "*",
+    "@octokit/app": "^16",
+    "@octokit/rest": "^22",
+    "@tavily/core": "^0.7",
+    "ignore": "^7",
+    "langsmith": "^0.10",
+    "openai": "^7",
+    "semver": "^7",
+    "tar": "^7",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@types/semver": "^7"
+  }
+}

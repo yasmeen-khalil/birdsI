@@ -1,0 +1,36 @@
+{
+  "name": "@birdsi/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The birdsI web app: landing page, demo scan, dashboard, findings, fixes, chat, API.",
+  "license": "MPL-2.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@birdsi/db": "*",
+    "@birdsi/engine": "*",
+    "@birdsi/shared": "*",
+    "@clerk/nextjs": "^7",
+    "@supabase/supabase-js": "^2",
+    "lucide-react": "^0.560",
+    "next": "16.3.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

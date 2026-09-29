@@ -1,0 +1,93 @@
+import type { FindingDraft } from "@birdsi/shared";
+import { numberLines } from "../scan/digest";
+import { filterModelFindings, MODEL_FINDINGS_JSON_SCHEMA, ModelFindings, REVIEW_VOICE, toDraft } from "./model-findings";
+import type { Check, CheckContext } from "./types";
+
+const SYSTEM = `You are birdsI, a careful reviewer reading one file of an application in the context of the whole codebase. ${REVIEW_VOICE}
+
+Look for, in this order of importance:
+1. Security holes: missing authorization checks, trusting client-supplied ids, injection (SQL, shell, template), unsafe deserialization, weak crypto, secrets in code, open redirects, missing input validation at a trust boundary, permissive CORS, disabled security features, privileged operations reachable without a check.
+2. Gaps: error paths that are not handled, missing states (empty, loading, failure), unfinished work (TODO that blocks correctness), features promised by names or comments but not implemented, money or quota operations that are not atomic.
+3. Inconsistencies: two ways of doing the same thing that disagree, a function whose behaviour contradicts its name or comment, types that lie.
+4. Contradictions with the rest of the codebase you were told about (routes, env vars, schema).
+
+Rules:
+- Report only real problems you can point at with line numbers. Style, naming and formatting are not problems.
+- Do not report something that is clearly handled elsewhere (for example, auth enforced by a middleware you were told about).
+- certainty is your honest probability that a competent engineer would agree it is a bug or hole.
+- actionKind is "fix" only when a change inside the repository resolves it fully; anything needing a dashboard, a key rotation or a product decision is "steps".
+- If the file is fine, return an empty findings list. That is a good outcome, not a failure.`;
+
+export const reviewCheck: Check = {
+  id: "review",
+  step: "review",
+  label: "Reading the code for security holes, gaps and inconsistencies",
+  tiers: ["light", "deep", "audit"],
+  available: () => true,
+  async run(ctx: CheckContext): Promise<FindingDraft[]> {
+    const findings: FindingDraft[] = [];
+    const knownPaths = new Set(ctx.inventory.files.map((f) => f.path));
+    const digest = ctx.digest.text;
+    const context = buildContextNotes(ctx);
+    const files = ctx.filesToRead;
+    await ctx.emit({ type: "step_started", step: "review", label: reviewCheck.label, total: files.length });
+    let done = 0;
+    for (const file of files) {
+      if (ctx.signal.aborted) break;
+      await ctx.emit({ type: "file_reading", step: "review", path: file.path, checks: ["security holes", "gaps", "inconsistencies"] });
+      const content = await ctx.read(file.path);
+      try {
+        const result = await ctx.models.complete({
+          tier: ctx.budget.reviewModel,
+          fast: ctx.budget.fast,
+          purpose: "review",
+          system: SYSTEM,
+          user: `Repository overview:\n${digest}\n\n${context}\n\nFile: ${file.path}\n\`\`\`\n${numberLines(content)}\n\`\`\``,
+          schema: ModelFindings,
+          jsonSchema: MODEL_FINDINGS_JSON_SCHEMA,
+          schemaName: "findings",
+          maxOutputTokens: 3000,
+          signal: ctx.signal,
+        });
+        const kept = filterModelFindings(result.findings, 0.55, knownPaths);
+        for (const f of kept) {
+          if (!f.path) f.path = file.path;
+          const draft = toDraft("review", f, { confidence: "judgment" });
+          findings.push(draft);
+          await ctx.emit({ type: "finding", finding: { ...draft, id: draft.key } });
+        }
+      } catch (error) {
+        if (isBudget(error)) {
+          await ctx.note(`Stopped reading files early: the scan budget for this tier was reached after ${done} files.`);
+          break;
+        }
+        await ctx.note(`Could not review ${file.path}: ${errorMessage(error)}`);
+      }
+      done += 1;
+      await ctx.emit({ type: "step_progress", step: "review", done, total: files.length });
+    }
+    return findings;
+  },
+};
+
+/** Facts extracted deterministically so the model does not invent them. */
+function buildContextNotes(ctx: CheckContext): string {
+  const notes: string[] = [];
+  const middleware = ctx.inventory.files.filter((f) => /(^|\/)(middleware|proxy)\.[tj]s$/.test(f.path)).map((f) => f.path);
+  if (middleware.length > 0) notes.push(`Request middleware exists at: ${middleware.join(", ")}. Auth may be enforced there.`);
+  const envExample = ctx.inventory.files.find((f) => /(^|\/)\.env\.example$/.test(f.path));
+  if (envExample) notes.push(`Environment variables are documented in ${envExample.path}.`);
+  const proven = ctx.findingsSoFar.filter((f) => f.confidence === "proven").slice(0, 15);
+  if (proven.length > 0) {
+    notes.push(`Already established by deterministic checks (do not repeat these): ${proven.map((f) => `${f.title}${f.location ? ` (${f.location.path})` : ""}`).join("; ")}`);
+  }
+  return notes.length > 0 ? `Known facts:\n- ${notes.join("\n- ")}` : "";
+}
+
+export function isBudget(error: unknown): boolean {
+  return error instanceof Error && error.name === "BudgetExceededError";
+}
+
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+}

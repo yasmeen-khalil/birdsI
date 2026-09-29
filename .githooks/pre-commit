@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Blocks commits that contain secrets or files that must stay out of the repo.
+# Installed by scripts/install-hooks.mjs (git config core.hooksPath .githooks).
+#
+# Extra patterns can be kept in .githooks/local-patterns (git-ignored), one
+# extended regex per line. That file never ships with the repo.
+
+set -euo pipefail
+
+fail=0
+red=$'\033[31m'
+reset=$'\033[0m'
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+# 1. Paths that are never committed.
+blocked_paths='^(vibe/|internal/|\.env($|\.)|.*\.pem$|\.githooks/local-patterns$)'
+while IFS= read -r file; do
+  if [[ "$file" =~ $blocked_paths ]] && [[ "$file" != *".env.example" ]]; then
+    echo "${red}blocked${reset}: $file must not be committed"
+    fail=1
+  fi
+done <<< "$staged"
+
+# 2. Secret shapes in staged content. Each line is an extended regex.
+secret_patterns=(
+  '-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----'
+  'AKIA[0-9A-Z]{16}'
+  'ghp_[A-Za-z0-9]{36}'
+  'gho_[A-Za-z0-9]{36}'
+  'ghs_[A-Za-z0-9]{36}'
+  'github_pat_[A-Za-z0-9_]{22,}'
+  'sk_(live|test)_[A-Za-z0-9]{20,}'
+  'whsec_[A-Za-z0-9]{20,}'
+  'tvly-[A-Za-z0-9_-]{20,}'
+  'lsv2_(pt|sk)_[A-Za-z0-9_-]{20,}'
+  'sb_(secret|publishable)_[A-Za-z0-9_-]{20,}'
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_-]{40,}\.[A-Za-z0-9_-]{20,}'
+  'xox[baprs]-[A-Za-z0-9-]{10,}'
+  'AIza[0-9A-Za-z_-]{35}'
+  'postgres(ql)?://[^:]+:[^@]+@'
+)
+
+local_file="$(git rev-parse --show-toplevel)/.githooks/local-patterns"
+if [ -f "$local_file" ]; then
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    [[ "$line" == \#* ]] && continue
+    secret_patterns+=("$line")
+  done < "$local_file"
+fi
+
+while IFS= read -r file; do
+  # Skip the hook itself, the engine's own detection rules, and the demo
+  # sample, which deliberately contains placeholder secrets to find.
+  [[ "$file" == .githooks/pre-commit ]] && continue
+  [[ "$file" == packages/engine/src/checks/secrets.ts ]] && continue
+  [[ "$file" == packages/engine/src/checks/secrets.test.ts ]] && continue
+  [[ "$file" == samples/* ]] && continue
+  if git show ":$file" | LC_ALL=C grep -qP '[\x00]' 2>/dev/null; then
+    continue
+  fi
+  for pattern in "${secret_patterns[@]}"; do
+    if git show ":$file" | grep -nE "$pattern" >/dev/null 2>&1; then
+      echo "${red}blocked${reset}: $file matches a secret or private pattern"
+      git show ":$file" | grep -nE "$pattern" | cut -c1-120 | sed 's/^/    /'
+      fail=1
+      break
+    fi
+  done
+done <<< "$staged"
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  echo "Commit stopped. Remove the flagged content (move secrets to .env.local) and try again."
+  exit 1
+fi

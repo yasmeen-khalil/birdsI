@@ -1,0 +1,19 @@
+{
+  "name": "@birdsi/db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side data access for birdsI: Supabase queries, the job queue, the usage ledger.",
+  "license": "MPL-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@birdsi/shared": "*",
+    "@supabase/supabase-js": "^2",
+    "zod": "^4"
+  }
+}

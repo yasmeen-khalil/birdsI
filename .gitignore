@@ -1,0 +1,28 @@
+# Private, never published
+vibe/
+internal/
+/CLAUDE.md
+.githooks/local-patterns
+
+# Secrets
+.env
+.env.*
+!.env.example
+# The demo sample deliberately ships a flawed env file with placeholder values.
+!samples/**/.env.*
+
+# Dependencies and builds
+node_modules/
+dist/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local tooling
+.vercel
+.supabase/.temp
+.DS_Store
+*.pem
+npm-debug.log*

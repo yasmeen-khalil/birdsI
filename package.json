@@ -1,0 +1,31 @@
+{
+  "name": "birdsi-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "birdsI: a bird's-eye codebase auditor. Monorepo for the web app, worker, CLI and shared engine.",
+  "license": "MPL-2.0",
+  "author": "yasmeen-khalil",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/install-hooks.mjs",
+    "dev": "npm run dev --workspace=apps/web",
+    "worker": "npm run dev --workspace=apps/worker",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5",
+    "vitest": "^5"
+  }
+}
