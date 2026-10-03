@@ -125,7 +125,7 @@ export function FindingDetail({
             <section className="flex flex-col gap-3.5">
               <h2 className="t-h3">Evidence</h2>
               {finding.evidence.excerpt && (
-                <Frame arm={16} bend={8} bracket="var(--text-2)" style={{ padding: 10 }}>
+                <Frame arm={16} bend={12} bracket="var(--text-2)" style={{ padding: 10 }}>
                   <CodeExcerpt code={finding.evidence.excerpt} startLine={loc?.lineStart ?? 1} highlightFrom={loc?.lineStart} highlightTo={loc?.lineEnd ?? loc?.lineStart} path={loc?.path ?? null} note={finding.category === "security" && finding.confidence === "proven" ? "Secrets are hidden here." : loc?.lineStart ? `Line ${loc.lineStart}` : undefined} />
                 </Frame>
               )}

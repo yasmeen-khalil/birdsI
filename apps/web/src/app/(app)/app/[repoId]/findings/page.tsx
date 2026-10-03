@@ -233,7 +233,7 @@ export default async function FindingsPage({ params, searchParams }: { params: P
 
       {all.length === 0 ? (
         <section className="flex flex-col gap-3.5" style={{ padding: "40px 0" }}>
-          <Frame arm={14} bend={6} className="flex items-center justify-center" style={{ width: 44, height: 44 }}>
+          <Frame arm={14} bend={10} className="flex items-center justify-center" style={{ width: 44, height: 44 }}>
             <Check {...icon20} />
           </Frame>
           <h2 className="t-h2" style={{ fontSize: 23 }}>

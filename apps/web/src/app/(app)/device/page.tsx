@@ -39,7 +39,7 @@ export default async function DevicePage({ searchParams }: { searchParams: Promi
             <li>You can revoke it at any time in Settings.</li>
           </ul>
         </section>
-        <Frame arm={24} bend={12} className="flex flex-col px-[30px] py-7 min-[901px]:col-span-6 min-[901px]:col-start-7">
+        <Frame arm={24} bend={17} className="flex flex-col px-[30px] py-7 min-[901px]:col-span-6 min-[901px]:col-start-7">
           <DeviceApproval initialCode={initialCode} initialState={initialState} />
         </Frame>
       </main>

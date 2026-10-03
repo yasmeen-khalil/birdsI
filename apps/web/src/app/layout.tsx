@@ -1,27 +1,25 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Atkinson_Hyperlegible_Mono, Atkinson_Hyperlegible_Next, Newsreader } from "next/font/google";
+import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 
 const serif = Newsreader({
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
+  axes: ["opsz"],
   style: ["normal", "italic"],
   variable: "--font-serif",
   display: "swap",
 });
 
-const sans = Atkinson_Hyperlegible_Next({
+const sans = Geist({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   variable: "--font-sans",
   display: "swap",
 });
 
-const mono = Atkinson_Hyperlegible_Mono({
+const mono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
   variable: "--font-mono",
   display: "swap",
 });
@@ -33,7 +31,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0b10",
+  themeColor: "#f1f2f4",
   width: "device-width",
   initialScale: 1,
 };

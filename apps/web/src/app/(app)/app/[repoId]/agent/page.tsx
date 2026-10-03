@@ -149,7 +149,7 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
           <SectionHead id="policy-title" title="What agents may do" intro="Agents can always read what birdsI knows about this app. These settings decide what they can ask you for." />
           <PolicyControls repoId={repo.id} policy={policy} />
         </div>
-        <Frame arm={26} bend={12} className="flex flex-col gap-3.5 self-start px-[30px] py-7 min-[901px]:col-span-4 min-[901px]:col-start-9 max-[900px]:px-[22px] max-[900px]:py-6">
+        <Frame arm={26} bend={19} className="flex flex-col gap-3.5 self-start px-[30px] py-7 min-[901px]:col-span-4 min-[901px]:col-start-9 max-[900px]:px-[22px] max-[900px]:py-6">
           <h2 className="t-h3">Connect your coding agent</h2>
           <p className="t-small c2">In Claude Code, run this once in your project folder:</p>
           <div className="code flex items-center justify-between gap-2" style={{ padding: "6px 6px 6px 14px" }}>

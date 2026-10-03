@@ -1,7 +1,8 @@
 import type { CSSProperties, ElementType, ReactNode } from "react";
 
 /**
- * Rounded corner brackets, the visual motif. Bend is half the arm unless given.
+ * Rounded corner brackets, the visual motif: a reticle whose arms are mostly
+ * curve. Bend is about three quarters of the arm unless given.
  * accent is reserved for what birdsI is reading right now.
  */
 export function Frame({
@@ -29,7 +30,7 @@ export function Frame({
 }) {
   const vars = {
     "--arm": `${arm}px`,
-    "--bend": `${bend ?? Math.round(arm / 2)}px`,
+    "--bend": `${bend ?? Math.round(arm * 0.72)}px`,
     ...(bracket ? { "--bracket": bracket } : {}),
     ...style,
   } as CSSProperties;

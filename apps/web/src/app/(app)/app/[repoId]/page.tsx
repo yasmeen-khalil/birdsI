@@ -284,7 +284,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
             })
           )}
         </div>
-        <Frame arm={26} bend={12} className="flex flex-col gap-3.5 px-[30px] py-7 min-[901px]:col-span-4 min-[901px]:col-start-9 max-[900px]:px-[22px] max-[900px]:py-6">
+        <Frame arm={32} bend={23} className="flex flex-col gap-3.5 px-[30px] py-7 min-[901px]:col-span-4 min-[901px]:col-start-9 max-[900px]:px-[22px] max-[900px]:py-6">
           <PlaneTakeoff {...icon20} className="i i20 c2" />
           <h2 className="t-h2 max-[900px]:text-[24px]!">Before you launch</h2>
           <p className="t-body c2">The pre-launch audit is the deepest check birdsI runs. It goes area by area, from sign-in to services and limits, and says plainly if you are ready. About 25 minutes.</p>

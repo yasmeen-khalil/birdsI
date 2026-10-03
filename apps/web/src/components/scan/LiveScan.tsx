@@ -257,7 +257,7 @@ export function LiveScan(props: LiveScanProps) {
         )}
 
         {view.reading && running && (
-          <Frame arm={18} bend={8} accent className="flex flex-col gap-3" style={{ padding: "20px 22px" }} aria-label="Reading now">
+          <Frame arm={18} bend={13} accent className="flex flex-col gap-3" style={{ padding: "20px 22px" }} aria-label="Reading now">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
               <span className="t-mono min-w-0 break-all" style={{ color: "var(--text)" }}>
                 {view.reading.path}

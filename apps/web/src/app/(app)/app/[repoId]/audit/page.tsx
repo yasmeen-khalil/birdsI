@@ -110,7 +110,7 @@ function Report({ scan, report, findings, base, name }: { scan: Scan; report: Au
         . Finished <LocalTime iso={scan.finishedAt} />
         {scan.stats ? `, took ${shortDuration(scan.stats.durationMs)}` : ""}.
       </p>
-      <Frame as="section" arm={40} bend={20} bracket="var(--text-2)" className="grid grid-cols-1 gap-y-8 px-16 py-14 max-[900px]:px-6 max-[900px]:py-8 max-[900px]:[--arm:24px]! max-[900px]:[--bend:12px]! min-[901px]:grid-cols-12 min-[901px]:items-end min-[901px]:gap-x-6" aria-labelledby="verdict">
+      <Frame as="section" arm={40} bend={29} bracket="var(--text-2)" className="grid grid-cols-1 gap-y-8 px-16 py-14 max-[900px]:px-6 max-[900px]:py-8 max-[900px]:[--arm:24px]! max-[900px]:[--bend:17px]! min-[901px]:grid-cols-12 min-[901px]:items-end min-[901px]:gap-x-6" aria-labelledby="verdict">
         <div className="flex flex-col gap-5 min-[901px]:col-span-7">
           <h1 id="verdict" className="t-hero max-[900px]:text-[38px]!" style={{ fontSize: 64 }}>
             {verdictText}
@@ -300,7 +300,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
           </>
         }
         checklist={
-          <Frame arm={24} bend={12} className="flex flex-col" style={{ padding: "28px 30px 30px" }}>
+          <Frame arm={24} bend={17} className="flex flex-col" style={{ padding: "28px 30px 30px" }}>
             <h2 className="t-h3" style={{ paddingBottom: 14 }}>
               What it checks
             </h2>

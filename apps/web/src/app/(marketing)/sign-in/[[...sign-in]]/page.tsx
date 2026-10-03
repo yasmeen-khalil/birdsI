@@ -10,14 +10,14 @@ export const metadata: Metadata = { title: "Sign in" };
 
 const appearance = {
   variables: {
-    colorPrimary: "#5A3FE0",
-    borderRadius: "8px",
+    colorPrimary: "#4E33E6",
+    borderRadius: "6px",
     fontFamily: "var(--sans)",
-    colorText: "#141418",
-    colorBackground: "#FAFAF8",
+    colorText: "#0C0D11",
+    colorBackground: "#FFFFFF",
   },
   elements: {
-    card: { boxShadow: "none", border: "1px solid #DDDDD7" },
+    card: { boxShadow: "none", border: "1px solid #DDE0E5" },
   },
 };
 
@@ -27,7 +27,7 @@ export default function SignInPage() {
       <div className="min-[901px]:py-5">
         <SiteHeader signedIn={false} back />
       </div>
-      <Frame as="section" arm={48} bend={24} className="mt-3 mb-12 grid grid-cols-1 gap-y-10 px-[22px] py-8 max-[900px]:[--arm:30px]! max-[900px]:[--bend:16px]! min-[901px]:mt-10 min-[901px]:grid-cols-12 min-[901px]:gap-x-6 min-[901px]:px-24 min-[901px]:py-[72px]" aria-labelledby="signin-title">
+      <Frame as="section" arm={72} bend={52} className="mt-3 mb-12 grid grid-cols-1 gap-y-10 px-[22px] py-8 max-[900px]:[--arm:40px]! max-[900px]:[--bend:30px]! min-[901px]:mt-10 min-[901px]:grid-cols-12 min-[901px]:gap-x-6 min-[901px]:px-24 min-[901px]:py-[72px]" aria-labelledby="signin-title">
         <div className="flex flex-col gap-6 min-[901px]:col-span-5">
           <h1 id="signin-title" className="t-display">
             Sign in to birdsI
