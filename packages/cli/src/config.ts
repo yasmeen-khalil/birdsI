@@ -12,6 +12,8 @@ const StoredConfig = z.object({
   login: z.string().optional(),
   /** The newest scan started from this computer, so "birdsi explain 3" can refer to its numbered findings. */
   lastScanId: z.string().optional(),
+  /** The repository that scan belonged to, so vendors, questions and approvals need no id. */
+  lastRepoId: z.string().optional(),
 });
 export type StoredConfig = z.infer<typeof StoredConfig>;
 

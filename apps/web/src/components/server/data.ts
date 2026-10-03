@@ -17,7 +17,7 @@ export const appUser = cache(async (): Promise<UserRow> => {
 export const userRepos = cache(async (userId: string): Promise<RepoRow[]> => reposForUser(userId));
 
 export function toOption(r: RepoRow): RepoOption {
-  return { id: r.id, fullName: r.full_name, defaultBranch: r.default_branch };
+  return { id: r.id, fullName: r.full_name, defaultBranch: r.default_branch, source: r.source ?? "github" };
 }
 
 export const repoContext = cache(async (rawRepoId: string): Promise<{ user: UserRow; repo: RepoRow }> => {

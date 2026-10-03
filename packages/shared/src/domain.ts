@@ -244,12 +244,17 @@ export const Scan = z.object({
 });
 export type Scan = z.infer<typeof Scan>;
 
+export const RepoSource = z.enum(["github", "local"]);
+export type RepoSource = z.infer<typeof RepoSource>;
+
 export const Repo = z.object({
   id: z.string(),
   fullName: z.string(),
   defaultBranch: z.string(),
   private: z.boolean(),
   installationId: z.string().nullable(),
+  /** github: read through the GitHub App; local: uploaded by the terminal tool. */
+  source: RepoSource,
   createdAt: z.string(),
 });
 export type Repo = z.infer<typeof Repo>;

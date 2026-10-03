@@ -107,3 +107,58 @@ export function PageSkeleton({ label }: { label: string }) {
     </LoadingRegion>
   );
 }
+
+export function VendorsSkeleton() {
+  return (
+    <LoadingRegion label="Loading vendors" className="flex flex-col gap-10 px-16 pt-12 pb-16 max-[900px]:px-5 max-[900px]:pt-7">
+      <div className="flex flex-col gap-3">
+        <Skeleton height={34} width={200} />
+        <Skeleton width="45%" />
+      </div>
+      <div className="flex flex-wrap items-end gap-8">
+        <Skeleton height={44} width={180} />
+        <div className="flex gap-2">
+          {[70, 60, 80, 50].map((w, i) => (
+            <Skeleton key={i} width={w} height={28} />
+          ))}
+        </div>
+      </div>
+      <p className="t-small c2">Loading vendors</p>
+      <div className="flex flex-col gap-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="panel grid grid-cols-1 gap-6 min-[901px]:grid-cols-12" style={{ padding: "24px 26px" }}>
+            <div className="flex flex-col gap-3 min-[901px]:col-span-5">
+              <Skeleton height={24} width="50%" />
+              <Skeleton width="90%" />
+              <Skeleton width="70%" />
+            </div>
+            <div className="flex flex-col gap-3 min-[901px]:col-span-7">
+              <Skeleton height={18} />
+              <Skeleton height={18} width="80%" />
+              <Skeleton height={18} width="60%" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </LoadingRegion>
+  );
+}
+
+export function AgentSkeleton() {
+  return (
+    <LoadingRegion label="Loading the agent page" className="flex flex-col gap-12 px-16 pt-12 pb-16 max-[900px]:px-5 max-[900px]:pt-7">
+      <div className="flex flex-col gap-3">
+        <Skeleton height={34} width={160} />
+        <Skeleton width="50%" />
+      </div>
+      {[2, 2, 3].map((rows, s) => (
+        <div key={s} className="flex flex-col gap-4">
+          <Skeleton height={24} width={220} />
+          {Array.from({ length: rows }).map((_, i) => (
+            <Skeleton key={i} height={88} />
+          ))}
+        </div>
+      ))}
+    </LoadingRegion>
+  );
+}

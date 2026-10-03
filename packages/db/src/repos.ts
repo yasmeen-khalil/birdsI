@@ -9,6 +9,10 @@ export interface RepoRow {
   default_branch: string;
   private: boolean;
   owner_user_id: string;
+  source: "github" | "local";
+  vision: string | null;
+  vision_updated_at: string | null;
+  vendors_synced_at: string | null;
   archived_at: string | null;
   created_at: string;
 }
@@ -25,7 +29,26 @@ export interface InstallationRow {
 }
 
 export function toRepo(row: RepoRow): Repo {
-  return { id: row.id, fullName: row.full_name, defaultBranch: row.default_branch, private: row.private, installationId: row.installation_id, createdAt: row.created_at };
+  return { id: row.id, fullName: row.full_name, defaultBranch: row.default_branch, private: row.private, installationId: row.installation_id, source: row.source ?? "github", createdAt: row.created_at };
+}
+
+/**
+ * A repository uploaded by the terminal tool. One per owner and name; the
+ * name is the GitHub remote when there is one, otherwise the folder name.
+ * Everything a GitHub-connected repository has (findings, chat, vendors,
+ * questions) hangs off it the same way.
+ */
+export async function localRepoFor(ownerUserId: string, fullName: string, branch: string | null): Promise<RepoRow> {
+  const db = getDb();
+  const { data, error } = await db.from("repos").select().eq("owner_user_id", ownerUserId).eq("full_name", fullName).is("github_repo_id", null).is("archived_at", null).maybeSingle();
+  if (error) throw new Error(`localRepoFor: ${error.message}`);
+  if (data) return data as RepoRow;
+  const result = await db
+    .from("repos")
+    .insert({ owner_user_id: ownerUserId, installation_id: null, github_repo_id: null, full_name: fullName, default_branch: branch ?? "main", private: true, source: "local" })
+    .select()
+    .single();
+  return unwrap(result, "localRepoFor") as RepoRow;
 }
 
 export async function upsertInstallation(input: { githubInstallationId: number; accountLogin: string; accountType: string; connectedBy: string | null }): Promise<InstallationRow> {

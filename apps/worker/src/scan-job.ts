@@ -9,6 +9,7 @@ import {
   insertDependencies,
   insertFindings,
   recordUsage,
+  replaceVendors,
   repoWithInstallation,
   scanById,
   snapshotById,
@@ -17,7 +18,7 @@ import {
   type JobRow,
 } from "@birdsi/db";
 import { GitHubSource, runScan, snapshotFromDirectory, snapshotFromTarball, type EngineConfig, type Snapshot } from "@birdsi/engine";
-import type { ScanEvent } from "@birdsi/shared";
+import type { ProjectHints, ScanEvent } from "@birdsi/shared";
 
 /**
  * Runs one scan job end to end: resolves the code, runs the engine, stores
@@ -50,6 +51,7 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
   }, 15_000);
 
   let snapshot: Snapshot | null = null;
+  const hints: ProjectHints | null = scan.snapshot_id ? (((await snapshotById(scan.snapshot_id))?.project_hints as ProjectHints | null) ?? null) : null;
   try {
     const result = await runScan(config, {
       kind: scan.kind,
@@ -59,6 +61,7 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
         return snapshot;
       },
       appDescription: scan.app_description,
+      projectHints: hints,
       signal: controller.signal,
       onEvent: emit,
       traceMetadata: { scanId, kind: scan.kind, source: scan.source },
@@ -79,7 +82,10 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
     await updateScan(scanId, { status: "done", finished_at: new Date().toISOString(), summary, audit, stats: result.stats });
 
     if (scan.repo_id) {
+      await replaceVendors(scan.repo_id, scanId, result.vendors);
+      // Static facts: where each vendor is used, so the ops stage and the dashboard can show it.
       await enqueueJob("embed", { scanId, repoId: scan.repo_id }, { maxAttempts: 1 });
+      if (scan.owner_user_id) await enqueueJob("vendor_sync", { repoId: scan.repo_id, ownerUserId: scan.owner_user_id, hints }, { maxAttempts: 1 });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

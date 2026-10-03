@@ -1,5 +1,5 @@
-export { loadEngineConfig, DEFAULT_MODELS, DEFAULT_BUDGETS, type EngineConfig, type ScanBudget, type ModelIds } from "./config";
-export { ModelClient, BudgetExceededError, extractJson, type Usage, type UsageSink, type ModelTier } from "./models/client";
+export { loadEngineConfig, detectProvider, DEFAULT_MODELS, ANTHROPIC_MODELS, NEBIUS_MODELS, DEFAULT_BUDGETS, type EngineConfig, type ScanBudget, type ModelIds, type Provider } from "./config";
+export { ModelClient, BudgetExceededError, EmbeddingsUnavailableError, extractJson, type Usage, type UsageSink, type ModelTier } from "./models/client";
 export { toJsonSchema } from "./models/schema";
 export type { Snapshot } from "./source/types";
 export { snapshotFromTarball, snapshotFromDirectory, MAX_SNAPSHOT_BYTES, MAX_SNAPSHOT_FILES } from "./source/tarball";
@@ -19,3 +19,4 @@ export { applyEdits, toUnifiedDiff, FileEdit, EditError, type AppliedFile } from
 export { generateFix, type GeneratedFix } from "./fix/generate";
 export { SandboxRunner, ecosystemHintFor, type SandboxRun } from "./fix/sandbox";
 export { answerQuestion, chunkFile, embedChunks, cosine, keywordScore, type Chunk } from "./chat/index";
+export * from "./vendors/index";

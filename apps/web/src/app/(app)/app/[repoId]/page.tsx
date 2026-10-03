@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Check, PlaneTakeoff } from "lucide-react";
+import { ArrowRight, Check, PlaneTakeoff } from "lucide-react";
 import { eventsAfter, latestDoneScan, toScan } from "@birdsi/db";
 import { STEP_LABELS } from "@birdsi/engine";
 import { CONFIDENCE_ORDER, SEVERITY_ORDER, type Confidence, type Finding, type Scan, type Severity } from "@birdsi/shared";
@@ -10,12 +10,15 @@ import { DependencyTable } from "@/components/DependencyTable";
 import { FindingRow } from "@/components/FindingRow";
 import { Frame } from "@/components/Frame";
 import { LocalTime } from "@/components/LocalTime";
-import { ScanAgainButton, ScanButtons } from "@/components/ScanActions";
+import { ScanAgainButton, ScanButtons, ScanControls } from "@/components/ScanActions";
 import { SeverityMeter } from "@/components/Severity";
 import { compareFindings, findingsHeadline, KIND_LABEL, KIND_LOWER, plural, repoName, shortDuration, shortSha } from "@/components/format";
-import { icon20 } from "@/components/icon";
+import { icon14, icon20 } from "@/components/icon";
+import { AlertList, PipelineStrip } from "@/components/ops/OpsParts";
+import { VisionEditor } from "@/components/ops/VisionEditor";
 import { ScanProgressCard } from "@/components/scan/ScanProgressCard";
 import { inventoryOf, latestDone, recentScans, repoContext, runningOf } from "@/components/server/data";
+import { loadInventory } from "@/lib/ops";
 import { loadScan } from "@/lib/scans";
 
 export const metadata: Metadata = { title: "Overview" };
@@ -45,7 +48,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
   const running = runningOf(scans);
   const lastAudit = lastAuditRow ? toScan(lastAuditRow) : null;
   const name = repoName(repo.full_name);
-  const [result, inventory, runningEvents] = await Promise.all([latest ? loadScan(latest.id, user) : null, latest ? inventoryOf(latest.id) : null, running ? eventsAfter(running.id, 0) : null]);
+  const [result, inventory, runningEvents, ops] = await Promise.all([latest ? loadScan(latest.id, user) : null, latest ? inventoryOf(latest.id) : null, running ? eventsAfter(running.id, 0) : null, loadInventory(repo.id, user)]);
   const newest = scans[0] ?? null;
   const lastProblem = newest && (newest.status === "failed" || newest.status === "stopped") && (!latest || new Date(newest.createdAt) > new Date(latest.createdAt)) ? newest : null;
 
@@ -61,7 +64,14 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
   const deps = result?.dependencies ?? [];
   const base = `/app/${repo.id}`;
 
-  const description = inventory ? `${languagesLine(inventory.languages)} ${plural(inventory.filesSeen, "file")} and ${plural(deps.length, "dependency", "dependencies")} on the ${latest?.branch ?? repo.default_branch} branch.` : `${repo.private ? "Private" : "Public"} repository on GitHub, ${repo.default_branch} branch.`;
+  const local = repo.source === "local";
+  const description = inventory
+    ? `${languagesLine(inventory.languages)} ${plural(inventory.filesSeen, "file")} and ${plural(deps.length, "dependency", "dependencies")} on the ${latest?.branch ?? repo.default_branch} branch.${local ? " Uploaded from your terminal." : ""}`
+    : local
+      ? `Uploaded from your terminal, ${repo.default_branch} branch.`
+      : `${repo.private ? "Private" : "Public"} repository on GitHub, ${repo.default_branch} branch.`;
+  const syncRunning = ops.stages.some((s) => s.id === "ops" && s.freshness === "running");
+  const needs = [ops.openQuestions > 0 ? plural(ops.openQuestions, "question") : null, ops.pendingActions > 0 ? plural(ops.pendingActions, "approval") : null].filter(Boolean).join(" and ");
 
   return (
     <main className="flex flex-col gap-[72px] px-16 pt-12 pb-16 max-[900px]:gap-12 max-[900px]:px-5 max-[900px]:pt-7 max-[900px]:pb-10">
@@ -70,8 +80,22 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
           <h1 className="t-h1 break-words">{name}</h1>
           <p className="t-body c2">{description}</p>
         </div>
-        <ScanButtons repoId={repo.id} runningKind={running?.kind ?? null} />
+        <ScanControls repoId={repo.id} runningKind={running?.kind ?? null} syncRunning={syncRunning} />
       </section>
+
+      {needs && (
+        <Link href={`${base}/agent`} className="panel flex items-center justify-between gap-4 max-[900px]:-mt-6 min-[901px]:-mt-10" style={{ padding: "14px 18px", textDecoration: "none", borderColor: "var(--line-strong)" }}>
+          <span className="t-body">
+            <span style={{ fontWeight: 600 }}>Needs you:</span> <span className="c2">{needs} waiting for your answer.</span>
+          </span>
+          <span className="t-small c2 inline-flex items-center gap-1.5">
+            Open
+            <ArrowRight {...icon14} />
+          </span>
+        </Link>
+      )}
+
+      <PipelineStrip stages={ops.stages} />
 
       {running && runningEvents && (
         <ScanProgressCard
@@ -110,8 +134,20 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
           <h2 id="no-scans" className="t-h2" style={{ fontSize: 23 }}>
             No scans of {name} yet
           </h2>
-          <p className="t-small c2">Start with a light scan. It takes about a minute and covers dependencies, secrets and known problems.</p>
+          <p className="t-small c2">Start with a full scan. It maps the code, checks current docs, audits the code and syncs the vendors it runs on, in that order. About 6 minutes. A quick check takes about a minute.</p>
           <ScanButtons repoId={repo.id} runningKind={null} layout="compact" />
+        </section>
+      )}
+
+      {ops.alerts.length > 0 && (
+        <section className="flex flex-col gap-4" aria-labelledby="alerts-title">
+          <div className="flex flex-col gap-1.5">
+            <h2 id="alerts-title" className="t-h2 max-[900px]:text-[24px]!">
+              Alerts
+            </h2>
+            <p className="t-body c2">What birdsI noticed about the services this app runs on.</p>
+          </div>
+          <AlertList alerts={ops.alerts} limit={4} vendorsHref={`${base}/vendors`} />
         </section>
       )}
 
@@ -193,6 +229,8 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
           ))}
         </section>
       )}
+
+      <VisionEditor repoId={repo.id} initial={ops.vision.text} updatedAt={ops.vision.updatedAt} />
 
       {latest && (
         <section id="deps" className="flex flex-col gap-5" aria-labelledby="deps-title">

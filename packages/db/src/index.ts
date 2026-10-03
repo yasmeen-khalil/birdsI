@@ -9,3 +9,6 @@ export * from "./fixes";
 export * from "./chat";
 export * from "./demo";
 export * from "./snapshots";
+export * from "./vendors";
+export * from "./connections";
+export * from "./agent";

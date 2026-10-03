@@ -44,7 +44,7 @@ export class SandboxRunner {
   constructor(private readonly config: EngineConfig) {}
 
   static isConfigured(config: EngineConfig): boolean {
-    return config.tokenFactory.projectId !== null;
+    return config.tokenFactory.projectId !== null && config.tokenFactory.apiKey !== null;
   }
 
   private headers(extra: Record<string, string> = {}): Record<string, string> {

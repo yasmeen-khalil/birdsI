@@ -1,14 +1,16 @@
 # birdsi
 
-birdsI is a bird's-eye codebase auditor. It reads a whole codebase and all of its dependencies, finds security holes, vulnerable packages, contradictions, inconsistencies and gaps, and checks them against current documentation. Every finding is written in plain words and carries a confidence class: Proven (a tool or rule established it), Doc-verified (checked against a cited, current official document) or Judgment (the model's reading of the code, worth checking). Each finding is either something birdsI can fix itself, tested in a sandbox first, or something you need to do, explained as steps. This package is the `birdsi` command-line tool and the birdsI MCP server for coding assistants.
+birdsI is the operations layer for coding agents: it maps a codebase, finds every outside service it runs on with plans, limits, usage and spend, audits the code against current docs, asks you what only you can answer, and lets your coding agent propose actions you approve. It reads a whole codebase and all of its dependencies, finds security holes, vulnerable packages, contradictions, inconsistencies and gaps, and checks them against current documentation. Every finding is written in plain words and carries a confidence class: Proven (a tool or rule established it), Doc-verified (checked against a cited, current official document) or Judgment (the model's reading of the code, worth checking). Each finding is either something birdsI can fix itself, tested in a sandbox first, or something you need to do, explained as steps. This package is the `birdsi` command-line tool and the birdsI MCP server for coding assistants.
 
 ## Install
 
-Run it without installing:
+Run it without installing, in your project folder:
 
 ```sh
-npx birdsi scan
+npx birdsi
 ```
+
+That runs the full pipeline (map the code, check current docs, audit, sync vendors and limits), opens the dashboard in your browser, streams progress, and ends with what needs you: limit alerts, questions, approvals. `npx birdsi --quick` does a quick check instead.
 
 Or install it globally:
 
@@ -33,6 +35,26 @@ birdsi logout            # remove the saved token from this computer
 
 ## Commands
 
+### `birdsi vendors`
+
+The services the app runs on: what each is, what the app uses it for, the plan, usage against limits, spend, and alerts. `--sync` refreshes from connected accounts and current pricing pages first. `--repo owner/name` picks a repository other than the one you scanned last.
+
+### `birdsi questions`
+
+What birdsI or your agent needs you to answer. On a terminal it asks them one by one (type a number to pick an option, or an answer, or Enter to skip). `--no-answer` only lists them.
+
+### `birdsi approvals [approve|deny|run] [id]`
+
+Actions your agent proposed, with the command, the reason and the cost. `approve <id>` and `deny <id>` decide. `run` runs every approved command on this computer, one at a time, each after a yes (`--yes` skips the question), and reports the output back so the agent can read it. Nothing ever runs on birdsI's servers.
+
+### `birdsi vision [text...]`
+
+Shows, or sets, what the app is for and where it is going. `--file VISION.md` reads it from a file. Agents and every audit read it.
+
+### `birdsi export`
+
+Writes the knowledge base as Markdown under `.birdsi/` (vision, vendors, alerts, questions) so agents that read files instead of MCP get the same picture.
+
 ### `birdsi scan [path]`
 
 Scans a folder (default: the current one). birdsI packs the folder, leaving out everything your `.gitignore` files exclude (at every level) plus build output, dependencies and binary files, uploads it, and streams progress as the scan runs.
@@ -46,6 +68,8 @@ birdsi scan --json > result.json             # the final result as JSON, nothing
 
 | Option | What it does |
 | --- | --- |
+| `--full` | The whole pipeline in order, then the vendor sync (what `birdsi` with no command runs). |
+| `--open` | Open the dashboard in the browser once the scan starts. |
 | `--deep` | Deep scan: reads all the code. |
 | `--audit` | Pre-launch audit: the deepest scan, with a ready or not-ready verdict per area. |
 | `--describe <text>` | What the app does, in a sentence or two. Sharpens the scan. |
@@ -110,7 +134,7 @@ Every command that prints data accepts `--json`, which prints the API response e
 
 `birdsi mcp` runs the birdsI MCP server over stdio, so coding assistants can scan, read findings and apply fixes mid-session. It uses the token from `birdsi login`, or `BIRDSI_TOKEN`.
 
-Tools: `birdsi_scan`, `birdsi_scan_status`, `birdsi_findings`, `birdsi_finding`, `birdsi_fix`, `birdsi_repos`, `birdsi_ask`.
+Tools: `birdsi_inventory` (call this first: vision, vendors, alerts, stages, what needs the owner), `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, `birdsi_sync_vendors`, `birdsi_scan` (with `full`), `birdsi_scan_status`, `birdsi_findings`, `birdsi_finding`, `birdsi_fix`, `birdsi_repos`, `birdsi_ask`.
 
 `birdsi mcp --install-hint` prints these snippets. Keep tokens out of files you commit: if you ran `birdsi login`, leave the `env` block out.
 

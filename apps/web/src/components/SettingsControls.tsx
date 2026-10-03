@@ -2,9 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { deleteAccountAction, disconnectRepoAction, revokeTokenAction, setEmailUpdatesAction } from "@/lib/actions";
+import { ChevronDown, ExternalLink, Plus } from "lucide-react";
+import { connectVendorAction, deleteAccountAction, disconnectRepoAction, disconnectVendorAction, revokeTokenAction, setEmailUpdatesAction } from "@/lib/actions";
 import { ButtonArc } from "./Arc";
+import { Dropdown } from "./Dropdown";
+import { Toast } from "./Toast";
 import { TwoStepButton } from "./TwoStep";
+import { safeUrl } from "./format";
+import { icon, icon14 } from "./icon";
 
 /** The email switch. Optimistic; on failure it flips back and says so. */
 export function EmailToggle({ initial }: { initial: boolean }) {
@@ -176,6 +181,157 @@ export function DeleteAccount({ expected, repoCount }: { expected: string; repoC
         </button>
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => setStep(0)} disabled={pending}>
           Keep my account
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export interface ConnectorOption {
+  slug: string;
+  name: string;
+  tokenHint: string;
+  tokenUrl: string;
+  fields: Array<{ key: string; label: string; hint: string; required: boolean }>;
+}
+
+export function DisconnectAccount({ connectionId, name }: { connectionId: string; name: string }) {
+  const router = useRouter();
+  return (
+    <TwoStepButton
+      label="Disconnect"
+      prompt={`Disconnect ${name}?`}
+      detail="birdsI deletes the token and stops reading the account. Facts it already read stay until the next vendor refresh."
+      confirmLabel="Disconnect"
+      cancelLabel="Keep it"
+      style={{ alignSelf: "flex-start", marginTop: 6, fontSize: 13, minHeight: 32 }}
+      onConfirm={async () => {
+        const r = await disconnectVendorAction(connectionId);
+        return r.ok ? { ok: true } : { ok: false, message: r.message };
+      }}
+      onDone={() => router.refresh()}
+    />
+  );
+}
+
+/** Pick a service, paste a read-only token, connect. The token is checked before it is stored. */
+export function ConnectAccount({ catalog, connected }: { catalog: ConnectorOption[]; connected: string[] }) {
+  const router = useRouter();
+  const [picked, setPicked] = useState<ConnectorOption | null>(null);
+  const [token, setToken] = useState("");
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [pending, start] = useTransition();
+  const available = catalog.filter((c) => !connected.includes(c.slug));
+
+  const reset = () => {
+    setPicked(null);
+    setToken("");
+    setSettings({});
+    setError(null);
+  };
+
+  if (available.length === 0 && !picked) {
+    return (
+      <>
+        <p className="t-small c3">Every service birdsI can read is connected.</p>
+        {done && <Toast onClose={() => setDone(false)}>Connected. birdsI is reading the account now.</Toast>}
+      </>
+    );
+  }
+
+  if (!picked) {
+    return (
+      <>
+        <Dropdown
+          buttonClassName="btn btn-secondary btn-sm"
+          menuLabel="Services birdsI can read"
+          button={
+            <>
+              <Plus {...icon} />
+              Connect an account
+              <ChevronDown {...icon14} />
+            </>
+          }
+        >
+          {available.map((c) => (
+            <button key={c.slug} type="button" className="mi" onClick={() => setPicked(c)}>
+              {c.name}
+            </button>
+          ))}
+        </Dropdown>
+        {done && <Toast onClose={() => setDone(false)}>Connected. birdsI is reading the account now.</Toast>}
+      </>
+    );
+  }
+
+  const url = safeUrl(picked.tokenUrl);
+  const missing = token.trim().length === 0 || picked.fields.some((f) => f.required && !(settings[f.key] ?? "").trim());
+  return (
+    <form
+      className="panel slide-in-down flex flex-col gap-4"
+      style={{ padding: "22px 24px", maxWidth: 560 }}
+      aria-labelledby="connect-title"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (missing) return;
+        start(async () => {
+          setError(null);
+          const r = await connectVendorAction({ vendorSlug: picked.slug, token, settings });
+          if (!r.ok) {
+            setError(r.message);
+            return;
+          }
+          reset();
+          setDone(true);
+          router.refresh();
+        });
+      }}
+    >
+      <h3 id="connect-title" className="t-h3">
+        Connect {picked.name}
+      </h3>
+      <p className="t-small c2">
+        {picked.tokenHint}
+        {url && (
+          <>
+            {" "}
+            <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1" style={{ color: "var(--text)" }}>
+              Create a token
+              <ExternalLink {...icon14} />
+            </a>
+          </>
+        )}
+      </p>
+      <div className="field">
+        <label htmlFor="connect-token">Token</label>
+        <input id="connect-token" type="password" className="input mono" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false} autoFocus disabled={pending} />
+      </div>
+      {picked.fields.map((f) => (
+        <div key={f.key} className="field">
+          <label htmlFor={`connect-${f.key}`}>
+            {f.label}
+            {!f.required && <span className="c3" style={{ fontWeight: 400 }}> (optional)</span>}
+          </label>
+          <input id={`connect-${f.key}`} className="input mono" value={settings[f.key] ?? ""} onChange={(e) => setSettings((s) => ({ ...s, [f.key]: e.target.value }))} autoComplete="off" spellCheck={false} disabled={pending} aria-describedby={`connect-${f.key}-hint`} />
+          <span id={`connect-${f.key}-hint`} className="t-small c3">
+            {f.hint}
+          </span>
+        </div>
+      ))}
+      {error && (
+        <p className="t-small" role="alert" style={{ color: "var(--critical)" }}>
+          {error}
+        </p>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" className="btn btn-secondary btn-sm" disabled={pending} onClick={reset}>
+          Cancel
+        </button>
+        <button type="submit" className="btn btn-primary btn-sm" disabled={pending || missing}>
+          {pending && <ButtonArc />}
+          {pending ? "Checking the token" : "Connect"}
         </button>
       </div>
     </form>

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AuditReport, Dependency, FindingDraft, ScanEvent, ScanKind, ScanStats, ScanStep, ScanSummary } from "@birdsi/shared";
+import type { AuditReport, Dependency, FindingDraft, ProjectHints, ScanEvent, ScanKind, ScanStats, ScanStep, ScanSummary, VendorDraft } from "@birdsi/shared";
 import { runAudit } from "../checks/audit";
 import { checksFor } from "../checks/registry";
 import type { Check, CheckContext } from "../checks/types";
@@ -12,6 +12,8 @@ import { walkInventory, type Inventory } from "../inventory/walk";
 import { ModelClient, type Usage } from "../models/client";
 import type { Snapshot } from "../source/types";
 import { buildDigest } from "./digest";
+import { discoverVendors } from "../vendors/discover";
+import { labelPurposes } from "../vendors/knowledge";
 import { rankFindings, summarise } from "./rank";
 
 export interface ScanInput {
@@ -19,6 +21,8 @@ export interface ScanInput {
   /** The code, or a function that fetches it; the fetch is then a visible step. */
   snapshot: Snapshot | (() => Promise<Snapshot>);
   appDescription?: string | null;
+  /** Hints the CLI collected on the owner's machine (Stripe Projects state and spend). */
+  projectHints?: ProjectHints | null;
   signal?: AbortSignal;
   onEvent: (event: ScanEvent) => Promise<void>;
   onUsage?: (usage: Usage) => Promise<void> | void;
@@ -32,6 +36,8 @@ export interface ScanResult {
   audit: AuditReport | null;
   stats: ScanStats;
   inventory: Inventory;
+  /** Outside services the code depends on, found deterministically. */
+  vendors: VendorDraft[];
   /** The resolved code, so the caller can clean it up. */
   snapshot: Snapshot;
 }
@@ -40,6 +46,7 @@ const STEP_LABELS: Record<ScanStep, string> = {
   fetch: "Fetching the code",
   inventory: "Mapping every file",
   dependencies: "Listing packages and their latest versions",
+  vendors: "Finding the services the app runs on",
   secrets: "Looking for committed keys and unsafe settings",
   vulnerabilities: "Checking packages against the vulnerability database",
   docs: "Checking packages against current documentation",
@@ -114,6 +121,21 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   stats.dependencies = dependencies.length;
   const digest = buildDigest(inventory, dependencies, input.appDescription ?? null);
 
+  // Vendors: every outside service, found from packages, env names, URLs and config files.
+  const vendorsStart = Date.now();
+  await emit({ type: "step_started", step: "vendors", label: STEP_LABELS.vendors });
+  const vendors = await discoverVendors(inventory, rawDependencies, input.projectHints ?? null);
+  for (const v of vendors) await emit({ type: "vendor", slug: v.slug, name: v.name, category: v.category, detectedBy: v.detectedBy });
+  if (vendors.length > 0 && !signal.aborted) {
+    try {
+      const purposes = await labelPurposes(models, vendors, digest, signal);
+      for (const v of vendors) v.purpose = purposes.get(v.slug) ?? null;
+    } catch (error) {
+      if (!signal.aborted) await note(`Could not describe what each service is used for: ${error instanceof Error ? error.message.slice(0, 160) : String(error)}`);
+    }
+  }
+  await emit({ type: "step_done", step: "vendors", findings: 0, durationMs: Date.now() - vendorsStart });
+
   const readCache = new Map<string, string>();
   const read = async (path: string): Promise<string> => {
     const cached = readCache.get(path);
@@ -178,7 +200,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   if (signal.aborted) {
     stats.durationMs = Date.now() - started;
     const ranked = rankFindings(findings);
-    return { findings: ranked, dependencies, summary: summarise(ranked, ranked.map((f) => f.key)), audit: null, stats, inventory, snapshot };
+    return { findings: ranked, dependencies, summary: summarise(ranked, ranked.map((f) => f.key)), audit: null, stats, inventory, vendors, snapshot };
   }
 
   // Rank
@@ -198,12 +220,12 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
 
   stats.durationMs = Date.now() - started;
   await emit({ type: "scan_done", findings: ranked.length, durationMs: stats.durationMs });
-  return { findings: ranked, dependencies, summary, audit, stats, inventory, snapshot };
+  return { findings: ranked, dependencies, summary, audit, stats, inventory, vendors, snapshot };
 }
 
 function orderedSteps(active: Check[], audit: boolean, fetch: boolean): ScanStep[] {
-  const order: ScanStep[] = ["fetch", "inventory", "dependencies", "secrets", "vulnerabilities", "docs", "review", "crosscheck", "rank", "audit"];
-  const present = new Set<ScanStep>(["inventory", "rank"]);
+  const order: ScanStep[] = ["fetch", "inventory", "dependencies", "vendors", "secrets", "vulnerabilities", "docs", "review", "crosscheck", "rank", "audit"];
+  const present = new Set<ScanStep>(["inventory", "vendors", "rank"]);
   if (fetch) present.add("fetch");
   for (const check of active) present.add(check.step);
   if (audit) present.add("audit");

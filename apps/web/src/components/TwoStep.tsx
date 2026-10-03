@@ -19,6 +19,9 @@ export function TwoStepButton({
   onDone,
   className,
   style,
+  restClassName = "btn btn-muted",
+  confirmClassName,
+  onArmedChange,
 }: {
   label: string;
   prompt: ReactNode;
@@ -30,14 +33,23 @@ export function TwoStepButton({
   onDone?: () => void;
   className?: string;
   style?: React.CSSProperties;
+  /** The control at rest. Muted by default; a likely next action may be primary. */
+  restClassName?: string;
+  /** Overrides the confirm button's look, for confirms that are not destructive. */
+  confirmClassName?: string;
+  onArmedChange?: (armed: boolean) => void;
 }) {
-  const [armed, setArmed] = useState(false);
+  const [armed, setArmedState] = useState(false);
+  const setArmed = (next: boolean) => {
+    setArmedState(next);
+    onArmedChange?.(next);
+  };
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   if (!armed) {
     return (
-      <button type="button" className={`btn btn-muted ${className ?? ""}`} style={style} onClick={() => setArmed(true)}>
+      <button type="button" className={`${restClassName} ${className ?? ""}`} style={style} onClick={() => setArmed(true)}>
         {label}
       </button>
     );
@@ -56,7 +68,7 @@ export function TwoStepButton({
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
-          className={`btn btn-sm ${danger ? "btn-danger" : "btn-secondary"}`}
+          className={confirmClassName ?? `btn btn-sm ${danger ? "btn-danger" : "btn-secondary"}`}
           disabled={pending}
           autoFocus
           onClick={() =>

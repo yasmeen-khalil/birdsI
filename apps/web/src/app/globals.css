@@ -336,3 +336,19 @@ a.q, button.q { display: block; padding: 0; border: 0; cursor: pointer; }
   .ghead { padding: 24px 0 8px; }
   .toast { right: 20px; left: 20px; bottom: 20px; }
 }
+
+/* Pipeline: the four stages in order. A running stage carries the accent line. */
+.pipe { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.pipe-stage { display: flex; flex-direction: column; gap: 6px; padding: 16px 20px 18px 0; position: relative; }
+.pipe-stage + .pipe-stage { border-top: 1px solid var(--line); }
+.pipe-stage.run::before { content: ""; position: absolute; top: -1px; left: 0; right: 0; height: 2px; background: var(--accent); }
+@media (min-width: 901px) {
+  .pipe-stage + .pipe-stage { border-top: 0; border-left: 1px solid var(--line); padding-left: 20px; }
+}
+
+/* Disclosure: a quiet summary line that opens its list below. */
+.disclose > summary { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; list-style: none; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; }
+.disclose > summary::-webkit-details-marker { display: none; }
+.disclose > summary::before { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform 120ms ease; }
+.disclose[open] > summary::before { transform: rotate(45deg); }
+.disclose > summary:hover { color: var(--text); }

@@ -1,6 +1,6 @@
 import { getDb, unwrap } from "./client";
 
-export type JobKind = "scan" | "fix" | "embed";
+export type JobKind = "scan" | "fix" | "embed" | "vendor_sync";
 
 export interface JobRow {
   id: string;
@@ -61,6 +61,14 @@ export async function failJob(job: JobRow, message: string): Promise<void> {
     })
     .eq("id", job.id);
   if (error) throw new Error(`failJob: ${error.message}`);
+}
+
+/** True when a job of this kind with this payload key is queued or running. */
+export async function jobActive(kind: JobKind, payloadKey: string, payloadValue: string): Promise<boolean> {
+  const db = getDb();
+  const { data, error } = await db.from("jobs").select("id").eq("kind", kind).in("status", ["queued", "running"]).contains("payload", { [payloadKey]: payloadValue }).limit(1);
+  if (error) throw new Error(`jobActive: ${error.message}`);
+  return ((data ?? []) as unknown[]).length > 0;
 }
 
 export async function queueDepth(): Promise<number> {

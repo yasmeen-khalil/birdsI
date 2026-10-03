@@ -7,6 +7,7 @@ import { CliError, EXIT } from "./exit";
 import { orderFindings } from "./format";
 import { readGitInfo, type GitInfo } from "./git";
 import { buildSnapshot, formatBytes, type WalkResult } from "./snapshot";
+import { collectHints } from "./hints";
 
 export const TERMINAL_SCAN: readonly ScanStatus[] = ["done", "failed", "stopped"];
 export const TERMINAL_FIX: readonly Fix["status"][] = ["tested", "pr_open", "failed"];
@@ -52,7 +53,9 @@ export async function sendSnapshot(
     options.onStage?.({ stage: "uploading", files: snapshot.walk.files.length, bytes: snapshot.bytes });
     const bytes = await readFile(snapshot.file);
     await api.uploadSnapshot(created.uploadUrl, bytes);
-    await api.completeSnapshot(created.snapshotId, snapshot.bytes);
+    // Facts that live only on this machine (Stripe Projects state and spend) ride along.
+    const hints = await collectHints(root);
+    await api.completeSnapshot(created.snapshotId, snapshot.bytes, hints);
     options.onStage?.({ stage: "uploaded" });
     return { snapshotId: created.snapshotId, git, branch, walk: snapshot.walk, bytes: snapshot.bytes };
   } finally {
@@ -62,18 +65,20 @@ export async function sendSnapshot(
 
 export async function startScan(
   api: ApiClient,
-  input: { snapshotId: string; kind: ScanKind; branch?: string | undefined; describe?: string | undefined },
-): Promise<Scan> {
-  const scan = (
+  input: { snapshotId: string; kind: ScanKind; branch?: string | undefined; describe?: string | undefined; full?: boolean },
+): Promise<Scan & { dashboardUrl?: string }> {
+  const created = (
     await api.createScan({
       kind: input.kind,
       snapshotId: input.snapshotId,
       ...(input.branch ? { branch: input.branch } : {}),
       ...(input.describe ? { appDescription: input.describe } : {}),
+      ...(input.full ? { full: true } : {}),
     })
-  ).data.scan;
-  await updateConfig({ lastScanId: scan.id }).catch(() => undefined);
-  return scan;
+  ).data;
+  const scan = created.scan;
+  await updateConfig({ lastScanId: scan.id, ...(scan.repoId ? { lastRepoId: scan.repoId } : {}) }).catch(() => undefined);
+  return { ...scan, ...(created.dashboardUrl ? { dashboardUrl: created.dashboardUrl } : {}) };
 }
 
 /** Calls fn, retrying transient failures (network blips, 5xx, 429) with backoff. */

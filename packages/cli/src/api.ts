@@ -1,7 +1,16 @@
 import {
+  ActionRequest,
+  ActionsResponse,
   ApiError,
   ChatMessage,
   CreateScanResponse,
+  InventoryResponse,
+  Question,
+  QuestionsResponse,
+  VendorsResponse,
+  VisionResponse,
+  type ProjectHints,
+  type RequestActionRequest,
   DeviceLoginPoll,
   DeviceLoginStart,
   Fix,
@@ -49,6 +58,8 @@ export type MeResponse = z.infer<typeof MeResponse>;
 const OkResponse = z.object({ ok: z.literal(true) });
 const FixEnvelope = z.object({ fix: Fix });
 const ChatResponse = z.object({ message: ChatMessage });
+const QuestionEnvelope = z.object({ question: Question });
+const ActionEnvelope = z.object({ action: ActionRequest });
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const UPLOAD_TIMEOUT_MS = 15 * 60_000;
@@ -63,6 +74,8 @@ interface RequestOptions<T> {
 export class ApiClient {
   readonly baseUrl: string;
   readonly auth: ResolvedAuth | null;
+  /** Who is calling: the terminal, or a coding agent through the MCP server. */
+  client: "cli" | "mcp" = "cli";
 
   constructor(baseUrl: string, auth: ResolvedAuth | null) {
     this.baseUrl = baseUrl;
@@ -89,7 +102,8 @@ export class ApiClient {
     const needsAuth = options.auth ?? true;
     const headers: Record<string, string> = {
       accept: "application/json",
-      "user-agent": `birdsi-cli/${VERSION}`,
+      "user-agent": `birdsi-${this.client}/${VERSION}`,
+      "x-birdsi-client": this.client,
     };
     if (needsAuth) headers.authorization = `Bearer ${this.requireAuth().token}`;
     let body: string | undefined;
@@ -192,8 +206,66 @@ export class ApiClient {
     }
   }
 
-  completeSnapshot(snapshotId: string, bytes: number): Promise<Result<z.infer<typeof OkResponse>>> {
-    return this.request("POST", `/snapshots/${enc(snapshotId)}/complete`, { schema: OkResponse, body: { bytes } });
+  completeSnapshot(snapshotId: string, bytes: number, hints?: ProjectHints | null): Promise<Result<z.infer<typeof OkResponse>>> {
+    return this.request("POST", `/snapshots/${enc(snapshotId)}/complete`, { schema: OkResponse, body: { bytes, ...(hints ? { hints } : {}) } });
+  }
+
+  // Vendors, questions, actions, vision: the operations layer
+
+  vendors(repoId: string): Promise<Result<VendorsResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/vendors`, { schema: VendorsResponse });
+  }
+
+  syncVendors(repoId: string): Promise<Result<z.infer<typeof OkResponse>>> {
+    return this.request("POST", `/repos/${enc(repoId)}/vendors/sync`, { schema: OkResponse, body: {} });
+  }
+
+  inventory(repoId: string): Promise<Result<InventoryResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/inventory`, { schema: InventoryResponse });
+  }
+
+  questions(repoId: string, status?: "open" | "answered" | "dismissed"): Promise<Result<QuestionsResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/questions${status ? `?status=${status}` : ""}`, { schema: QuestionsResponse });
+  }
+
+  askOwner(repoId: string, body: { question: string; why: string; options?: string[]; vendorSlug?: string }): Promise<Result<z.infer<typeof QuestionEnvelope>>> {
+    return this.request("POST", `/repos/${enc(repoId)}/questions`, { schema: QuestionEnvelope, body });
+  }
+
+  answerQuestion(questionId: string, answer: string): Promise<Result<z.infer<typeof QuestionEnvelope>>> {
+    return this.request("POST", `/questions/${enc(questionId)}`, { schema: QuestionEnvelope, body: { answer } });
+  }
+
+  dismissQuestion(questionId: string): Promise<Result<z.infer<typeof OkResponse>>> {
+    return this.request("POST", `/questions/${enc(questionId)}`, { schema: OkResponse, body: { dismiss: true } });
+  }
+
+  actions(repoId: string, status?: ActionRequest["status"]): Promise<Result<ActionsResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/actions${status ? `?status=${status}` : ""}`, { schema: ActionsResponse });
+  }
+
+  requestAction(repoId: string, body: RequestActionRequest): Promise<Result<z.infer<typeof ActionEnvelope>>> {
+    return this.request("POST", `/repos/${enc(repoId)}/actions`, { schema: ActionEnvelope, body });
+  }
+
+  action(actionId: string): Promise<Result<z.infer<typeof ActionEnvelope>>> {
+    return this.request("GET", `/actions/${enc(actionId)}`, { schema: ActionEnvelope });
+  }
+
+  decideAction(actionId: string, decision: "approve" | "deny"): Promise<Result<z.infer<typeof ActionEnvelope>>> {
+    return this.request("POST", `/actions/${enc(actionId)}/decide`, { schema: ActionEnvelope, body: { decision } });
+  }
+
+  reportAction(actionId: string, ok: boolean, output: string): Promise<Result<z.infer<typeof ActionEnvelope>>> {
+    return this.request("POST", `/actions/${enc(actionId)}/report`, { schema: ActionEnvelope, body: { ok, output: output.slice(0, 20_000) } });
+  }
+
+  vision(repoId: string): Promise<Result<VisionResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/vision`, { schema: VisionResponse });
+  }
+
+  setVision(repoId: string, text: string): Promise<Result<VisionResponse>> {
+    return this.request("PUT", `/repos/${enc(repoId)}/vision`, { schema: VisionResponse, body: { text } });
   }
 
   // Scans

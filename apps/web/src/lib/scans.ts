@@ -12,6 +12,7 @@ import {
   latestDemoScanId,
   latestDoneScan,
   latestFixForFinding,
+  localRepoFor,
   matchChunks,
   recordUsage,
   repoForUser,
@@ -39,18 +40,27 @@ export async function startScan(user: UserRow, input: CreateScanRequest, source:
   await assertSpendCap();
   await assertUserScanQuota(user.id, input.kind);
   let branch = input.branch ?? null;
+  let repoId = input.repoId ?? null;
   if (input.repoId) {
     const repo = await repoForUser(input.repoId, user.id);
     branch = branch ?? repo.default_branch;
-    const running = await runningScanForRepo(repo.id);
-    if (running) throw new ApiError(409, "already_running", "A scan of this repository is already running. Wait for it to finish or stop it first.");
   }
   if (input.snapshotId) {
     const snap = await snapshotForUser(input.snapshotId, user.id);
     if (!snap.uploaded_at) throw new ApiError(400, "bad_request", "The snapshot upload has not completed.");
     branch = branch ?? snap.branch;
+    // A snapshot from the terminal belongs to a local repository, so everything
+    // (findings, vendors, questions, chat) accumulates under one place.
+    if (!repoId) {
+      const name = snap.full_name?.trim() || `local/${input.snapshotId.slice(0, 8)}`;
+      repoId = (await localRepoFor(user.id, name, branch)).id;
+    }
   }
-  const scan = await createScan({ repoId: input.repoId ?? null, snapshotId: input.snapshotId ?? null, ownerUserId: user.id, kind: input.kind, source, branch, appDescription: input.appDescription ?? null });
+  if (repoId) {
+    const running = await runningScanForRepo(repoId);
+    if (running) throw new ApiError(409, "already_running", "A scan of this repository is already running. Wait for it to finish or stop it first.");
+  }
+  const scan = await createScan({ repoId, snapshotId: input.snapshotId ?? null, ownerUserId: user.id, kind: input.kind, source, branch, appDescription: input.appDescription ?? null });
   await enqueueJob("scan", { scanId: scan.id });
   return toScan(scan);
 }

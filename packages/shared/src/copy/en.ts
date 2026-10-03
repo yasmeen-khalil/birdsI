@@ -71,6 +71,7 @@ export const en = {
     fetch: "Fetch the code",
     inventory: "Read the repository",
     dependencies: "Map dependencies",
+    vendors: "Find the services it runs on",
     secrets: "Look for keys and unsafe settings",
     vulnerabilities: "Check known problems",
     docs: "Check against current docs",

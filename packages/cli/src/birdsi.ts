@@ -3,6 +3,7 @@ import { toCliError } from "./api";
 import { askCommand, dismissCommand, explainCommand, findingsCommand, reposCommand } from "./commands/findings";
 import { fixCommand } from "./commands/fix";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth";
+import { approvalsCommand, exportCommand, questionsCommand, vendorsCommand, visionCommand } from "./commands/ops";
 import { scanCommand } from "./commands/scan";
 import { CliError, EXIT } from "./exit";
 import { installInterruptHandler } from "./interrupt";
@@ -12,6 +13,7 @@ import { VERSION } from "./version";
 
 const asciiOption = (): Option => new Option("--ascii", "use [P] [D] [J] and plain glyphs instead of Unicode");
 const jsonOption = (): Option => new Option("--json", "print the API response as JSON, for scripts");
+const repoOption = (): Option => new Option("--repo <ref>", "repository id or owner/name (default: the one you scanned last)");
 
 /** Runs a command action and turns its result or error into the process exit code. */
 function run<A extends unknown[]>(action: (...args: A) => Promise<number | void>): (...args: A) => Promise<void> {
@@ -31,11 +33,23 @@ export function buildProgram(): Command {
   const program = new Command();
   program
     .name("birdsi")
-    .description("birdsI: scan a codebase, read findings in plain words, approve fixes.")
+    .description("birdsI: the operations layer for coding agents. Run it in a project to map the code, the vendors it runs on, their limits, and what needs you.")
     .version(VERSION, "-v, --version", "print the version")
     .helpOption("-h, --help", "show help")
     .showHelpAfterError("(run birdsi --help for the full list)")
-    .exitOverride();
+    .exitOverride()
+    .argument("[path]", "folder to scan (default: the current one)")
+    .option("--quick", "a quick check instead of the full scan")
+    .option("--describe <text>", "what the app does, in a sentence or two")
+    .option("--no-open", "do not open the dashboard in the browser")
+    .option("--no-fix-prompt", "do not offer fixes after the scan")
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(
+      run((path: string | undefined, options: { quick?: boolean; describe?: string; open: boolean; fixPrompt: boolean; json?: boolean; ascii?: boolean }) =>
+        scanCommand(path, { ...(options.quick ? {} : { full: true }), describe: options.describe, open: options.open, fixPrompt: options.fixPrompt, json: options.json, ascii: options.ascii }),
+      ),
+    );
 
   program
     .command("login")
@@ -58,8 +72,10 @@ export function buildProgram(): Command {
     .command("scan")
     .description("scan a folder (default: the current one)")
     .argument("[path]", "folder to scan")
+    .option("--full", "the whole pipeline in order, then the vendor sync (the default when you run birdsi with no command)")
     .option("--deep", "deep scan: reads all the code")
     .option("--audit", "pre-launch audit: the deepest scan")
+    .option("--open", "open the dashboard in the browser")
     .option("--describe <text>", "what the app does, in a sentence or two")
     .option("--branch <name>", "branch name to record, if not the current one")
     .addOption(jsonOption())
@@ -121,6 +137,54 @@ export function buildProgram(): Command {
     .argument("<question...>", "your question")
     .addOption(jsonOption())
     .action(run((repo: string, question: string[], options: { json?: boolean }) => askCommand(repo, question, options)));
+
+  program
+    .command("vendors")
+    .description("the services the app runs on: plans, usage, limits, spend, alerts")
+    .option("--sync", "refresh from connected accounts and current pricing pages first")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((options: { sync?: boolean; repo?: string; json?: boolean; ascii?: boolean }) => vendorsCommand(options)));
+
+  program
+    .command("questions")
+    .description("what birdsI or your agent needs you to answer")
+    .option("--answer", "answer them one by one (the default on a terminal)")
+    .option("--no-answer", "only list them")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((options: { answer?: boolean; repo?: string; json?: boolean; ascii?: boolean }) => questionsCommand(options)));
+
+  program
+    .command("approvals")
+    .description("actions your agent proposed: list, approve, deny, or run approved ones here")
+    .argument("[action]", "approve | deny | run")
+    .argument("[id]", "request id")
+    .option("-y, --yes", "run approved commands without asking")
+    .option("--path <dir>", "folder to run commands in (default: the current one)")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((action: string | undefined, id: string | undefined, options: { yes?: boolean; path?: string; repo?: string; json?: boolean; ascii?: boolean }) => approvalsCommand(action, id, options)));
+
+  program
+    .command("vision")
+    .description("show or set what the app is for and where it is going")
+    .argument("[text...]", "the vision, in your words")
+    .option("--file <path>", "read the vision from a file")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .action(run((text: string[] | undefined, options: { file?: string; repo?: string; json?: boolean }) => visionCommand(text, options)));
+
+  program
+    .command("export")
+    .description("write the knowledge base as Markdown under .birdsi/ for agents that read files")
+    .option("--path <dir>", "project folder (default: the current one)")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .action(run((options: { path?: string; repo?: string; json?: boolean }) => exportCommand(options)));
 
   program
     .command("mcp")

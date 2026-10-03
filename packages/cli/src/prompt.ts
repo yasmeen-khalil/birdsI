@@ -27,3 +27,23 @@ export function askYesNo(question: string): Promise<boolean | null> {
     rl.question(`${question} `, (answer) => finish(isYes(answer)));
   });
 }
+
+/** Asks for a line of text. Resolves null on Ctrl+C or closed input. */
+export function askText(question: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    let settled = false;
+    const finish = (value: string | null): void => {
+      if (settled) return;
+      settled = true;
+      rl.close();
+      resolve(value);
+    };
+    rl.on("SIGINT", () => {
+      process.stdout.write("\n");
+      finish(null);
+    });
+    rl.on("close", () => finish(null));
+    rl.question(question, (answer) => finish(answer));
+  });
+}

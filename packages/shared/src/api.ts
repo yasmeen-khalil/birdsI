@@ -8,6 +8,7 @@ import {
   ScanKind,
 } from "./domain";
 import { ScanEventRecord } from "./events";
+import { ProjectHints } from "./ops";
 
 /**
  * Request and response shapes for the public API (/api/v1) used by the CLI
@@ -30,10 +31,12 @@ export const CreateScanRequest = z.object({
   branch: z.string().optional(),
   /** Optional description of what the app does; sharpens the audit. */
   appDescription: z.string().max(2000).optional(),
+  /** Full scan: run the whole pipeline, then sync vendors and limits. */
+  full: z.boolean().optional(),
 });
 export type CreateScanRequest = z.infer<typeof CreateScanRequest>;
 
-export const CreateScanResponse = z.object({ scan: Scan });
+export const CreateScanResponse = z.object({ scan: Scan, dashboardUrl: z.string().optional() });
 export type CreateScanResponse = z.infer<typeof CreateScanResponse>;
 
 export const ScanResponse = z.object({
@@ -59,6 +62,12 @@ export type FindingResponse = z.infer<typeof FindingResponse>;
 
 export const StartFixResponse = z.object({ fix: Fix });
 export type StartFixResponse = z.infer<typeof StartFixResponse>;
+
+export const CompleteSnapshotRequest = z.object({
+  bytes: z.number().int().nonnegative().nullable().optional(),
+  hints: ProjectHints.optional(),
+});
+export type CompleteSnapshotRequest = z.infer<typeof CompleteSnapshotRequest>;
 
 export const SnapshotUploadResponse = z.object({
   snapshotId: z.string(),

@@ -10,6 +10,8 @@ export interface RepoOption {
   id: string;
   fullName: string;
   defaultBranch: string;
+  /** "local" when uploaded from the terminal tool rather than read through GitHub. */
+  source?: "github" | "local";
 }
 
 /** Switches between connected repositories. Opens below, on the left, beside its control. */
@@ -22,7 +24,7 @@ export function RepoSwitcher({ repos, current, compact = false }: { repos: RepoO
       </>
     ) : (
       <>
-        <span className="c3">{repoOwner(current.fullName)} /</span>
+        {repoOwner(current.fullName) && <span className="c3">{repoOwner(current.fullName)} /</span>}
         <span className="truncate">{repoName(current.fullName)}</span>
         <span className="c3">{current.defaultBranch}</span>
         <ChevronDown {...icon14} className="i c3" />
@@ -40,7 +42,7 @@ export function RepoSwitcher({ repos, current, compact = false }: { repos: RepoO
         <Link key={r.id} href={`/app/${r.id}`} aria-current={current?.id === r.id ? "true" : undefined}>
           <span className="flex min-w-0 flex-col">
             <span className="truncate">{repoName(r.fullName)}</span>
-            <span className="t-small c3 truncate">{r.fullName}</span>
+            <span className="t-small c3 truncate">{r.source === "local" ? "Uploaded from your terminal" : r.fullName}</span>
           </span>
         </Link>
       ))}

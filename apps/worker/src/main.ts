@@ -4,6 +4,7 @@ import { loadEngineConfig } from "@birdsi/engine";
 import { runEmbedJob } from "./embed-job";
 import { runFixJob } from "./fix-job";
 import { runScanJob } from "./scan-job";
+import { runVendorSyncJob } from "./vendor-sync-job";
 
 /**
  * The birdsI worker: claims jobs from the queue and runs them one at a time.
@@ -22,6 +23,7 @@ async function handle(job: JobRow): Promise<void> {
   if (job.kind === "scan") return runScanJob(config, job, beat);
   if (job.kind === "fix") return runFixJob(config, job, beat);
   if (job.kind === "embed") return runEmbedJob(config, job, beat);
+  if (job.kind === "vendor_sync") return runVendorSyncJob(config, job, beat);
   throw new Error(`unknown job kind ${job.kind}`);
 }
 
@@ -30,7 +32,7 @@ async function loop(): Promise<void> {
   while (!stopping) {
     let job: JobRow | null = null;
     try {
-      job = await claimJob(workerId, ["scan", "fix", "embed"]);
+      job = await claimJob(workerId, ["scan", "fix", "embed", "vendor_sync"]);
     } catch (error) {
       console.error(`[worker] claim failed: ${error instanceof Error ? error.message : String(error)}`);
       await sleep(IDLE_MS * 3);

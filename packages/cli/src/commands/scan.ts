@@ -12,11 +12,17 @@ import { ScanProgress } from "../progress";
 import { formatBytes } from "../snapshot";
 import { VERSION } from "../version";
 import { followScan, sendSnapshot, startScan, withRetry } from "../workflow";
+import { openBrowser } from "./auth";
 import { runFix } from "./fix";
+import { formatNeedsYou } from "./ops";
 
 export interface ScanOptions {
   deep?: boolean;
   audit?: boolean;
+  /** Full scan: the whole pipeline in order, then the vendor sync. */
+  full?: boolean;
+  /** Open the dashboard in the browser once the scan starts. */
+  open?: boolean;
   describe?: string;
   branch?: string;
   json?: boolean;
@@ -24,8 +30,8 @@ export interface ScanOptions {
   ascii?: boolean;
 }
 
-export function scanKind(options: Pick<ScanOptions, "deep" | "audit">): ScanKind {
-  return options.audit ? "audit" : options.deep ? "deep" : "light";
+export function scanKind(options: Pick<ScanOptions, "deep" | "audit" | "full">): ScanKind {
+  return options.audit ? "audit" : options.deep || options.full ? "deep" : "light";
 }
 
 export async function scanCommand(pathArg: string | undefined, options: ScanOptions): Promise<number> {
@@ -62,9 +68,11 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
   if (git?.commitSha) where.push(`at ${git.commitSha.slice(0, 7)}`);
   say();
   say(`${paint.bold(style, `birdsI ${VERSION}`)}  ${where.join(" ")}`);
-  say(`${KIND_WORD[kind]}. Signed in as ${login}.`);
+  say(`${options.full ? "Full scan: map the code, check docs, audit, sync vendors" : KIND_WORD[kind]}. Signed in as ${login}.`);
 
   let scanId: string;
+  let repoId: string | null = null;
+  let dashboardUrl: string | null = null;
   let repoConnected = false;
   try {
     const sent = await sendSnapshot(api, root, {
@@ -83,9 +91,16 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
       kind,
       branch: sent.branch,
       describe: options.describe,
+      ...(options.full ? { full: true } : {}),
     });
     scanId = scan.id;
+    repoId = scan.repoId;
+    dashboardUrl = scan.dashboardUrl ?? null;
     repoConnected = scan.repoId !== null;
+    if (dashboardUrl) {
+      say(paint.dim(style, `Dashboard: ${dashboardUrl}`));
+      if (options.open && process.stdout.isTTY) openBrowser(dashboardUrl);
+    }
   } catch (error) {
     throw toCliError(error, "that");
   }
@@ -168,6 +183,20 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
   } else if (findings.some((f) => f.actionKind === "fix" && f.status === "open")) {
     say();
     say(paint.dim(style, "Start any fix with: birdsi fix <number>"));
+  }
+
+  // What needs the owner outside the code: limits, questions, approvals.
+  if (repoId) {
+    try {
+      const inv = (await api.inventory(repoId)).data;
+      const needs = formatNeedsYou(inv.openQuestions, inv.pendingActions, inv.alerts, dashboardUrl, style);
+      if (needs) {
+        say();
+        say(needs);
+      }
+    } catch {
+      // The ops layer may still be syncing; the dashboard shows it when ready.
+    }
   }
   return exitCode;
 }

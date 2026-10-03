@@ -7,12 +7,16 @@ export const NAV_ITEMS = [
   { key: "overview", label: "Overview", path: "" },
   { key: "findings", label: "Findings", path: "/findings" },
   { key: "dependencies", label: "Dependencies", path: "/dependencies" },
+  { key: "vendors", label: "Vendors", path: "/vendors" },
+  { key: "agent", label: "Agent", path: "/agent" },
   { key: "audit", label: "Pre-launch audit", path: "/audit" },
 ] as const;
 
 export function activeNav(pathname: string, repoId: string): string | null {
   const base = `/app/${repoId}`;
   if (pathname === base) return "overview";
+  // Dependencies are part of the overview; the full list lives one level down.
+  if (pathname.startsWith(`${base}/dependencies`)) return "overview";
   for (const item of NAV_ITEMS) if (item.path && pathname.startsWith(base + item.path)) return item.key;
   return null;
 }

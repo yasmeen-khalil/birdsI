@@ -39,6 +39,7 @@ export interface ScanView {
 const UNITS: Partial<Record<ScanStep, [string, string]>> = {
   inventory: ["file", "files"],
   dependencies: ["package", "packages"],
+  vendors: ["service", "services"],
   secrets: ["file", "files"],
   vulnerabilities: ["package", "packages"],
   docs: ["library", "libraries"],

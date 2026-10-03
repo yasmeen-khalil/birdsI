@@ -5,17 +5,18 @@ import { SignOutButton } from "@clerk/nextjs";
 import { ExternalLink, LogOut, Plus } from "lucide-react";
 import { latestDoneScan, tokensForUser, toScan, usageForUser } from "@birdsi/db";
 import { LocalTime } from "@/components/LocalTime";
-import { DeleteAccount, DisconnectRepo, EmailToggle, RevokeToken } from "@/components/SettingsControls";
+import { ConnectAccount, DeleteAccount, DisconnectAccount, DisconnectRepo, EmailToggle, RevokeToken } from "@/components/SettingsControls";
 import { TopBar } from "@/components/shell/TopBar";
 import { initials, KIND_LABEL, plural, repoName } from "@/components/format";
 import { icon } from "@/components/icon";
 import { appUser, toOption, userRepos } from "@/components/server/data";
+import { connectorCatalog, listConnections } from "@/lib/ops";
 
 export const metadata: Metadata = { title: "Settings" };
 
-function Section({ title, muted = false, last = false, children }: { title: string; muted?: boolean; last?: boolean; children: ReactNode }) {
+function Section({ id, title, muted = false, last = false, children }: { id?: string; title: string; muted?: boolean; last?: boolean; children: ReactNode }) {
   return (
-    <section className="grid grid-cols-1 gap-y-4 min-[901px]:grid-cols-12 min-[901px]:gap-x-6" style={{ padding: "36px 0", borderTop: "1px solid var(--line)", ...(last ? { borderBottom: "1px solid var(--line)" } : {}) }}>
+    <section id={id} className="grid grid-cols-1 gap-y-4 min-[901px]:grid-cols-12 min-[901px]:gap-x-6" style={{ padding: "36px 0", borderTop: "1px solid var(--line)", ...(last ? { borderBottom: "1px solid var(--line)" } : {}) }}>
       <h2 className={`t-h3 min-[901px]:col-span-3${muted ? " c2" : ""}`} style={muted ? { fontWeight: 500 } : undefined}>
         {title}
       </h2>
@@ -33,7 +34,8 @@ function amount(n: number): string {
 export default async function SettingsPage() {
   const user = await appUser();
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
-  const [repos, tokens, usage] = await Promise.all([userRepos(user.id), tokensForUser(user.id), usageForUser(user.id, monthStart)]);
+  const [repos, tokens, usage, connections] = await Promise.all([userRepos(user.id), tokensForUser(user.id), usageForUser(user.id, monthStart), listConnections(user)]);
+  const catalog = connectorCatalog().map((c) => ({ slug: c.slug, name: c.name, tokenHint: c.tokenHint, tokenUrl: c.tokenUrl, fields: c.fields.map((f) => ({ key: f.key, label: f.label, hint: f.hint, required: f.required })) }));
   const lastScans = await Promise.all(repos.map(async (r) => {
     const row = await latestDoneScan(r.id);
     return row ? toScan(row) : null;
@@ -66,7 +68,7 @@ export default async function SettingsPage() {
 
         <Section title="Repositories">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="t-small c2">birdsI reads these through its GitHub App.</p>
+            <p className="t-small c2">birdsI reads these through its GitHub App or from your terminal.</p>
             <Link className="btn btn-secondary btn-sm" href="/connect">
               <Plus {...icon} />
               Add a repository
@@ -88,6 +90,7 @@ export default async function SettingsPage() {
                         {repoName(r.full_name)}
                       </span>
                       <span className="t-small c2">
+                        {r.source === "local" ? "Uploaded from your terminal. " : ""}
                         {s ? (
                           <>
                             Last {KIND_LABEL[s.kind].toLowerCase()} <LocalTime iso={s.finishedAt} />. {plural(n, "finding")}.
@@ -110,6 +113,39 @@ export default async function SettingsPage() {
             Change which repositories birdsI can read on GitHub
             <ExternalLink {...icon} />
           </a>
+        </Section>
+
+        <Section id="connected-accounts" title="Connected accounts">
+          <p className="t-small c2">With a read-only token, birdsI reads a service&apos;s plan, usage and spend itself, so it can warn you before a limit is reached.</p>
+          {connections.length === 0 ? (
+            <p className="t-small c3" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
+              No accounts connected yet.
+            </p>
+          ) : (
+            <div className="flex flex-col" style={{ borderTop: "1px solid var(--line)" }}>
+              {connections.map((c) => (
+                <div key={c.id} className="flex flex-col gap-1" style={{ padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
+                  <span className="flex flex-wrap items-center gap-2.5">
+                    <span className="t-body" style={{ fontWeight: 600 }}>
+                      {c.name}
+                    </span>
+                    {c.lastStatus === "failed" ? <span className="tag bad">Could not read</span> : c.lastStatus === "ok" ? <span className="tag ok">Working</span> : <span className="tag">Not checked yet</span>}
+                  </span>
+                  <span className="t-small c2">
+                    Connected <LocalTime iso={c.createdAt} style="relative" />. {c.lastProbedAt ? <>Last checked <LocalTime iso={c.lastProbedAt} style="relative" />.</> : null}
+                  </span>
+                  {c.lastStatus === "failed" && c.lastError && (
+                    <span className="t-small" style={{ color: "var(--critical)" }}>
+                      {c.lastError}
+                    </span>
+                  )}
+                  <DisconnectAccount connectionId={c.id} name={c.name} />
+                </div>
+              ))}
+            </div>
+          )}
+          <ConnectAccount catalog={catalog} connected={connections.map((c) => c.vendorSlug)} />
+          <p className="t-small c3">Tokens are encrypted on birdsI&apos;s servers and only ever read by the vendor connectors. Use read-only tokens.</p>
         </Section>
 
         <Section title="Terminal and MCP">

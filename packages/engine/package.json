@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@birdsi/shared": "*",
     "@octokit/app": "^16",
     "@octokit/rest": "^22",

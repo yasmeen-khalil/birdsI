@@ -1,8 +1,8 @@
 # birdsI
 
-A bird's-eye codebase auditor. birdsI reads a whole codebase and all of its dependencies, finds gaps, security holes, contradictions and inconsistencies, checks them against current documentation, and either fixes them with a pull request you approve or explains what you need to do in plain steps.
+The operations layer for coding agents. birdsI reads a whole codebase and everything outside it that makes the app run: the services it depends on, their plans, limits, usage and spend. It audits the code against current documentation, keeps a queue of the questions only the owner can answer, and lets coding agents act on the project within an approval policy. Run `npx birdsi` in a project and the dashboard opens with all of it.
 
-Built for people who ship real apps with GitHub and AI coding tools and do not read code fluently. Technical developers get the same depth with no handicaps.
+Built for people who ship real apps with AI coding tools and do not read code fluently. Technical developers get the same depth with no handicaps.
 
 **Live demo:** https://birdsi.vercel.app (scan a sample repository without signing in)
 
@@ -24,23 +24,34 @@ Three scan tiers:
 
 Fixes are tested in an isolated sandbox before a pull request is opened. Findings that need an action outside the code come with numbered steps.
 
+## Built for agents
+
+A coding agent in your terminal can read your code. It cannot see the vendors the app runs on, what plan each is on, how close the app is to a limit, what the app costs, what the owner is building towards, or ask the owner anything. birdsI holds all of that and hands it to the agent:
+
+- **Vendors**: every outside service, found deterministically from packages, env names, URLs, config files and Stripe Projects state. For each: what it is, what this app uses it for, where the code calls it, the plan, its limits, usage and spend. Facts carry their source: found in the code, from the connected account, from the vendor's current docs, estimated, or told by the owner.
+- **Alerts**: a limit at 80% warns, at 95% is critical, with the command that fixes it when the project is managed by Stripe Projects.
+- **Questions**: when birdsI cannot know something (a plan, a usage number with no API) it asks the owner once, in one queue. Agents ask there too.
+- **Approvals**: agents propose actions outside the code (a plan upgrade, a spend limit) as plain commands. Nothing runs until the owner approves; approved commands run on the owner's own machine with `birdsi approvals run`. A per-repository policy can auto-approve small, allowed commands.
+- **Vision**: what the app is for and where it is going, in the owner's words. Every judgment is made against it.
+- **Pipeline**: four stages in dependency order (map the code, check current docs, audit, sync vendors and limits). A full scan runs all of them; each shows how fresh it is.
+
 Three surfaces share one engine:
 
-- the **web app** (dashboard, findings, dependency table, chat about the codebase, pre-launch audit),
-- the **`birdsi` terminal tool** (`npx birdsi scan`), and
-- an **MCP server** (`npx birdsi mcp`) so Claude Code, Cursor and Codex can call birdsI mid-session.
+- the **web app** (dashboard, findings, vendors, agent queue, chat about the codebase, pre-launch audit),
+- the **`birdsi` terminal tool** (`npx birdsi` runs the full pipeline and opens the dashboard; `birdsi vendors`, `questions`, `approvals`, `vision`, `export`), and
+- an **MCP server** (`npx birdsi mcp`) so Claude Code, Cursor and Codex can read the inventory, ask the owner, and propose actions mid-session. `birdsi export` also writes the knowledge base as Markdown under `.birdsi/` for agents that read files.
 
-## Nemotron and Token Factory
+## Models
 
-birdsI runs on [Nebius Token Factory](https://tokenfactory.nebius.com) with NVIDIA's open Nemotron 3 models, called live during every scan:
+One model door, two providers. With `ANTHROPIC_API_KEY`, birdsI runs on Claude:
 
-| Model | Used for |
-|---|---|
-| Nemotron 3 Nano | light scans, chat, docs comparisons |
-| Nemotron 3 Super | deep scans, the cross-file pass, writing fixes |
-| Nemotron 3 Ultra | the pre-launch audit verdict |
+| Tier | Model | Used for |
+|---|---|---|
+| nano | Claude Haiku 4.5 | light scans, docs comparisons, vendor purposes and tiers, chat |
+| super | Claude Opus 5.5 | deep scans, the cross-file pass, writing fixes |
+| ultra | Claude Fable 5.1 | the pre-launch audit verdict |
 
-The `-fast` flavor serves interactive work; the base flavor serves background scans. Fixes are verified in [Token Factory Sandboxes](https://docs.tokenfactory.nebius.com/sandboxes/overview) before a pull request is opened. Qwen3 embeddings from Token Factory power code-aware chat.
+With `NEBIUS_API_KEY` instead, it runs on NVIDIA's open Nemotron 3 models (Nano, Super, Ultra) through [Nebius Token Factory](https://tokenfactory.nebius.com); with both keys, Claude does the reasoning and Token Factory provides Qwen3 embeddings for chat and [Sandboxes](https://docs.tokenfactory.nebius.com/sandboxes/overview) for fix testing. Without embeddings, chat retrieves by keywords.
 
 Other services: [Tavily](https://tavily.com) fetches current documentation, changelogs and advisories per dependency at runtime; [OSV](https://osv.dev) and [deps.dev](https://deps.dev) provide vulnerability and version data; [LangSmith](https://smith.langchain.com) traces every scan when configured.
 
@@ -89,10 +100,12 @@ See `.env.example` for the full list with comments. The essentials:
 
 | Variable | Purpose |
 |---|---|
-| `NEBIUS_API_KEY` | Token Factory inference (required) |
+| `ANTHROPIC_API_KEY` | Claude (one of this or `NEBIUS_API_KEY` is required) |
+| `NEBIUS_API_KEY` | Token Factory inference, embeddings and Sandboxes |
 | `NEBIUS_AI_PROJECT` | Token Factory project id, enables Sandboxes fix testing |
+| `BIRDSI_SECRETS_KEY` | encrypts vendor account tokens the owner connects (any long random string) |
 | `TAVILY_API_KEY` | current docs lookups (the docs check is skipped without it) |
-| `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | database and storage |
+| `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | database, storage, job queue, vector search |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | sign-in |
 | `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` | connecting repositories and opening pull requests |
 | `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` | tracing |
@@ -109,9 +122,13 @@ Model ids are overridable (`BIRDSI_MODEL_NANO`, `BIRDSI_MODEL_SUPER`, `BIRDSI_MO
 
 ```bash
 npx birdsi login          # sign in through the browser
-npx birdsi scan           # light scan of the current folder
-npx birdsi scan --deep    # deep scan
-npx birdsi scan --audit --describe "what the app does"
+npx birdsi                # full pipeline on the current folder, opens the dashboard
+npx birdsi --quick        # a quick check instead
+npx birdsi vendors        # plans, usage, limits, spend, alerts
+npx birdsi questions      # answer what birdsI or your agent needs to know
+npx birdsi approvals      # decide on proposed actions; `approvals run` runs approved ones here
+npx birdsi vision "..."   # what the app is for and where it is going
+npx birdsi export         # the knowledge base as Markdown under .birdsi/
 npx birdsi mcp            # MCP server over stdio for coding agents
 ```
 
@@ -122,17 +139,19 @@ See `packages/cli/README.md` for every command, option and exit code, and the MC
 1. **Fetch**: the GitHub App downloads the repository at the branch head, or the CLI uploads a snapshot of the working tree.
 2. **Inventory**: every file is mapped, honouring `.gitignore`; files are prioritised by how much they affect security and correctness.
 3. **Dependencies**: manifests and lockfiles across npm, PyPI, Go, crates.io, RubyGems, Packagist, Maven, NuGet, Hex and Pub.
-4. **Deterministic checks** (Proven): committed secrets, repository hygiene, OSV vulnerabilities, versions behind.
-5. **Docs check** (Doc-verified): Tavily finds current documentation for the main packages; Nemotron compares it with how the code uses them and must cite the passage.
-6. **Review** (Judgment): Nemotron reads the prioritised files for security holes, gaps and inconsistencies, then a cross-file pass looks for contradictions.
-7. **Rank**: deterministic ordering and de-duplication; the summary says what to start with.
-8. **Audit** (pre-launch only): a verdict per area.
+4. **Vendors**: every outside service, from packages, env names, URLs, config files and Stripe Projects; the small model writes what each is used for.
+5. **Deterministic checks** (Proven): committed secrets, repository hygiene, OSV vulnerabilities, versions behind.
+6. **Docs check** (Doc-verified): Tavily finds current documentation for the main packages; the model compares it with how the code uses them and must cite the passage.
+7. **Review** (Judgment): the model reads the prioritised files for security holes, gaps and inconsistencies, then a cross-file pass looks for contradictions.
+8. **Rank**: deterministic ordering and de-duplication; the summary says what to start with.
+9. **Audit** (pre-launch only): a verdict per area.
+10. **Ops sync** (after every scan, or alone): connected accounts are probed through their APIs (Vercel, Supabase, Stripe, Anthropic, Tavily, Supadata, Resend), each vendor's current pricing page is read through Tavily and the tiers cached for a week, Stripe Projects spend is folded in, and a question is queued for anything birdsI still cannot know.
 
 Every step writes to an append-only event log that the web app, the CLI and the MCP server replay live.
 
-## Hackathon
+## Hackathons
 
-Built for the Nebius x NVIDIA Global AI Hackathon, track: Coding and Agentic Engineering. See `HACKATHON.md` for the submission notes and feedback on the tools.
+Built at the Supabase Select Hackathon at YC (October 2026) on the Supabase, Claude, Stripe and Vercel stack, and entered in the Nebius x NVIDIA Global AI Hackathon (Coding and Agentic Engineering track). See `HACKATHON.md`.
 
 ## Contributing and security
 

@@ -11,6 +11,7 @@ export const ScanStep = z.enum([
   "fetch",
   "inventory",
   "dependencies",
+  "vendors",
   "secrets",
   "vulnerabilities",
   "docs",
@@ -60,6 +61,13 @@ export const ScanEvent = z.discriminatedUnion("type", [
         files: z.array(z.string()),
       }),
     ),
+  }),
+  z.object({
+    type: z.literal("vendor"),
+    slug: z.string(),
+    name: z.string(),
+    category: z.string(),
+    detectedBy: z.array(z.string()),
   }),
   z.object({
     type: z.literal("finding"),
