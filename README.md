@@ -4,7 +4,7 @@ The operations layer for coding agents. birdsI reads a whole codebase and everyt
 
 Built for people who ship real apps with AI coding tools and do not read code fluently. Technical developers get the same depth with no handicaps.
 
-**Live demo:** https://birds-i.vercel.app (scan a sample repository without signing in)
+**Live demo:** https://birdsi.vercel.app (scan a sample repository without signing in)
 
 ## What it does
 

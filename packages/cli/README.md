@@ -194,7 +194,7 @@ Dismissed and fixed findings do not count toward exit code 1.
 | Variable | Purpose |
 | --- | --- |
 | `BIRDSI_TOKEN` | Token to use instead of the saved sign-in. Starts with `bsi_`. |
-| `BIRDSI_API_URL` | birdsI address. Default `https://birds-i.vercel.app`. Must be https, except for localhost. |
+| `BIRDSI_API_URL` | birdsI address. Default `https://birdsi.vercel.app`. Must be https, except for localhost. |
 | `XDG_CONFIG_HOME` | Where the config folder lives. Default `~/.config`. |
 | `NO_COLOR` | Turns colour off. |
 
