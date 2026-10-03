@@ -81,12 +81,15 @@ function hitFor(map: Map<string, Hit>, entry: CatalogEntry | null, slug: string,
 function slugFromEnv(name: string): { slug: string; label: string } | null {
   if (GENERIC_ENV.has(name)) return null;
   const stripped = name.replace(/^(NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_|PUBLIC_|REACT_APP_|NUXT_PUBLIC_|NUXT_)/, "");
-  const m = stripped.match(/^([A-Z0-9]+(?:_[A-Z0-9]+)*?)_(API_KEY|APIKEY|SECRET_KEY|SECRET|TOKEN|ACCESS_TOKEN|AUTH_TOKEN|KEY|CLIENT_ID|CLIENT_SECRET|PUBLISHABLE_KEY|PRIVATE_KEY|APP_ID|PROJECT_ID|DSN|WEBHOOK_SECRET|URL|API_URL|ENDPOINT)$/);
+  // For a service birdsI does not know, only a key-shaped name is evidence. A bare
+  // SECRET, CLIENT_ID or URL is usually the app's own setting or a sign-in provider.
+  const m = stripped.match(/^([A-Z0-9]+(?:_[A-Z0-9]+)*?)_(API_KEY|APIKEY|API_TOKEN|ACCESS_TOKEN|AUTH_TOKEN|TOKEN|SECRET_KEY|PUBLISHABLE_KEY|PRIVATE_KEY|DSN|APP_ID|PROJECT_ID|API_URL|ENDPOINT)$/);
   if (!m) return null;
   const vendorPart = m[1]!;
   if (vendorPart.length < 3 || GENERIC_ENV.has(vendorPart)) return null;
-  if (/^(APP|DB|DATABASE|API|AUTH|JWT|SESSION|SERVER|CLIENT|PUBLIC|PRIVATE|INTERNAL|ADMIN|USER|SMTP|MAIL|EMAIL|REDIS|POSTGRES|MYSQL|MONGO|MONGODB|S3|CDN|SITE|WEB|NEXT|NEXTAUTH|CRON|WEBHOOK|OAUTH|GOOGLE|APPLE|FACEBOOK|TWITTER|LINKEDIN|DISCORD|SLACK)$/.test(vendorPart)) {
-    // Sign-in providers and infrastructure shorthand are not billed vendors by themselves.
+  const first = vendorPart.split("_")[0]!;
+  if (/^(APP|DB|DATABASE|API|AUTH|JWT|SESSION|SERVER|CLIENT|PUBLIC|PRIVATE|INTERNAL|ADMIN|USER|OPS|DEV|TEST|STAGING|PROD|SMTP|MAIL|EMAIL|REDIS|POSTGRES|MYSQL|MONGO|MONGODB|S3|CDN|SITE|WEB|IOS|ANDROID|NEXT|NEXTAUTH|CRON|WEBHOOK|OAUTH|GOOGLE|APPLE|FACEBOOK|TWITTER|LINKEDIN|DISCORD|SLACK|STUDENT|TEACHER|SCHOOL)$/.test(first)) {
+    // The app's own settings, sign-in providers and infrastructure shorthand are not billed vendors.
     return null;
   }
   const slug = vendorPart.toLowerCase().replace(/_/g, "-");

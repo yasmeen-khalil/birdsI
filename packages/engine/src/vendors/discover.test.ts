@@ -52,7 +52,7 @@ describe("discoverVendors", () => {
 
   it("names unknown vendors from their env var and ignores generic names", async () => {
     const dir = await fixture({
-      "app.py": 'import os\nkey = os.environ["ACME_WEATHER_API_KEY"]\nsecret = os.getenv("JWT_SECRET")\n',
+      "app.py": 'import os\nkey = os.environ["ACME_WEATHER_API_KEY"]\nsecret = os.getenv("JWT_SECRET")\ng = os.getenv("GOOGLE_IOS_CLIENT_ID")\ns = os.getenv("STUDENT_SESSION_SECRET")\no = os.getenv("OPS_SECRET")\n',
     });
     const inventory = await walkInventory(dir);
     const vendors = await discoverVendors(inventory, [], null);
