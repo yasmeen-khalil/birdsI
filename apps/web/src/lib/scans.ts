@@ -30,6 +30,7 @@ import type { ChatMessage, CreateScanRequest, FindingResponse, ScanResponse } fr
 import { ApiError } from "./api";
 import { envInt } from "./env";
 import { assertSpendCap, assertUserScanQuota, runningScanForRepo } from "./limits";
+import { loadInventory } from "./ops";
 
 /**
  * Scan and fix operations shared by the web pages and /api/v1. Every
@@ -156,12 +157,28 @@ export async function askRepo(repoId: string, user: UserRow, question: string): 
   }
   if (chunks.length === 0) chunks = (await chunksForRepo(repo.id)).map((c) => ({ path: c.path, lineStart: c.line_start, lineEnd: c.line_end, text: c.text }));
 
+  let projectSummary = "";
+  try {
+    const inv = await loadInventory(repo.id, user);
+    projectSummary = [
+      inv.vision.text ? `Vision: ${inv.vision.text.slice(0, 600)}` : "Vision: not written yet.",
+      `Vendors (${inv.vendors.length}): ${inv.vendors.map((v) => `${v.name}${v.facts.find((f) => f.kind === "plan") ? ` (${v.facts.find((f) => f.kind === "plan")!.value})` : ""}`).join(", ") || "none found yet"}`,
+      `Alerts: ${inv.alerts.map((a) => `[${a.level}] ${a.title}`).join("; ") || "none"}`,
+      `Tracking: ${inv.watches.map((w) => `${w.vendorName}: ${w.title}`).join("; ") || "nothing"}`,
+      `Stages: ${inv.stages.map((s) => `${s.label} ${s.freshness}`).join(", ")}`,
+      `Open questions for the owner: ${inv.openQuestions}. Pending approvals: ${inv.pendingActions}.`,
+      inv.latestScan ? `Latest scan: ${inv.latestScan.kind}, ${inv.latestScan.findings} open findings.` : "No scan has finished yet.",
+    ].join("\n");
+  } catch {
+    // The summary is a help, not a requirement.
+  }
   const answer = await answerQuestion(config, {
     question: trimmed,
     history: history.map((m) => ({ role: m.role, content: m.content })),
     chunks,
     findings,
     repoName: repo.full_name,
+    projectSummary,
     onUsage: (u) => recordUsage({ ownerUserId: user.id, scanId: latest?.id ?? null, fixId: null, purpose: u.purpose, model: u.model, inputTokens: u.inputTokens, outputTokens: u.outputTokens, costMicrodollars: u.costMicrodollars }),
   });
   const citations = answer.citations.map((c) => ({
