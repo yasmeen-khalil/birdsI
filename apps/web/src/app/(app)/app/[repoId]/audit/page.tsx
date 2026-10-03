@@ -285,7 +285,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
               <dt className="c3">Takes</dt>
               <dd style={{ margin: 0 }}>About 25 minutes. You can close the page.</dd>
               <dt className="c3">Covers</dt>
-              <dd style={{ margin: 0 }}>{latest?.stats ? `8 areas, ${plural(latest.stats.filesSeen, "file")}, ${plural(latest.stats.dependencies, "dependency", "dependencies")}` : "8 areas, every file and every dependency"}</dd>
+              <dd style={{ margin: 0 }}>{latest?.stats ? `${AUDIT_AREAS.length} areas, ${plural(latest.stats.filesSeen, "file")}, ${plural(latest.stats.dependencies, "dependency", "dependencies")}` : `${AUDIT_AREAS.length} areas, every file and every dependency`}</dd>
               <dt className="c3">When done</dt>
               <dd style={{ margin: 0 }}>The report appears on this page</dd>
             </dl>

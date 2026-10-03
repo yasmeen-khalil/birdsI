@@ -151,6 +151,13 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
         </section>
       )}
 
+      {ops.alerts.length === 0 && ops.watches.length > 0 && (
+        <Link href={`${base}/vendors`} className="t-small c2 inline-flex items-center gap-1.5 self-start max-[900px]:-mt-4 min-[901px]:-mt-10" style={{ minHeight: 32 }}>
+          Tracking {plural(ops.watches.length, "condition")} on your services
+          <ArrowRight {...icon14} />
+        </Link>
+      )}
+
       {latest && result && (
         <section className="grid grid-cols-1 gap-y-10 min-[901px]:grid-cols-12 min-[901px]:gap-x-6">
           <div className="flex min-w-0 flex-col gap-3.5 min-[901px]:col-span-7">

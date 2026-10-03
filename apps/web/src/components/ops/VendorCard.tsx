@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
-import { FACT_SOURCE_LABEL, type FactKind, type Vendor, type VendorFact } from "@birdsi/shared";
+import { FACT_SOURCE_LABEL, type FactKind, type Runway, type Vendor, type VendorFact, type Watch } from "@birdsi/shared";
 import { LocalTime } from "../LocalTime";
 import { hostOf, safeUrl } from "../format";
 import { icon14 } from "../icon";
-import { CATEGORY_LABEL } from "./OpsParts";
+import { CATEGORY_LABEL, WatchList } from "./OpsParts";
 
 const FACT_ORDER: FactKind[] = ["plan", "cost", "usage", "limit", "billing", "status"];
 const FACT_HEADING: Record<FactKind, string> = { plan: "Plan", cost: "Cost", usage: "Usage", limit: "Limits", billing: "Billing", status: "Status", purpose: "Purpose" };
@@ -28,7 +28,7 @@ function UsageBar({ fact }: { fact: VendorFact }) {
   );
 }
 
-function FactLine({ fact }: { fact: VendorFact }) {
+function FactLine({ fact, runway }: { fact: VendorFact; runway?: Runway }) {
   const url = safeUrl(fact.evidence?.url);
   return (
     <div className="flex flex-col gap-1" style={{ padding: "10px 0", borderTop: "1px solid var(--line)" }}>
@@ -40,6 +40,11 @@ function FactLine({ fact }: { fact: VendorFact }) {
         </span>
       </span>
       {fact.kind === "usage" && <UsageBar fact={fact} />}
+      {runway?.runsOutAt && (
+        <span className="t-small c3">
+          At the current rate, runs out around <LocalTime iso={runway.runsOutAt} style="date" />
+        </span>
+      )}
       <span className="t-small c3 flex flex-wrap items-center gap-x-2">
         <span>{FACT_SOURCE_LABEL[fact.source]}</span>
         <span aria-hidden="true">/</span>
@@ -56,7 +61,8 @@ function FactLine({ fact }: { fact: VendorFact }) {
 }
 
 /** One vendor: what it is, what this app uses it for, how birdsI knows, and every fact with its source. */
-export function VendorCard({ vendor }: { vendor: Vendor }) {
+export function VendorCard({ vendor, watches = [], runways = [] }: { vendor: Vendor; watches?: Watch[]; runways?: Runway[] }) {
+  const runwayFor = new Map(runways.map((r) => [r.metric, r]));
   const groups = FACT_ORDER.map((kind) => ({ kind, facts: vendor.facts.filter((f) => f.kind === kind) })).filter((g) => g.facts.length > 0);
   const docs = safeUrl(vendor.docsUrl);
   const pricing = safeUrl(vendor.pricingUrl);
@@ -138,10 +144,18 @@ export function VendorCard({ vendor }: { vendor: Vendor }) {
                 {FACT_HEADING[g.kind]}
               </h4>
               {g.facts.map((f) => (
-                <FactLine key={f.id} fact={f} />
+                <FactLine key={f.id} fact={f} runway={f.kind === "usage" ? runwayFor.get(f.metric) : undefined} />
               ))}
             </div>
           ))
+        )}
+        {watches.length > 0 && (
+          <div className="flex flex-col">
+            <h4 className="t-label c3" style={{ paddingBottom: 4 }}>
+              Tracking
+            </h4>
+            <WatchList watches={watches} showVendor={false} compact />
+          </div>
         )}
       </div>
     </article>

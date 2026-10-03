@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition, type ReactNode } from "react";
 import { Check, X } from "lucide-react";
-import type { ScanEventRecord, ScanKind, ScanStatus } from "@birdsi/shared";
+import { AUDIT_AREAS, type ScanEventRecord, type ScanKind, type ScanStatus } from "@birdsi/shared";
 import { stopDemoScanAction, stopScanAction } from "@/lib/actions";
 import { Arc } from "../Arc";
 import { BirdsEyeMap, hitsFromFindings, MapLegend } from "../BirdsEyeMap";
@@ -33,7 +33,7 @@ export interface LiveScanProps {
   expectedSeconds: number;
   scanError?: string | null;
   leaveNote: string;
-  /** Pre-launch audit: the eight areas, judged once every file is read. */
+  /** Pre-launch audit: the launch areas, judged once every file is read. */
   areaTitles?: Record<string, string>;
 }
 
@@ -282,8 +282,8 @@ export function LiveScan(props: LiveScanProps) {
         {props.areaTitles && (
           <div className="flex flex-col">
             <div className="flex items-baseline justify-between gap-3" style={{ paddingBottom: 8 }}>
-              <h2 className="t-h3">The eight launch areas</h2>
-              <span className="t-small c3">{view.areas.length > 0 ? `${view.areas.length} of 8 judged` : "Judged once every file is read"}</span>
+              <h2 className="t-h3">The {AUDIT_AREAS.length} launch areas</h2>
+              <span className="t-small c3">{view.areas.length > 0 ? `${view.areas.length} of ${AUDIT_AREAS.length} judged` : "Judged once every file is read"}</span>
             </div>
             {Object.entries(props.areaTitles).map(([area, title], i, all) => {
               const result = view.areas.find((a) => a.area === area);

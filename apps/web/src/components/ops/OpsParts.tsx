@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import type { Alert, AlertLevel, StageState, VendorCategory } from "@birdsi/shared";
+import type { Alert, AlertLevel, StageState, VendorCategory, Watch } from "@birdsi/shared";
 import { Arc } from "../Arc";
 import { CopyButton } from "../CopyButton";
 import { LocalTime } from "../LocalTime";
@@ -108,7 +108,15 @@ export function AlertList({ alerts, vendorsHref, limit }: { alerts: Alert[]; ven
             <span className="t-body" style={{ fontWeight: 600 }}>
               {a.title}
             </span>
-            <span className="t-small c2">{a.detail}</span>
+            <span className="t-small c2">
+              {a.detail}
+              {a.runsOutAt && (
+                <>
+                  {" "}
+                  Runs out around <LocalTime iso={a.runsOutAt} style="date" />.
+                </>
+              )}
+            </span>
             {a.suggestedCommand && (
               <span className="code mt-1.5 flex items-center justify-between gap-3" style={{ padding: "6px 6px 6px 14px" }}>
                 <code className="t-mono-s min-w-0 overflow-x-auto whitespace-pre" style={{ color: "var(--text)" }}>
@@ -127,5 +135,33 @@ export function AlertList({ alerts, vendorsHref, limit }: { alerts: Alert[]; ven
         </Link>
       )}
     </div>
+  );
+}
+
+/**
+ * Conditions worth tracking, not alerts: something that might happen (a free
+ * plan that pauses when idle, a trial that ends). Quiet on purpose, no warning colour.
+ */
+export function WatchList({ watches, showVendor = true, compact = false }: { watches: Watch[]; showVendor?: boolean; compact?: boolean }) {
+  return (
+    <ul className="m-0 flex list-none flex-col p-0">
+      {watches.map((w, i) => (
+        <li key={w.id} className="flex flex-col gap-1" style={{ padding: compact ? "10px 0" : "14px 0", borderTop: "1px solid var(--line)", ...(i === watches.length - 1 ? { borderBottom: "1px solid var(--line)" } : {}) }}>
+          <span className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+            <span className={compact ? "t-small" : "t-body"} style={{ fontWeight: 600 }}>
+              {showVendor && w.vendorName ? `${w.vendorName}: ` : ""}
+              {w.title}
+            </span>
+            {w.dueAt && (
+              <span className="t-small c2">
+                <LocalTime iso={w.dueAt} style="date" />
+              </span>
+            )}
+          </span>
+          <span className="t-small c2">{w.detail}</span>
+          {w.needs && <span className="t-small c3">To know for sure: {w.needs}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }

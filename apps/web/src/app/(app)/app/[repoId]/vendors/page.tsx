@@ -4,7 +4,7 @@ import type { VendorCategory } from "@birdsi/shared";
 import { LocalTime } from "@/components/LocalTime";
 import { ScanAgainButton } from "@/components/ScanActions";
 import { plural } from "@/components/format";
-import { AlertList, CATEGORY_LABEL, usd } from "@/components/ops/OpsParts";
+import { AlertList, CATEGORY_LABEL, usd, WatchList } from "@/components/ops/OpsParts";
 import { RefreshVendorsButton } from "@/components/ops/RefreshVendors";
 import { VendorCard } from "@/components/ops/VendorCard";
 import { recentScans, repoContext, runningOf } from "@/components/server/data";
@@ -17,7 +17,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
   const { user, repo } = await repoContext(repoId);
   const [data, scans] = await Promise.all([loadVendors(repo.id, user), recentScans(repo.id)]);
   const running = runningOf(scans);
-  const { vendors, alerts, monthlyUsd } = data;
+  const { vendors, alerts, watches, runways, monthlyUsd } = data;
 
   const counts = new Map<VendorCategory, number>();
   for (const v of vendors) counts.set(v.category, (counts.get(v.category) ?? 0) + 1);
@@ -107,13 +107,27 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
             </section>
           )}
 
+          {watches.length > 0 && (
+            <section className="flex flex-col gap-4" aria-labelledby="tracking-title">
+              <div className="flex flex-col gap-1.5">
+                <h2 id="tracking-title" className="t-h2 max-[900px]:text-[24px]!">
+                  Tracking
+                </h2>
+                <p className="t-body c2" style={{ maxWidth: 720 }}>
+                  Conditions that might happen, not problems yet. birdsI keeps an eye on them and raises an alert only when it sees one happening.
+                </p>
+              </div>
+              <WatchList watches={watches} />
+            </section>
+          )}
+
           <section className="flex flex-col gap-4" aria-labelledby="list-title">
             <h2 id="list-title" className="t-h2 max-[900px]:text-[24px]!">
               {plural(vendors.length, "vendor")}
             </h2>
             <div className="flex flex-col gap-4">
               {sorted.map((v) => (
-                <VendorCard key={v.id} vendor={v} />
+                <VendorCard key={v.id} vendor={v} watches={watches.filter((w) => w.vendorId === v.id)} runways={runways[v.id] ?? []} />
               ))}
             </div>
           </section>
