@@ -137,8 +137,51 @@ export const Alert = z.object({
   detail: z.string(),
   /** A proposed action an agent or the owner can take, when there is one. */
   suggestedCommand: z.string().nullable(),
+  /** For limit alerts: when it runs out at the observed rate, when known. */
+  runsOutAt: z.string().nullable().default(null),
 });
 export type Alert = z.infer<typeof Alert>;
+
+/**
+ * A condition worth tracking, as opposed to an alert about something true
+ * now: a free plan that pauses after inactivity, a trial that ends on a date.
+ * Shown as a tracker on the vendor, never as a warning, until evidence shows
+ * it is happening.
+ */
+export const Watch = z.object({
+  id: z.string(),
+  vendorId: z.string(),
+  vendorName: z.string(),
+  title: z.string(),
+  detail: z.string(),
+  /** When the condition is dated (a trial end), the date. */
+  dueAt: z.string().nullable(),
+  /** The evidence birdsI would need to turn this into an alert, in plain words. */
+  needs: z.string().nullable(),
+});
+export type Watch = z.infer<typeof Watch>;
+
+/** How long a counted limit lasts at the observed rate. */
+export const Runway = z.object({
+  metric: z.string(),
+  label: z.string(),
+  perDay: z.number(),
+  runsOutAt: z.string().nullable(),
+  daysLeft: z.number().nullable(),
+  observations: z.number().int(),
+});
+export type Runway = z.infer<typeof Runway>;
+
+/** What the audit sees of operations, built from stored facts before a scan runs. */
+export const OpsSummary = z.object({
+  vendors: z.number().int().nonnegative(),
+  plansKnown: z.number().int().nonnegative(),
+  connected: z.number().int().nonnegative(),
+  alerts: z.array(z.object({ level: AlertLevel, title: z.string() })),
+  watches: z.array(z.object({ title: z.string() })),
+  lastSyncAt: z.string().nullable(),
+});
+export type OpsSummary = z.infer<typeof OpsSummary>;
 
 export const QuestionStatus = z.enum(["open", "answered", "dismissed"]);
 export type QuestionStatus = z.infer<typeof QuestionStatus>;
@@ -264,6 +307,9 @@ export const STAGE_FRESH_HOURS: Record<StageId, number> = { inventory: 24, docs:
 export const VendorsResponse = z.object({
   vendors: z.array(Vendor),
   alerts: z.array(Alert),
+  watches: z.array(Watch),
+  /** Runway per vendor id, for counted limits with enough history. */
+  runways: z.record(z.string(), z.array(Runway)),
   stages: z.array(StageState),
   /** Monthly spend across vendors where known, in US dollars. */
   monthlyUsd: z.number().nullable(),
@@ -323,6 +369,7 @@ export const InventoryResponse = z.object({
   vision: Vision,
   vendors: z.array(Vendor),
   alerts: z.array(Alert),
+  watches: z.array(Watch),
   stages: z.array(StageState),
   openQuestions: z.number().int().nonnegative(),
   pendingActions: z.number().int().nonnegative(),

@@ -135,8 +135,10 @@ describe("runScan over the sample repository", () => {
       onEvent: async () => {},
     });
     expect(result.audit?.verdict).toBe("not_ready");
-    expect(result.audit?.areas).toHaveLength(8);
+    expect(result.audit?.areas).toHaveLength(9);
     expect(result.audit?.areas.find((a) => a.area === "secrets")?.verdict).toBe("blocker");
+    // Operations is judged by rule; before the first sync it passes with a note saying so.
+    expect(result.audit?.areas.find((a) => a.area === "operations")?.verdict).toBe("pass");
   });
 
   it("stops cleanly when aborted", async () => {

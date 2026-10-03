@@ -11,7 +11,7 @@ export { prioritise, priorityOf } from "./inventory/priority";
 export { ALL_CHECKS, checksFor } from "./checks/registry";
 export type { Check, CheckContext } from "./checks/types";
 export { redact } from "./checks/secrets";
-export { AREA_LABELS, areaOf } from "./checks/audit";
+export { AREA_LABELS, areaOf, operationsArea } from "./checks/audit";
 export { runScan, STEP_LABELS, type ScanInput, type ScanResult } from "./scan/runner";
 export { rankFindings, summarise } from "./scan/rank";
 export { buildDigest, numberLines } from "./scan/digest";

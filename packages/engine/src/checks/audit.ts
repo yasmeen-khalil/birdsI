@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AUDIT_AREAS, type AuditArea, type AuditReport, type FindingDraft } from "@birdsi/shared";
+import { AUDIT_AREAS, MODEL_AUDIT_AREAS, type AuditArea, type AuditAreaResult, type AuditReport, type FindingDraft, type OpsSummary } from "@birdsi/shared";
 import { toJsonSchema } from "../models/schema";
 import { REVIEW_VOICE } from "./model-findings";
 import { errorMessage } from "./review";
@@ -14,16 +14,17 @@ const AREA_LABELS: Record<AuditArea, { title: string; question: string }> = {
   config: { title: "Deployment settings", question: "Are production settings safe: debug off, CORS scoped, security headers, rate limits on public endpoints, env separation?" },
   legal: { title: "Legal pages", question: "Does the app have a privacy policy and terms, and does what they say match what the code does with data?" },
   tests: { title: "Tests and checks", question: "Is there any automated test or type check that would catch a broken deploy?" },
+  operations: { title: "Services and limits", question: "Are the services the app runs on known, on plans that will not pause or run out, and is anything near a limit?" },
 };
 
 const AreaVerdict = z.object({
-  area: z.enum(AUDIT_AREAS),
+  area: z.enum(MODEL_AUDIT_AREAS as [AuditArea, ...AuditArea[]]),
   verdict: z.enum(["pass", "attention", "blocker"]),
   note: z.string().max(400).describe("Two sentences at most: what was seen and what it means for launch"),
 });
 const AuditOutput = z.object({
   headline: z.string().max(160).describe("One sentence verdict a founder can act on"),
-  areas: z.array(AreaVerdict).length(AUDIT_AREAS.length),
+  areas: z.array(AreaVerdict).length(MODEL_AUDIT_AREAS.length),
   blockers: z.array(z.string().max(160)).max(8).describe("Things that must be fixed before launch, each one line"),
   fixBeforeLaunch: z.array(z.string().max(160)).max(10).describe("Strongly advised before launch"),
   canWait: z.array(z.string().max(160)).max(10).describe("Fine to do after launch"),
@@ -41,11 +42,12 @@ You have the repository overview, every finding from a deep scan (with confidenc
  */
 export async function runAudit(ctx: CheckContext, findings: FindingDraft[]): Promise<AuditReport> {
   const facts = await auditFacts(ctx);
+  const operations = operationsArea(ctx.ops);
   const findingsText = findings
     .slice(0, 80)
     .map((f) => `- [${f.severity}/${f.confidence}/${f.category}] ${f.title}${f.location ? ` (${f.location.path})` : ""}: ${f.explanation.slice(0, 200)}`)
     .join("\n");
-  const areasText = AUDIT_AREAS.map((a) => `${a}: ${AREA_LABELS[a].title}. ${AREA_LABELS[a].question}`).join("\n");
+  const areasText = MODEL_AUDIT_AREAS.map((a) => `${a}: ${AREA_LABELS[a].title}. ${AREA_LABELS[a].question}`).join("\n");
   const tier = ctx.budget.crosscheckModel ?? ctx.budget.reviewModel;
   try {
     const output = await ctx.models.complete({
@@ -60,28 +62,30 @@ export async function runAudit(ctx: CheckContext, findings: FindingDraft[]): Pro
       maxOutputTokens: 3000,
       signal: ctx.signal,
     });
-    const areas = AUDIT_AREAS.map((area) => {
+    const areas: AuditAreaResult[] = MODEL_AUDIT_AREAS.map((area) => {
       const v = output.areas.find((a) => a.area === area) ?? { area, verdict: "attention" as const, note: "Not assessed." };
       const relevant = findings.filter((f) => areaOf(f) === area).map((f) => f.key);
       return { area, verdict: v.verdict, note: v.note, findingIds: relevant };
     });
+    areas.push(operations);
     for (const a of areas) await ctx.emit({ type: "audit_area", area: a.area, verdict: a.verdict, note: a.note });
     const hasBlocker = areas.some((a) => a.verdict === "blocker");
     return {
       verdict: hasBlocker ? "not_ready" : "ready",
       headline: output.headline,
       areas,
-      blockers: output.blockers,
+      blockers: [...output.blockers, ...(operations.verdict === "blocker" ? [operations.note.split(". ")[0] ?? operations.note] : [])],
       fixBeforeLaunch: output.fixBeforeLaunch,
       canWait: output.canWait,
     };
   } catch (error) {
     await ctx.note(`The audit verdict could not be produced: ${errorMessage(error)}`);
-    const areas = AUDIT_AREAS.map((area) => {
+    const areas: AuditAreaResult[] = MODEL_AUDIT_AREAS.map((area) => {
       const relevant = findings.filter((f) => areaOf(f) === area);
       const worst = relevant.find((f) => f.severity === "critical") ? "blocker" : relevant.length > 0 ? "attention" : "pass";
       return { area, verdict: worst as "pass" | "attention" | "blocker", note: relevant.length > 0 ? `${relevant.length} related finding${relevant.length === 1 ? "" : "s"}.` : "Nothing found.", findingIds: relevant.map((f) => f.key) };
     });
+    areas.push(operations);
     const hasBlocker = areas.some((a) => a.verdict === "blocker");
     return {
       verdict: hasBlocker ? "not_ready" : "ready",
@@ -92,6 +96,32 @@ export async function runAudit(ctx: CheckContext, findings: FindingDraft[]): Pro
       canWait: findings.filter((f) => f.severity === "medium" || f.severity === "low").map((f) => f.title).slice(0, 10),
     };
   }
+}
+
+/**
+ * The operations area is judged by rule, never by the model: a blocker is a
+ * paused project or a limit at 95%; attention is a limit at 80% or a plan
+ * birdsI could not learn; conditions that might happen are named, not held
+ * against the launch. With no sync yet, it says so instead of guessing.
+ */
+export function operationsArea(ops: OpsSummary | null): AuditAreaResult {
+  if (!ops || ops.vendors === 0) {
+    return { area: "operations", verdict: "pass", note: ops ? "No outside services were found in the code." : "The services the app runs on have not been synced yet; this area is judged after the first sync.", findingIds: [] };
+  }
+  const critical = ops.alerts.filter((a) => a.level === "critical");
+  const warnings = ops.alerts.filter((a) => a.level === "warning");
+  const unknownPlans = ops.vendors - ops.plansKnown;
+  const watching = ops.watches.length > 0 ? ` Tracking: ${ops.watches.slice(0, 3).map((w) => w.title.toLowerCase()).join("; ")}.` : "";
+  if (critical.length > 0) {
+    return { area: "operations", verdict: "blocker", note: `${critical.map((a) => a.title).join(". ")}. Launching now means users hit this.${watching}`, findingIds: [] };
+  }
+  if (warnings.length > 0 || unknownPlans > 0) {
+    const parts = [];
+    if (warnings.length > 0) parts.push(warnings.map((a) => a.title).join(". "));
+    if (unknownPlans > 0) parts.push(`${unknownPlans} of ${ops.vendors} services have no known plan, so their limits cannot be watched`);
+    return { area: "operations", verdict: "attention", note: `${parts.join(". ")}.${watching}`, findingIds: [] };
+  }
+  return { area: "operations", verdict: "pass", note: `${ops.vendors} services known, ${ops.plansKnown} with plans, ${ops.connected} connected. Nothing is near a limit.${watching}`, findingIds: [] };
 }
 
 /** Maps a finding to the audit area it informs. */

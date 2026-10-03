@@ -378,6 +378,7 @@ const AUDIT_AREA_WORD: Record<AuditReport["areas"][number]["area"], string> = {
   dependencies: "Dependencies",
   errors: "Error handling",
   config: "Configuration",
+  operations: "Services and limits",
   legal: "Legal pages",
   tests: "Tests",
 };

@@ -8,6 +8,7 @@ import {
   decideAction,
   deleteConnection,
   enqueueJob,
+  factHistory,
   factsForVendors,
   findingsForScan,
   isSecretsKeyConfigured,
@@ -32,7 +33,7 @@ import {
   visionForRepo,
   type UserRow,
 } from "@birdsi/db";
-import { computeAlerts, CONNECTOR_BY_SLUG, connectorInfo, monthlySpend, stageStates } from "@birdsi/engine";
+import { computeAlerts, computeRunway, computeWatches, CONNECTOR_BY_SLUG, connectorInfo, monthlySpend, stageStates } from "@birdsi/engine";
 import type { ActionRequest, ActionsResponse, AskOwnerRequest, InventoryResponse, Question, RequestActionRequest, UpdatePolicyRequest, Vendor, VendorsResponse, Vision } from "@birdsi/shared";
 import { ApiError } from "./api";
 import { assertSpendCap } from "./limits";
@@ -57,7 +58,16 @@ export async function loadVendors(repoId: string, user: UserRow): Promise<Vendor
     if (k && !v.pricingUrl) v.pricingUrl = k.pricingUrl;
     return v;
   });
-  const alerts = computeAlerts(vendors, knowledge, errors);
+  const history = await factHistory(rows.map((r) => r.id));
+  const runways: Record<string, ReturnType<typeof computeRunway>> = {};
+  const runwayMap = new Map<string, ReturnType<typeof computeRunway>>();
+  for (const v of vendors) {
+    const r = computeRunway(history.get(v.id) ?? [], new Map(v.facts.map((f) => [f.metric, f.label])));
+    if (r.length > 0) runways[v.id] = r;
+    runwayMap.set(v.id, r);
+  }
+  const alerts = computeAlerts(vendors, knowledge, errors, runwayMap);
+  const watches = computeWatches(vendors, knowledge);
   const running = scans.some((s) => s.status === "queued" || s.status === "running");
   const latestDone = scans.find((s) => s.status === "done") ?? null;
   const latestAudit = scans.find((s) => s.status === "done" && (s.kind === "deep" || s.kind === "audit")) ?? null;
@@ -70,7 +80,7 @@ export async function loadVendors(repoId: string, user: UserRow): Promise<Vendor
     lastOpsAt: repo.vendors_synced_at,
     opsRunning: syncRunning,
   });
-  return { vendors, alerts, stages, monthlyUsd: monthlySpend(vendors, knowledge), syncRunning, lastSyncAt: repo.vendors_synced_at };
+  return { vendors, alerts, watches, runways, stages, monthlyUsd: monthlySpend(vendors, knowledge), syncRunning, lastSyncAt: repo.vendors_synced_at };
 }
 
 /** Starts the ops stage alone. Needs a finished scan first, because vendors come from the scan. */
@@ -230,6 +240,7 @@ export async function loadInventory(repoId: string, user: UserRow): Promise<Inve
     vision,
     vendors: vendors.vendors,
     alerts: vendors.alerts,
+    watches: vendors.watches,
     stages: vendors.stages,
     openQuestions: questions.length,
     pendingActions: actions.length,

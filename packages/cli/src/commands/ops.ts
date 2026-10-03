@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { ActionRequest, Alert, Question, Vendor, VendorFact } from "@birdsi/shared";
+import type { ActionRequest, Alert, Question, Vendor, VendorFact, Watch } from "@birdsi/shared";
 import { FACT_SOURCE_LABEL } from "@birdsi/shared";
 import { ApiClient, toCliError } from "../api";
 import { readConfig } from "../config";
@@ -50,7 +50,7 @@ function factLine(f: VendorFact, style: Style): string {
   return `    ${f.label}: ${paint.bold(style, f.value)}${bar}  ${paint.dim(style, FACT_SOURCE_LABEL[f.source].toLowerCase())}`;
 }
 
-export function formatVendors(vendors: readonly Vendor[], alerts: readonly Alert[], monthlyUsd: number | null, style: Style): string {
+export function formatVendors(vendors: readonly Vendor[], alerts: readonly Alert[], monthlyUsd: number | null, style: Style, watches: readonly Watch[] = []): string {
   const g = glyphs(style);
   const lines: string[] = [];
   lines.push(paint.bold(style, `${plural(vendors.length, "vendor")}${monthlyUsd !== null ? `, about $${monthlyUsd}/month where known` : ""}`));
@@ -61,6 +61,11 @@ export function formatVendors(vendors: readonly Vendor[], alerts: readonly Alert
       lines.push(wrap(a.detail, style, "  "));
       if (a.suggestedCommand) lines.push(paint.dim(style, `  Try: ${a.suggestedCommand}`));
     }
+  }
+  if (watches.length > 0) {
+    lines.push("");
+    lines.push(paint.dim(style, "Tracking (not alerts):"));
+    for (const w of watches) lines.push(paint.dim(style, `  ${w.vendorName}: ${w.title}`));
   }
   for (const v of vendors) {
     lines.push("");
@@ -91,7 +96,7 @@ export async function vendorsCommand(options: PrintOptions & { sync?: boolean })
       return EXIT.ok;
     }
     println(paint.dim(style, repo.fullName));
-    println(formatVendors(result.data.vendors, result.data.alerts, result.data.monthlyUsd, style));
+    println(formatVendors(result.data.vendors, result.data.alerts, result.data.monthlyUsd, style, result.data.watches));
     const stale = result.data.stages.filter((s) => s.freshness === "stale" || s.freshness === "never");
     if (stale.length > 0) {
       println();

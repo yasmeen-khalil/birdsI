@@ -1,4 +1,4 @@
-import type { Dependency, FindingDraft, ScanKind, ScanStep } from "@birdsi/shared";
+import type { Dependency, FindingDraft, OpsSummary, ScanKind, ScanStep } from "@birdsi/shared";
 import type { EngineConfig, ScanBudget } from "../config";
 import type { Inventory, InventoryFile } from "../inventory/walk";
 import type { RawDependency } from "../inventory/manifests";
@@ -29,6 +29,8 @@ export interface CheckContext {
   appDescription: string | null;
   /** Findings produced so far, for checks that build on earlier ones. */
   findingsSoFar: FindingDraft[];
+  /** What is known about the app's services and limits from earlier syncs; null before the first. */
+  ops: OpsSummary | null;
 }
 
 /**

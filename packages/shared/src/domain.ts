@@ -204,8 +204,11 @@ export const AUDIT_AREAS = [
   "config",
   "legal",
   "tests",
+  "operations",
 ] as const;
 export const AuditArea = z.enum(AUDIT_AREAS);
+/** The areas the model judges from findings; operations is judged deterministically from vendor facts. */
+export const MODEL_AUDIT_AREAS = AUDIT_AREAS.filter((a) => a !== "operations") as Exclude<AuditArea, "operations">[];
 export type AuditArea = z.infer<typeof AuditArea>;
 
 export const AuditAreaResult = z.object({

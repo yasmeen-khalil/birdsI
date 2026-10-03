@@ -150,11 +150,39 @@ export interface FactInput {
   evidence?: VendorFact["evidence"];
 }
 
+export interface FactObservation {
+  metric: string;
+  numeric: number;
+  limit_numeric: number | null;
+  observed_at: string;
+}
+
+/** Appends usage observations so runway can be computed from the rate. */
+export async function recordFactHistory(vendorId: string, facts: FactInput[]): Promise<void> {
+  const rows = facts.filter((f) => f.kind === "usage" && f.numeric !== null).map((f) => ({ vendor_id: vendorId, metric: f.metric, numeric: f.numeric, limit_numeric: f.limitNumeric }));
+  if (rows.length === 0) return;
+  const db = getDb();
+  const { error } = await db.from("vendor_fact_history").insert(rows);
+  if (error) throw new Error(`recordFactHistory: ${error.message}`);
+}
+
+export async function factHistory(vendorIds: string[], days = 60): Promise<Map<string, FactObservation[]>> {
+  const out = new Map<string, FactObservation[]>();
+  if (vendorIds.length === 0) return out;
+  const db = getDb();
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const { data, error } = await db.from("vendor_fact_history").select("vendor_id, metric, numeric, limit_numeric, observed_at").in("vendor_id", vendorIds).gte("observed_at", since).order("observed_at");
+  if (error) throw new Error(`factHistory: ${error.message}`);
+  for (const r of (data ?? []) as Array<FactObservation & { vendor_id: string }>) out.set(r.vendor_id, [...(out.get(r.vendor_id) ?? []), r]);
+  return out;
+}
+
 /** Writes facts from one source for one vendor, replacing that source's earlier facts. */
 export async function replaceFacts(vendorId: string, source: FactSource, facts: FactInput[]): Promise<void> {
   const db = getDb();
   const { error: delError } = await db.from("vendor_facts").delete().eq("vendor_id", vendorId).eq("source", source);
   if (delError) throw new Error(`replaceFacts delete: ${delError.message}`);
+  if (source === "connector" || source === "asked") await recordFactHistory(vendorId, facts);
   if (facts.length === 0) return;
   const rows = facts.map((f) => ({
     vendor_id: vendorId,

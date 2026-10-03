@@ -56,6 +56,7 @@ export const en = {
     config: "Deployment settings",
     legal: "Legal pages",
     tests: "Tests and checks",
+    operations: "Services and limits",
   },
   auditVerdict: {
     ready: "Ready to launch.",

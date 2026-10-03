@@ -4,7 +4,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   appendEvent,
+  connectionsForUser,
   downloadSnapshot,
+  factHistory,
+  factsForVendors,
+  knowledgeFor,
+  toVendor,
+  vendorsForRepo,
   enqueueJob,
   insertDependencies,
   insertFindings,
@@ -17,8 +23,8 @@ import {
   updateScan,
   type JobRow,
 } from "@birdsi/db";
-import { GitHubSource, runScan, snapshotFromDirectory, snapshotFromTarball, type EngineConfig, type Snapshot } from "@birdsi/engine";
-import type { ProjectHints, ScanEvent } from "@birdsi/shared";
+import { computeAlerts, computeRunway, computeWatches, GitHubSource, runScan, snapshotFromDirectory, snapshotFromTarball, type EngineConfig, type Snapshot } from "@birdsi/engine";
+import type { OpsSummary, ProjectHints, ScanEvent } from "@birdsi/shared";
 
 /**
  * Runs one scan job end to end: resolves the code, runs the engine, stores
@@ -52,6 +58,7 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
 
   let snapshot: Snapshot | null = null;
   const hints: ProjectHints | null = scan.snapshot_id ? (((await snapshotById(scan.snapshot_id))?.project_hints as ProjectHints | null) ?? null) : null;
+  const ops = scan.repo_id && scan.owner_user_id ? await opsSummaryFor(scan.repo_id, scan.owner_user_id) : null;
   try {
     const result = await runScan(config, {
       kind: scan.kind,
@@ -62,6 +69,7 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
       },
       appDescription: scan.app_description,
       projectHints: hints,
+      ops,
       signal: controller.signal,
       onEvent: emit,
       traceMetadata: { scanId, kind: scan.kind, source: scan.source },
@@ -101,6 +109,29 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
     clearInterval(ticker);
     await (snapshot as Snapshot | null)?.cleanup();
   }
+}
+
+/** What earlier syncs learned about the app's services, for the audit's operations area. Null before the first sync. */
+async function opsSummaryFor(repoId: string, ownerUserId: string): Promise<OpsSummary | null> {
+  const rows = await vendorsForRepo(repoId);
+  if (rows.length === 0) return null;
+  const [facts, connections, knowledge, history] = await Promise.all([factsForVendors(rows.map((r) => r.id)), connectionsForUser(ownerUserId), knowledgeFor(rows.map((r) => r.slug)), factHistory(rows.map((r) => r.id))]);
+  const connected = new Set(connections.map((c) => c.vendor_slug));
+  const errors = new Map(connections.filter((c) => c.last_status === "failed" && c.last_error).map((c) => [c.vendor_slug, c.last_error!]));
+  const vendors = rows.map((r) => toVendor(r, facts.filter((f) => f.vendor_id === r.id), connected.has(r.slug)));
+  const runways = new Map(vendors.map((v) => [v.id, computeRunway(history.get(v.id) ?? [], new Map(v.facts.map((f) => [f.metric, f.label])))]));
+  const alerts = computeAlerts(vendors, knowledge, errors, runways);
+  const watches = computeWatches(vendors, knowledge);
+  const syncedAt = (await (await import("@birdsi/db")).repoWithInstallation(repoId)).repo.vendors_synced_at;
+  if (!syncedAt) return null;
+  return {
+    vendors: vendors.length,
+    plansKnown: vendors.filter((v) => v.facts.some((f) => f.kind === "plan")).length,
+    connected: vendors.filter((v) => v.connected).length,
+    alerts: alerts.map((a) => ({ level: a.level, title: a.title })),
+    watches: watches.map((w) => ({ title: w.title })),
+    lastSyncAt: syncedAt,
+  };
 }
 
 /** The bundled sample, found from this file whether running from source or from the built bundle. */

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AuditReport, Dependency, FindingDraft, ProjectHints, ScanEvent, ScanKind, ScanStats, ScanStep, ScanSummary, VendorDraft } from "@birdsi/shared";
+import type { AuditReport, Dependency, FindingDraft, OpsSummary, ProjectHints, ScanEvent, ScanKind, ScanStats, ScanStep, ScanSummary, VendorDraft } from "@birdsi/shared";
 import { runAudit } from "../checks/audit";
 import { checksFor } from "../checks/registry";
 import type { Check, CheckContext } from "../checks/types";
@@ -23,6 +23,8 @@ export interface ScanInput {
   appDescription?: string | null;
   /** Hints the CLI collected on the owner's machine (Stripe Projects state and spend). */
   projectHints?: ProjectHints | null;
+  /** The operations picture from earlier syncs, for the audit's operations area. */
+  ops?: OpsSummary | null;
   signal?: AbortSignal;
   onEvent: (event: ScanEvent) => Promise<void>;
   onUsage?: (usage: Usage) => Promise<void> | void;
@@ -165,6 +167,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
     signal,
     appDescription: input.appDescription ?? null,
     findingsSoFar: findings,
+    ops: input.ops ?? null,
   };
 
   // Checks, grouped by step so the progress view shows one line per step.

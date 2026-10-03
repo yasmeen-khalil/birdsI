@@ -268,6 +268,7 @@ export function createServer(): McpServer {
       if (inv.latestScan) lines.push(`Latest scan: ${inv.latestScan.kind} ${inv.latestScan.id}, ${inv.latestScan.findings} open findings${inv.latestScan.headline ? `. ${inv.latestScan.headline}` : ""}`);
       lines.push("");
       lines.push(`Alerts (${inv.alerts.length}):`, ...(inv.alerts.length ? inv.alerts.map((a) => `- [${a.level}] ${a.title}. ${a.detail}${a.suggestedCommand ? ` Suggested: ${a.suggestedCommand}` : ""}`) : ["- none"]), "");
+      if (inv.watches.length > 0) lines.push(`Tracking (conditions, not alerts):`, ...inv.watches.map((w) => `- ${w.vendorName}: ${w.title}. ${w.detail}${w.needs ? ` To know for sure: ${w.needs}` : ""}`), "");
       lines.push(`Vendors (${inv.vendors.length}):`);
       for (const v of inv.vendors) {
         const plan = v.facts.find((f) => f.kind === "plan");

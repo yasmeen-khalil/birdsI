@@ -27,6 +27,7 @@ const AREA_HINTS: Record<AuditArea, string> = {
   config: "Production settings are safe and every setting your code needs exists",
   legal: "A privacy policy and terms that match what the code does",
   tests: "Something catches a broken deploy before your users do",
+  operations: "The services it runs on are known, on plans that will not pause, and nothing is near a limit",
 };
 
 function areaTitles(): Record<string, string> {
