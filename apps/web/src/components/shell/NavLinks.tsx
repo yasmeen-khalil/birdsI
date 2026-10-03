@@ -15,8 +15,6 @@ export const NAV_ITEMS = [
 export function activeNav(pathname: string, repoId: string): string | null {
   const base = `/app/${repoId}`;
   if (pathname === base) return "overview";
-  // Dependencies are part of the overview; the full list lives one level down.
-  if (pathname.startsWith(`${base}/dependencies`)) return "overview";
   for (const item of NAV_ITEMS) if (item.path && pathname.startsWith(base + item.path)) return item.key;
   return null;
 }
