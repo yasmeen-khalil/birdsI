@@ -229,7 +229,7 @@ export function LiveScan(props: LiveScanProps) {
         )}
         {connectionLost && running && (
           <p className="t-small" role="status" style={{ marginTop: 16, color: "var(--high)" }}>
-            The connection to birdsI dropped. Retrying every few seconds; the scan keeps going.
+            The connection to birdsI dropped. The scan keeps going, and this page reconnects every few seconds.
           </p>
         )}
         <div style={{ marginTop: "auto", paddingTop: 32 }}>{actions}</div>

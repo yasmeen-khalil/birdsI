@@ -64,12 +64,12 @@ export function formatVendors(vendors: readonly Vendor[], alerts: readonly Alert
   }
   if (watches.length > 0) {
     lines.push("");
-    lines.push(paint.dim(style, "Tracking (not alerts):"));
+    lines.push(paint.dim(style, "Tracking (might happen, not true now):"));
     for (const w of watches) lines.push(paint.dim(style, `  ${w.vendorName}: ${w.title}`));
   }
   for (const v of vendors) {
     lines.push("");
-    lines.push(`${g.bullet} ${paint.bold(style, v.name)}  ${paint.dim(style, v.category)}${v.connected ? `  ${paint.ok(style, "connected")}` : v.connectable ? `  ${paint.dim(style, "connectable in Settings")}` : ""}`);
+    lines.push(`${g.bullet} ${paint.bold(style, v.name)}  ${paint.dim(style, v.category)}${v.connected ? `  ${paint.ok(style, "connected")}` : v.connectable ? `  ${paint.dim(style, "connect it in Settings")}` : ""}`);
     if (v.what) lines.push(wrap(v.what, style, "    "));
     if (v.purpose) lines.push(wrap(`Used for: ${v.purpose}`, style, "    "));
     const order: VendorFact["kind"][] = ["plan", "cost", "usage", "limit", "billing", "status"];
@@ -88,7 +88,7 @@ export async function vendorsCommand(options: PrintOptions & { sync?: boolean })
     const repo = await resolveRepo(api, options.repo);
     if (options.sync) {
       await api.syncVendors(repo.id);
-      if (!options.json) println(paint.dim(style, "Vendor sync started. It reads connected accounts and current pricing pages; check again in a minute."));
+      if (!options.json) println(paint.dim(style, "Refreshing vendors from connected accounts and current pricing pages. Check again in a minute."));
     }
     const result = await api.vendors(repo.id);
     if (options.json) {
@@ -100,7 +100,7 @@ export async function vendorsCommand(options: PrintOptions & { sync?: boolean })
     const stale = result.data.stages.filter((s) => s.freshness === "stale" || s.freshness === "never");
     if (stale.length > 0) {
       println();
-      println(paint.dim(style, `Stages not fresh: ${stale.map((s) => s.label.toLowerCase()).join(", ")}. Run birdsi to refresh everything in order.`));
+      println(paint.dim(style, `Stages out of date: ${stale.map((s) => s.label.toLowerCase()).join(", ")}. Run birdsi to refresh everything in order.`));
     }
     return EXIT.ok;
   } catch (error) {
@@ -129,7 +129,7 @@ export async function questionsCommand(options: PrintOptions & { answer?: boolea
     }
     const open = result.data.questions;
     if (open.length === 0) {
-      println("Nothing to answer. birdsI asks here when it cannot know something itself.");
+      println("Nothing to answer. When birdsI or your agent cannot find something out, it asks here.");
       return EXIT.ok;
     }
     println(paint.dim(style, repo.fullName));
@@ -218,7 +218,7 @@ export async function approvalsCommand(sub: string | undefined, id: string | und
         println("Nothing approved is waiting to run.");
         return EXIT.ok;
       }
-      if (!isInteractive() && !options.yes) throw usageError("Running commands needs a yes.", "Add --yes to run approved commands without a question.");
+      if (!isInteractive() && !options.yes) throw usageError("Running approved commands needs your yes.", "Add --yes to run them without the prompt.");
       const cwd = resolve(options.path ?? process.cwd());
       for (const a of approved) await runApproved(api, a, cwd, style, Boolean(options.yes));
       return EXIT.ok;
@@ -232,7 +232,7 @@ export async function approvalsCommand(sub: string | undefined, id: string | und
     const approved = result.data.actions.filter((a) => a.status === "approved");
     const recent = result.data.actions.filter((a) => a.status !== "pending" && a.status !== "approved").slice(0, 5);
     println(paint.dim(style, repo.fullName));
-    println(paint.bold(style, `${plural(pending.length, "request")} waiting for you, ${approved.length} approved and not run yet`));
+    println(paint.bold(style, `${plural(pending.length, "command")} waiting for your approval, ${approved.length} approved and not run yet`));
     for (const a of pending) {
       println();
       println(actionBlock(a, style));
@@ -248,7 +248,7 @@ export async function approvalsCommand(sub: string | undefined, id: string | und
     }
     println();
     const policy = result.data.policy;
-    println(paint.dim(style, `Policy: agents ${policy.allowPropose ? "may" : "may not"} propose. Auto-approve: ${policy.autoApproveUnderUsd === null ? "always ask" : `at or under $${policy.autoApproveUnderUsd}/month for ${policy.autoApprovePrefixes.join(", ")}`}.`));
+    println(paint.dim(style, `Policy: agents ${policy.allowPropose ? "may" : "may not"} propose commands. Auto-approve: ${policy.autoApproveUnderUsd === null ? "always ask" : `at or under $${policy.autoApproveUnderUsd}/month for ${policy.autoApprovePrefixes.join(", ")}`}.`));
     println(paint.dim(style, "Decide with: birdsi approvals approve <id> | deny <id>. Run approved commands here with: birdsi approvals run"));
     return EXIT.ok;
   } catch (error) {
@@ -277,7 +277,7 @@ export async function visionCommand(text: string[] | undefined, options: PrintOp
       return EXIT.ok;
     }
     if (!vision.text) {
-      println("No vision written yet. birdsI judges every finding against what you are building.");
+      println("No vision written yet. The vision is what you are building and why; birdsI and your agent read it.");
       println(paint.dim(style, 'Write it with: birdsi vision "What this app is for and where it is going", or --file VISION.md'));
       return EXIT.ok;
     }
@@ -303,7 +303,7 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
     const vendorsMd = [
       `# Vendors of ${inv.repo.fullName}`,
       "",
-      `Generated by birdsI on ${new Date().toISOString().slice(0, 10)}. ${inv.vendors.length} services the app depends on outside the code.`,
+      `Generated by birdsI on ${new Date().toISOString().slice(0, 10)}. ${inv.vendors.length} outside services (vendors) the app runs on.`,
       "",
       ...inv.vendors.flatMap((v) => [
         `## ${v.name}`,
@@ -327,8 +327,8 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
       "",
       `- vision.md: what the app is for and where it is going, in the owner's words`,
       `- vendors.md: every outside service, its plan, limits, usage and where the code uses it`,
-      `- alerts.md: limits being approached and accounts that could not be read`,
-      `- questions.md: what only the owner can answer, and actions waiting for approval`,
+      `- alerts.md: what is true now and needs attention, like a limit at 80% or an account that could not be read`,
+      `- questions.md: what only the owner can answer, and commands waiting for approval`,
       "",
       `Pipeline stages: ${inv.stages.map((s) => `${s.label} (${s.freshness})`).join(", ")}.`,
       "",
@@ -356,7 +356,7 @@ export function formatNeedsYou(openQuestions: number, pendingActions: number, al
   const serious = alerts.filter((a) => a.level !== "info");
   if (serious.length > 0) lines.push(`${paint.high(style, plural(serious.length, "limit alert"))}: ${serious.map((a) => a.title).join("; ")}`);
   if (openQuestions > 0) lines.push(`${plural(openQuestions, "question")} for you: birdsi questions --answer`);
-  if (pendingActions > 0) lines.push(`${plural(pendingActions, "request")} waiting for approval: birdsi approvals`);
+  if (pendingActions > 0) lines.push(`${plural(pendingActions, "command")} waiting for approval: birdsi approvals`);
   if (dashboardUrl) lines.push(paint.dim(style, `Dashboard: ${dashboardUrl}`));
   return lines.join("\n");
 }

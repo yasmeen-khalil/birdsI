@@ -10,8 +10,8 @@ export const en = {
     judgment: "Judgment",
   },
   confidenceExplained: {
-    proven: "A deterministic tool or rule found it. Run it again and you get the same answer.",
-    doc_verified: "Checked against a current official document, which is cited so you can read it too.",
+    proven: "A fixed rule or tool found it, not a model. Run it again and you get the same answer.",
+    doc_verified: "Checked against the current official docs, which are cited so you can read them too.",
     judgment: "birdsI's reading of your code. Usually right, worth a look before acting.",
   },
   severity: {
@@ -21,14 +21,14 @@ export const en = {
     low: "Low",
   },
   scanKind: {
-    light: "Light scan",
-    deep: "Deep scan",
+    light: "Quick check",
+    deep: "Full scan",
     audit: "Pre-launch audit",
   },
   scanKindDuration: {
     light: "About 1 min",
     deep: "About 6 min",
-    audit: "About 15 min",
+    audit: "About 25 min",
   },
   scanStatus: {
     queued: "Queued",
@@ -73,7 +73,7 @@ export const en = {
     inventory: "Read the repository",
     dependencies: "Map dependencies",
     vendors: "Find the services it runs on",
-    secrets: "Look for keys and unsafe settings",
+    secrets: "Look for exposed keys and unsafe settings",
     vulnerabilities: "Check known problems",
     docs: "Check against current docs",
     review: "Read the code",
@@ -83,7 +83,7 @@ export const en = {
   },
   fixStatus: {
     proposed: "Writing the change",
-    testing: "Testing in the sandbox",
+    testing: "Testing on a separate copy",
     tested: "Tested",
     pr_open: "Pull request open",
     failed: "Could not fix",

@@ -91,8 +91,8 @@ export default async function LandingPage() {
       <Frame as="section" arm={64} bend={30} className="mt-3 flex flex-col px-[72px] pt-14 pb-16 max-[900px]:gap-[22px] max-[900px]:px-[22px] max-[900px]:pt-[26px] max-[900px]:pb-7 max-[900px]:[--arm:30px]! max-[900px]:[--bend:16px]! min-[901px]:min-h-[760px]" aria-labelledby="hero-title">
         <div className="t-small c2 flex items-baseline justify-between gap-4 min-[901px]:text-[15px]">
           <span>
-            <span className="max-[900px]:hidden">birdsI, a codebase auditor</span>
-            <span className="min-[901px]:hidden">A codebase auditor</span>
+            <span className="max-[900px]:hidden">birdsI, the operations layer for coding agents</span>
+            <span className="min-[901px]:hidden">Operations for coding agents</span>
           </span>
           <span>
             <span className="max-[900px]:hidden">Sample scan: 142 files, 38 dependencies, about 2 min</span>
@@ -100,11 +100,11 @@ export default async function LandingPage() {
           </span>
         </div>
         <h1 id="hero-title" className="t-hero max-[900px]:text-[38px]! max-[900px]:leading-[1.1]! min-[901px]:mt-[72px]" style={{ maxWidth: 1080 }}>
-          birdsI reads your whole codebase from above, finds what is broken or exposed, and helps you fix it.
+          birdsI knows what your coding agent cannot: the code, the services it runs on, and where you want it to go.
         </h1>
         <div className="grid grid-cols-1 gap-[22px] min-[901px]:mt-auto min-[901px]:grid-cols-[440px_minmax(0,1fr)] min-[901px]:items-end min-[901px]:gap-x-24 min-[901px]:pt-16">
           <div className="flex flex-col gap-7">
-            <p className="t-body-l c2 max-[900px]:text-[15px]!">Every file and every dependency, checked against current documentation. birdsI fixes what it can with a pull request you approve, and explains the rest in plain steps.</p>
+            <p className="t-body-l c2 max-[900px]:text-[15px]!">Run npx birdsi in a project. It maps the code, finds every outside service the app runs on with its plan, limits and spend, audits it against current docs, and asks you only what it cannot know.</p>
             <div className="flex flex-wrap gap-3 max-[900px]:hidden">
               {primaryCta}
               <DemoButton />
@@ -132,15 +132,15 @@ export default async function LandingPage() {
 
       <section id="how" className="grid grid-cols-1 gap-y-4 pt-[88px] min-[901px]:grid-cols-12 min-[901px]:gap-x-6 min-[901px]:gap-y-16 min-[901px]:pt-44">
         <div className="flex flex-col gap-5 min-[901px]:col-span-5">
-          <h2 className="t-display max-[900px]:text-[34px]!">Every finding says how sure it is.</h2>
+          <h2 className="t-display max-[900px]:text-[34px]!">Every fact says how birdsI knows it.</h2>
           <p className="t-body-l c2 max-[900px]:text-[15px]!" style={{ maxWidth: 440 }}>
-            Some problems can be proven. Some can be checked against the docs. Some are a careful reading of your code. birdsI never mixes them up, so you know what to trust outright.
+            Some things a fixed rule can prove. Some are checked against current docs. Some are a careful reading of your code. birdsI labels each one, so you and your agent know what to trust.
           </p>
         </div>
         <div className="flex flex-col min-[901px]:col-span-6 min-[901px]:col-start-7">
           {(
             [
-              ["proven", "Proven", "A deterministic tool or rule found it. Run it again and you get the same answer.", "Example: a secret scanner rule matched a Supabase service key."],
+              ["proven", "Proven", "A fixed rule or tool found it, not a model. Run it again and you get the same answer.", "Example: a secret scanner rule matched a Supabase service key."],
               ["doc_verified", "Doc-verified", "Checked against the current official docs for the exact library you use. The finding links to the page and the date it was read.", "Example: Stripe’s webhook guide, read today, says the signature must be checked."],
               ["judgment", "Judgment", "birdsI’s own reading of your code. Often right, sometimes not. It shows its evidence so you can decide.", "Example: two files charge different prices for the same cake."],
             ] as const
@@ -181,9 +181,9 @@ export default async function LandingPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-y-4 pt-[88px] min-[901px]:grid-cols-12 min-[901px]:gap-x-6 min-[901px]:gap-y-12 min-[901px]:pt-44">
-        <h2 className="t-display max-[900px]:text-[34px]! min-[901px]:col-span-5">Each finding ends in an action.</h2>
+        <h2 className="t-display max-[900px]:text-[34px]! min-[901px]:col-span-5">Nothing changes until you say so.</h2>
         <p className="t-body-l c2 max-[900px]:text-[15px]! min-[901px]:col-span-5 min-[901px]:col-start-7 min-[901px]:self-end">
-          When the fix is in your code, birdsI writes it, tests it in a sandbox, and opens a pull request. Nothing reaches your main branch until you merge it. When the fix lives somewhere birdsI cannot reach, like your database settings, you get the steps.
+          When the fix is in your code, birdsI writes it, tests it, and opens a pull request you merge. When it lives outside the code, like database settings or a vendor plan, you get the steps. Your coding agent works the same way: it proposes, you approve.
         </p>
         <div className="mt-2.5 flex min-w-0 flex-col gap-4 min-[901px]:col-span-6 min-[901px]:mt-0">
           <ActionKind kind="fix" strong />
@@ -234,9 +234,9 @@ export default async function LandingPage() {
       <section id="where" className="grid grid-cols-1 gap-y-[22px] pt-[88px] pb-[88px] min-[901px]:grid-cols-12 min-[901px]:gap-x-6 min-[901px]:gap-y-12 min-[901px]:pt-44 min-[901px]:pb-44">
         <h2 className="t-display max-[900px]:text-[34px]! min-[901px]:col-span-6">Use it where you already work.</h2>
         {[
-          ["In the browser", "A dashboard for your repositories, their dependencies and their findings. Ask questions about your code in plain words.", null],
-          ["In the terminal", "The same scan from your project folder. It asks before it opens any pull request.", "npx birdsi scan"],
-          ["Inside your coding AI", "An MCP server, so Claude Code, Cursor or Codex can ask birdsI before they change your code.", "npx birdsi mcp"],
+          ["In the browser", "A dashboard for each app: findings, vendors, alerts, questions, approvals and your vision. Ask about your code in plain words.", null],
+          ["In the terminal", "One command in your project folder runs a full scan and opens the dashboard.", "npx birdsi"],
+          ["Inside your coding agent", "Through MCP, the standard way agents use tools, Claude Code, Cursor or Codex read your vendors and limits, ask you questions and propose actions.", "npx birdsi mcp"],
         ].map(([title, body, cmd], i) => (
           <div key={title} className={`flex flex-col gap-3.5 pt-4 min-[901px]:col-span-4 min-[901px]:pt-6 ${i === 0 ? "min-[901px]:col-start-1" : ""}`} style={{ borderTop: "1px solid var(--text)" }}>
             <h3 className="t-h3">{title}</h3>

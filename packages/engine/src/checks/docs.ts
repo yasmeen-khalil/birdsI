@@ -64,7 +64,7 @@ export const docsCheck: Check = {
             schema: ModelFindings,
             jsonSchema: MODEL_FINDINGS_JSON_SCHEMA,
             schemaName: "findings",
-            maxOutputTokens: 2000,
+            maxOutputTokens: 4000,
             signal: ctx.signal,
           });
           const kept = filterModelFindings(result.findings, 0.6, knownPaths).filter((f) => f.docUrl && allowed.has(f.docUrl) && f.docQuote);

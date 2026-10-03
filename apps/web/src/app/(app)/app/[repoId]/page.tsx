@@ -86,7 +86,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
       {needs && (
         <Link href={`${base}/agent`} className="panel flex items-center justify-between gap-4 max-[900px]:-mt-6 min-[901px]:-mt-10" style={{ padding: "14px 18px", textDecoration: "none", borderColor: "var(--line-strong)" }}>
           <span className="t-body">
-            <span style={{ fontWeight: 600 }}>Needs you:</span> <span className="c2">{needs} waiting for your answer.</span>
+            <span style={{ fontWeight: 600 }}>Needs you:</span> <span className="c2">{needs} waiting on you.</span>
           </span>
           <span className="t-small c2 inline-flex items-center gap-1.5">
             Open
@@ -116,8 +116,8 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
             {lastProblem.status === "stopped" ? `The ${KIND_LOWER[lastProblem.kind]} was stopped` : `The ${KIND_LOWER[lastProblem.kind]} did not finish`}
           </h2>
           <p className="t-small c2">
-            {lastProblem.status === "stopped" ? "It was stopped before it finished. " : `${lastProblem.error ?? "Something went wrong while it ran."} `}
-            {latest ? "The results below are from the last scan that finished." : "Nothing was lost; start it again when you are ready."}
+            {lastProblem.status === "stopped" ? "It was stopped before it finished. " : `${lastProblem.error ?? "It stopped with an error before it finished."} `}
+            {latest ? "The results below are from the last scan that finished." : "Nothing was lost. Start it again when you are ready."}
           </p>
           <p className="t-mono-s c3">Reference: scan {lastProblem.id.slice(0, 6)}</p>
           <div className="flex flex-wrap items-center justify-end gap-2.5">
@@ -134,7 +134,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
           <h2 id="no-scans" className="t-h2" style={{ fontSize: 23 }}>
             No scans of {name} yet
           </h2>
-          <p className="t-small c2">Start with a full scan. It maps the code, checks current docs, audits the code and syncs the vendors it runs on, in that order. About 6 minutes. A quick check takes about a minute.</p>
+          <p className="t-small c2">Start with a full scan. It maps the code, checks it against current docs, audits it, then finds the vendors (outside services) the app runs on. About 6 minutes.</p>
           <ScanButtons repoId={repo.id} runningKind={null} layout="compact" />
         </section>
       )}
@@ -145,7 +145,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
             <h2 id="alerts-title" className="t-h2 max-[900px]:text-[24px]!">
               Alerts
             </h2>
-            <p className="t-body c2">What birdsI noticed about the services this app runs on.</p>
+            <p className="t-body c2">Things that are true right now about the services this app runs on.</p>
           </div>
           <AlertList alerts={ops.alerts} limit={4} vendorsHref={`${base}/vendors`} />
         </section>
@@ -153,7 +153,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
 
       {ops.alerts.length === 0 && ops.watches.length > 0 && (
         <Link href={`${base}/vendors`} className="t-small c2 inline-flex items-center gap-1.5 self-start max-[900px]:-mt-4 min-[901px]:-mt-10" style={{ minHeight: 32 }}>
-          Tracking {plural(ops.watches.length, "condition")} on your services
+          Tracking {plural(ops.watches.length, "condition")} that could affect your services
           <ArrowRight {...icon14} />
         </Link>
       )}
@@ -245,7 +245,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
             <h2 id="deps-title" className="t-h2 max-[900px]:text-[24px]!">
               Dependencies
             </h2>
-            <p className="t-body c2">{deps.length === 0 ? "No package manifests were found in this repository." : `${plural(deps.length, "package")}. Each one is checked for known problems, and deep scans check it against its current docs.`}</p>
+            <p className="t-body c2">{deps.length === 0 ? "No package manifests were found in this repository." : `${plural(deps.length, "package")}. Each one is checked for known problems, and full scans check it against its current docs.`}</p>
           </div>
           {deps.length > 0 && <DependencyTable dependencies={deps} limit={8} showAllHref={`${base}/dependencies`} />}
         </section>
@@ -287,7 +287,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
         <Frame arm={26} bend={12} className="flex flex-col gap-3.5 px-[30px] py-7 min-[901px]:col-span-4 min-[901px]:col-start-9 max-[900px]:px-[22px] max-[900px]:py-6">
           <PlaneTakeoff {...icon20} className="i i20 c2" />
           <h2 className="t-h2 max-[900px]:text-[24px]!">Before you launch</h2>
-          <p className="t-body c2">The pre-launch audit is the deepest check birdsI runs. It goes area by area, from sign-in to payments, and tells you plainly whether you are ready. About 25 minutes.</p>
+          <p className="t-body c2">The pre-launch audit is the deepest check birdsI runs. It goes area by area, from sign-in to services and limits, and says plainly if you are ready. About 25 minutes.</p>
           {lastAudit?.audit ? (
             <p className="t-small c3">
               Last audit <LocalTime iso={lastAudit.finishedAt} />: {lastAudit.audit.verdict === "ready" ? "ready to launch" : lastAudit.audit.verdict === "not_ready" ? "not ready yet" : "no verdict"}.

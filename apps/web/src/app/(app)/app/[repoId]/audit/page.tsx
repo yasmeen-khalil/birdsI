@@ -22,7 +22,7 @@ const AREA_HINTS: Record<AuditArea, string> = {
   auth: "Pages and data that need sign-in actually require it",
   secrets: "No key or password in the code, its history or the browser",
   data: "Each person sees only their own records, and data can be deleted",
-  dependencies: "No known problems, nothing abandoned",
+  dependencies: "No published vulnerabilities, nothing abandoned",
   errors: "Payments, uploads and emails fail safely and tell the user",
   config: "Production settings are safe and every setting your code needs exists",
   legal: "A privacy policy and terms that match what the code does",
@@ -262,7 +262,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
             {problem.status === "stopped" ? "The last audit was stopped" : "The last audit did not finish"}
           </h2>
           <p className="t-small c2">
-            {problem.status === "stopped" ? "It was stopped before every area was judged." : (problem.error ?? "Something went wrong while it ran.")} Start it again below. It takes about 25 minutes.
+            {problem.status === "stopped" ? "It was stopped before every area was judged." : (problem.error ?? "It stopped with an error before it finished.")} Start it again below. It takes about 25 minutes.
           </p>
           <p className="t-mono-s c3">Reference: scan {problem.id.slice(0, 6)}</p>
         </section>
@@ -279,7 +279,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
           <>
             <h1 className="t-display">Pre-launch audit</h1>
             <p className="t-body-l c2" style={{ maxWidth: 560 }}>
-              The deepest check birdsI runs. It reads every file with its most thorough model, goes through each area a real launch depends on, and ends with a plain answer: ready, or not yet and why.
+              The deepest check birdsI runs. It reads every file with its most careful model, judges each area a real launch depends on, and ends with a plain answer: ready, or not yet and why.
             </p>
             <dl className="t-body grid grid-cols-[120px_minmax(0,1fr)] gap-y-2.5" style={{ margin: "8px 0 0", maxWidth: 560 }}>
               <dt className="c3">Takes</dt>
@@ -291,7 +291,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
             </dl>
             {busy && (
               <p className="t-small" style={{ color: "var(--high)" }}>
-                A {running?.kind === "audit" ? "pre-launch audit" : "scan"} of {name} is running. Start the audit when it finishes.{" "}
+                A {running?.kind === "audit" ? "pre-launch audit" : "scan"} of {name} is running. You can start the audit when it finishes.{" "}
                 <Link href={`${base}/scans/${running!.id}`} style={{ color: "var(--text)" }}>
                   Watch progress
                 </Link>

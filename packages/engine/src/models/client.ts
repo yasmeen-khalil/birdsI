@@ -145,7 +145,7 @@ export class ModelClient {
 
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {
-      const repair = attempt > 0 && lastError instanceof Error ? `The previous answer did not match the schema: ${lastError.message.slice(0, 500)}. Answer again with valid JSON only.` : null;
+      const repair = attempt > 0 && lastError instanceof Error ? `The previous answer did not match the schema: ${lastError.message.slice(0, 500)}. Answer again with valid JSON only, and keep every text field short so the whole answer fits.` : null;
       const { text, usage } = await this.traced(`${opts.purpose}:${model}`, () => this.completeRaw(model, opts, system, repair))();
       await this.record(model, opts.purpose, usage);
       try {
@@ -162,22 +162,30 @@ export class ModelClient {
       const client = this.requireAnthropic();
       const messages: Anthropic.MessageParam[] = [{ role: "user", content: opts.user }];
       if (repair) messages.push({ role: "user", content: repair });
-      const response = await client.messages.parse(
-        {
-          model,
-          max_tokens: opts.maxOutputTokens ?? 4096,
-          system,
-          messages,
-          output_config: { format: zodOutputFormat(opts.schema as never), ...(this.effortFor(model, opts.tier, opts.effort)) },
-        },
-        { signal: opts.signal ?? undefined },
-      );
-      assertNotRefused(response, opts.purpose);
-      const usage = usageOf(response);
-      if (response.parsed_output !== null && response.parsed_output !== undefined) {
-        return { text: JSON.stringify(response.parsed_output), usage };
+      const params = {
+        model,
+        max_tokens: opts.maxOutputTokens ?? 4096,
+        system,
+        messages,
+        output_config: { format: zodOutputFormat(opts.schema as never), ...(this.effortFor(model, opts.tier, opts.effort)) },
+      };
+      try {
+        const response = await client.messages.parse(params, { signal: opts.signal ?? undefined });
+        assertNotRefused(response, opts.purpose);
+        const usage = usageOf(response);
+        if (response.parsed_output !== null && response.parsed_output !== undefined) {
+          return { text: JSON.stringify(response.parsed_output), usage };
+        }
+        return { text: textOf(response), usage };
+      } catch (error) {
+        // The SDK could not parse the reply (usually cut off at max_tokens). Read the raw text
+        // instead; the caller's repair attempt asks for a shorter answer.
+        if (!(error instanceof Error) || !/parse structured output/i.test(error.message)) throw error;
+        const response = await client.messages.create(params, { signal: opts.signal ?? undefined });
+        assertNotRefused(response, opts.purpose);
+        const text = textOf(response);
+        return { text: response.stop_reason === "max_tokens" ? `${text}\n` : text, usage: usageOf(response) };
       }
-      return { text: textOf(response), usage };
     }
     const client = this.requireOpenAI();
     const messages: OpenAI.ChatCompletionMessageParam[] = [

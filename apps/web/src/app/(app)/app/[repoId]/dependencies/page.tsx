@@ -24,7 +24,7 @@ export default async function DependenciesPage({ params }: { params: Promise<{ r
         {latest ? (
           <p className="t-body c2">
             {plural(deps.length, "package")} in {repoName(repo.full_name)}
-            {vulnerable > 0 ? `, ${vulnerable} with known problems` : ""}. From the {KIND_LOWER[latest.kind]} <LocalTime iso={latest.finishedAt} />. Docs are read through Tavily during each deep scan.
+            {vulnerable > 0 ? `, ${vulnerable} with known problems` : ""}. From the {KIND_LOWER[latest.kind]} <LocalTime iso={latest.finishedAt} />. Each full scan checks them against their current docs.
           </p>
         ) : (
           <p className="t-body c2">Nothing has been scanned yet, so birdsI has not listed the packages this repository uses.</p>
@@ -49,7 +49,7 @@ export default async function DependenciesPage({ params }: { params: Promise<{ r
         </div>
       ) : (
         <div className="panel flex flex-col gap-3" style={{ padding: "22px 24px", maxWidth: 560 }}>
-          <p className="t-small c2">A light scan lists every package and checks it against the vulnerability database in about a minute.</p>
+          <p className="t-small c2">A quick check lists every package and checks it for published vulnerabilities in about a minute.</p>
           <ScanButtons repoId={repo.id} runningKind={null} layout="compact" />
         </div>
       )}

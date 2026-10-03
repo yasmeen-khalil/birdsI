@@ -37,7 +37,7 @@ function tool<A>(what: string, fn: (api: ApiClient, args: A) => Promise<ToolResu
       api.client = "mcp";
       if (!api.signedIn) {
         return {
-          content: [{ type: "text", text: "Not signed in to birdsI. Run birdsi login in a terminal, or set BIRDSI_TOKEN in this server's environment." }],
+          content: [{ type: "text", text: "Not signed in to birdsI. Ask the owner to run birdsi login in a terminal, or set BIRDSI_TOKEN in this server's environment." }],
           isError: true,
         };
       }
@@ -73,7 +73,7 @@ function summarize(result: ScanResponse, top = 10): string {
     lines.push("", ordered.length > top ? `Top ${top} findings:` : "Findings:");
     for (const f of ordered.slice(0, top)) lines.push(compactFinding(f));
     if (ordered.length > top) lines.push(`${ordered.length - top} more: call birdsi_findings with scanId ${scan.id}.`);
-    lines.push("", "Confidence: Proven means a tool or rule proved it. Doc-verified means checked against a current official document. Judgment means the model's reading, worth checking.");
+    lines.push("", "Confidence: Proven means a fixed rule or tool found it. Doc-verified means checked against current official docs, which are cited. Judgment means the model's reading of the code; verify before acting on it.");
   }
   return lines.join("\n");
 }
@@ -114,15 +114,15 @@ export function createServer(): McpServer {
   server.registerTool(
     "birdsi_scan",
     {
-      title: "Scan a local codebase",
+      title: "Scan a local folder",
       description:
-        "Uploads a snapshot of a local folder (honouring .gitignore) to birdsI and scans it for security holes, vulnerable dependencies, contradictions and gaps, checked against current docs. By default waits for the result and returns a summary with the top findings and their ids.",
+        "Uploads a snapshot of a local folder (files .gitignore leaves out stay local) and scans it: exposed keys, published vulnerabilities, security problems, contradictions between files, and code that disagrees with current docs. Waits by default and returns the counts, a headline, and the top 10 findings with their ids. Use full for the whole pipeline, including vendors and limits.",
       inputSchema: {
         path: z.string().describe("Absolute path of the folder to scan."),
-        kind: ScanKind.optional().describe("light (default, fast), deep (reads all the code), or audit (pre-launch audit, the deepest)."),
-        full: z.boolean().optional().describe("Full scan: the whole pipeline in order (map the code, check docs, audit, sync vendors and limits). Implies deep."),
-        describe: z.string().max(2000).optional().describe("What the app does, in a sentence or two. Sharpens the scan."),
-        wait: z.boolean().optional().describe("Wait for the scan to finish (default true). With false, returns the scan id at once."),
+        kind: ScanKind.optional().describe("light: Quick check, about 1 minute (default). deep: reads all the code, about 6 minutes. audit: Pre-launch audit with a verdict per area, about 25 minutes."),
+        full: z.boolean().optional().describe("Full scan: the whole pipeline in order (map the code, check docs, audit, refresh vendors and limits). Implies deep."),
+        describe: z.string().max(2000).optional().describe("What the app does, in a sentence or two. Helps birdsI judge what matters."),
+        wait: z.boolean().optional().describe("Wait for the scan to finish, up to 30 minutes (default true). With false, returns the scan id at once; poll with birdsi_scan_status."),
       },
     },
     tool("that folder", async (api, args: { path: string; kind?: z.infer<typeof ScanKind> | undefined; full?: boolean | undefined; describe?: string | undefined; wait?: boolean | undefined }) => {
@@ -145,7 +145,7 @@ export function createServer(): McpServer {
     "birdsi_scan_status",
     {
       title: "Scan status",
-      description: "Status and progress of a birdsI scan; the summary and top findings once it is done.",
+      description: "While a scan runs: its status, the steps done, the step running now, and findings so far. Once it has finished, failed or stopped: the same summary birdsi_scan returns, with the top findings and their ids.",
       inputSchema: { scanId: z.string() },
     },
     tool("that scan", async (api, args: { scanId: string }) => {
@@ -161,7 +161,7 @@ export function createServer(): McpServer {
     "birdsi_findings",
     {
       title: "List findings",
-      description: "Findings of a scan, optionally filtered by severity, confidence, or who acts (fix: birdsI can fix it; steps: the developer must act).",
+      description: "Every finding of a scan as one line each (severity, title, file:line, confidence, who acts, id), most serious first. Filter by severity, confidence, or actionKind (fix: birdsI can fix it; steps: the owner must act).",
       inputSchema: {
         scanId: z.string(),
         severity: Severity.optional(),
@@ -186,7 +186,7 @@ export function createServer(): McpServer {
     "birdsi_finding",
     {
       title: "Explain a finding",
-      description: "One finding in full: what is wrong, why it matters, the evidence, the steps or fix plan, and what its confidence class means.",
+      description: "One finding in full: what is wrong, why it matters, the evidence (code excerpt, rule, advisory or cited doc), the steps or fix plan, any fix in progress, and what its confidence label means. Call before changing code for a finding.",
       inputSchema: { findingId: z.string() },
     },
     tool("that finding", async (api, args: { findingId: string }) => {
@@ -200,7 +200,7 @@ export function createServer(): McpServer {
     {
       title: "Fix a finding",
       description:
-        "Has birdsI write and sandbox-test a fix for a finding it can fix. Returns the pull request link for repositories connected through the GitHub App, otherwise the patch. With apply and a local path, applies the patch there with git apply.",
+        "For a finding with actionKind fix: birdsI writes the change and runs the project's build and tests on a separate copy. Returns the pull request link for repositories connected through the GitHub App, otherwise the patch. With apply and a local path, applies the patch there with git apply. Fails for steps findings.",
       inputSchema: {
         findingId: z.string(),
         apply: z.boolean().optional().describe("Apply the patch to the local folder at path."),
@@ -210,7 +210,7 @@ export function createServer(): McpServer {
     tool("that finding", async (api, args: { findingId: string; apply?: boolean | undefined; path?: string | undefined }) => {
       const { finding } = (await api.finding(args.findingId)).data;
       if (finding.actionKind !== "fix") {
-        return { content: [{ type: "text", text: "birdsI cannot fix this finding itself. Call birdsi_finding for the steps the developer must take." }], isError: true };
+        return { content: [{ type: "text", text: "birdsI cannot fix this finding itself. Call birdsi_finding for the steps the owner must take." }], isError: true };
       }
       if (args.apply && !args.path) {
         return { content: [{ type: "text", text: "To apply the fix, pass path: the local folder to change." }], isError: true };
@@ -219,7 +219,7 @@ export function createServer(): McpServer {
       const fix = await waitForFix(api, started, { expectPr: finding.repoId !== null });
       const lines = [fixStatusLine(fix)];
       const result = sandboxResult(fix);
-      if (result) lines.push(`Sandbox: ${result}`);
+      if (result) lines.push(`Test result: ${result}`);
       if (fix.status === "failed") return { content: [{ type: "text", text: lines.join("\n") }], isError: true };
       if (fix.prUrl) {
         lines.push(`Pull request: ${fix.prUrl}`);
@@ -234,7 +234,7 @@ export function createServer(): McpServer {
         }
       }
       if (finding.fixPlan && finding.fixPlan.followUp.length > 0) {
-        lines.push("", "The developer still needs to:", ...finding.fixPlan.followUp.map((f) => `- ${f}`));
+        lines.push("", "The owner still needs to:", ...finding.fixPlan.followUp.map((f) => `- ${f}`));
       }
       return text(lines.join("\n"));
     }),
@@ -255,9 +255,9 @@ export function createServer(): McpServer {
   server.registerTool(
     "birdsi_inventory",
     {
-      title: "Everything about the project in one call",
+      title: "Project overview",
       description:
-        "The project's knowledge base: the owner's vision, every outside service the app runs on (vendors) with plan, usage, limits and spend, the current alerts (limits being approached), the pipeline stages and how fresh each is, how many questions wait for the owner and how many actions wait for approval, and the latest scan. Call this first.",
+        "Call this first. Returns the owner's vision, every vendor (outside service the app runs on) with plan, usage, limits and spend, the alerts that are true now (a limit at 80% or 95%, an account that could not be read), conditions being tracked, the pipeline stages and how fresh each is, counts of open questions and pending approvals, and the latest scan.",
       inputSchema: repoArg,
     },
     tool("that repository", async (api, args: { repoId?: string | undefined }) => {
@@ -268,7 +268,7 @@ export function createServer(): McpServer {
       if (inv.latestScan) lines.push(`Latest scan: ${inv.latestScan.kind} ${inv.latestScan.id}, ${inv.latestScan.findings} open findings${inv.latestScan.headline ? `. ${inv.latestScan.headline}` : ""}`);
       lines.push("");
       lines.push(`Alerts (${inv.alerts.length}):`, ...(inv.alerts.length ? inv.alerts.map((a) => `- [${a.level}] ${a.title}. ${a.detail}${a.suggestedCommand ? ` Suggested: ${a.suggestedCommand}` : ""}`) : ["- none"]), "");
-      if (inv.watches.length > 0) lines.push(`Tracking (conditions, not alerts):`, ...inv.watches.map((w) => `- ${w.vendorName}: ${w.title}. ${w.detail}${w.needs ? ` To know for sure: ${w.needs}` : ""}`), "");
+      if (inv.watches.length > 0) lines.push(`Tracking (might happen, not true now):`, ...inv.watches.map((w) => `- ${w.vendorName}: ${w.title}. ${w.detail}${w.needs ? ` To know for sure: ${w.needs}` : ""}`), "");
       lines.push(`Vendors (${inv.vendors.length}):`);
       for (const v of inv.vendors) {
         const plan = v.facts.find((f) => f.kind === "plan");
@@ -286,7 +286,7 @@ export function createServer(): McpServer {
     "birdsi_vendor",
     {
       title: "One vendor in full",
-      description: "Everything known about one outside service: what it is, what this app uses it for, every fact with its source and evidence, the limits of its plan, and where the code calls it.",
+      description: "Everything known about one vendor: what it is, what this app uses it for, how it was found, every fact (plan, cost, usage, limits) with its source and evidence, links to pricing and docs, and where the code calls it.",
       inputSchema: { ...repoArg, slug: z.string().describe("Vendor slug from birdsi_inventory, for example supabase or vercel.") },
     },
     tool("that vendor", async (api, args: { repoId?: string | undefined; slug: string }) => {
@@ -306,7 +306,7 @@ export function createServer(): McpServer {
     "birdsi_vision",
     {
       title: "The owner's vision",
-      description: "What the app is for and where it is going, in the owner's own words. Judge decisions against it. Only the owner writes it.",
+      description: "The owner's vision: what the app is for and where it is going, in their own words, with when it was last updated. Weigh decisions against it. Only the owner writes it.",
       inputSchema: repoArg,
     },
     tool("that repository", async (api, args: { repoId?: string | undefined }) => {
@@ -319,7 +319,7 @@ export function createServer(): McpServer {
     "birdsi_questions",
     {
       title: "Questions waiting for the owner",
-      description: "Questions only the owner can answer, asked by birdsI or by agents, with their status. Answered questions include the answer.",
+      description: "Questions only the owner can answer, asked by birdsI or by agents, each with status, who asked, why, options and id. Answered ones include the answer. Check here before asking a question again.",
       inputSchema: { ...repoArg, status: z.enum(["open", "answered", "dismissed"]).optional() },
     },
     tool("the questions", async (api, args: { repoId?: string | undefined; status?: "open" | "answered" | "dismissed" | undefined }) => {
@@ -333,7 +333,7 @@ export function createServer(): McpServer {
     "birdsi_ask_owner",
     {
       title: "Ask the owner a question",
-      description: "Queues a question only a person can answer (a decision, a plan name, a number from a dashboard). The owner answers in the birdsI dashboard or terminal; read the answer later with birdsi_questions. Ask only what you cannot find out yourself.",
+      description: "Adds a question to the owner's Questions queue, for what only a person can answer: a decision, a plan name, a number from a dashboard. Returns the question id at once. The owner answers in the dashboard or terminal; read the answer later with birdsi_questions. Ask only what you cannot find out yourself.",
       inputSchema: {
         ...repoArg,
         question: z.string().min(1).max(1000),
@@ -351,9 +351,9 @@ export function createServer(): McpServer {
   server.registerTool(
     "birdsi_request_action",
     {
-      title: "Propose an action for approval",
+      title: "Propose a command for approval",
       description:
-        "Proposes something to be done outside the code: a command to run on the owner's machine, for example a Stripe Projects upgrade (stripe projects upgrade vercel) or a spend limit (stripe projects billing update --limit 50). Nothing runs until the owner approves it, unless the repository's policy auto-approves small, allowed commands. Give the cost honestly. Read the result later with birdsi_action_status.",
+        "Proposes a command to run on the owner's machine for something outside the code, for example a plan upgrade (stripe projects upgrade vercel) or a spend limit (stripe projects billing update --limit 50). Returns the request id and whether it waits for approval or was auto-approved by the repository's policy. Nothing runs until approved. Give the cost honestly. Follow it with birdsi_action_status.",
       inputSchema: {
         ...repoArg,
         title: z.string().min(1).max(200),
@@ -373,8 +373,8 @@ export function createServer(): McpServer {
   server.registerTool(
     "birdsi_action_status",
     {
-      title: "Status of a proposed action",
-      description: "Whether an action request is pending, approved, denied, executed or failed, and the command's output once it ran.",
+      title: "Status of a proposed command",
+      description: "Whether a proposed command is pending, approved, denied, executed, failed or expired, when it was decided, and its output once it ran.",
       inputSchema: { actionId: z.string() },
     },
     tool("that request", async (api, args: { actionId: string }) => {
@@ -387,12 +387,12 @@ export function createServer(): McpServer {
     "birdsi_sync_vendors",
     {
       title: "Refresh vendors and limits",
-      description: "Runs the ops stage alone: reads connected accounts and current pricing pages again and refreshes the questions. Needs a finished scan.",
+      description: "Refreshes the vendor stage alone: reads connected accounts and current pricing pages again, updates alerts, and queues questions for what is still unknown. Returns at once; call birdsi_inventory in a minute for the result. Needs a finished scan.",
       inputSchema: repoArg,
     },
     tool("the sync", async (api, args: { repoId?: string | undefined }) => {
       await api.syncVendors(await repoIdFrom(api, args.repoId));
-      return text("Vendor sync started. Call birdsi_inventory again in a minute.");
+      return text("Refreshing vendors. Call birdsi_inventory again in a minute.");
     }),
   );
 
@@ -400,12 +400,12 @@ export function createServer(): McpServer {
     "birdsi_repos",
     {
       title: "Connected repositories",
-      description: "Repositories connected to birdsI through the GitHub App, with the ids birdsi_ask needs.",
+      description: "Repositories on the owner's birdsI account, from GitHub or uploaded from a terminal, with the ids that birdsi_ask and repoId arguments need.",
       inputSchema: {},
     },
     tool("your repositories", async (api) => {
       const { repos } = (await api.repos()).data;
-      if (repos.length === 0) return text("No repositories are connected to birdsI.");
+      if (repos.length === 0) return text("No repositories are connected to birdsI yet.");
       return text(repos.map((r) => `- ${r.fullName} (${r.private ? "private" : "public"}), id: ${r.id}`).join("\n"));
     }),
   );
@@ -414,7 +414,7 @@ export function createServer(): McpServer {
     "birdsi_ask",
     {
       title: "Ask about a repository",
-      description: "Asks birdsI a question about a connected repository. Answers cite files and findings.",
+      description: "Asks birdsI a question about a connected repository and returns a plain answer that cites the files and findings it used. Answers marked Judgment have no finding behind them.",
       inputSchema: { repoId: z.string().describe("Repository id from birdsi_repos."), question: z.string().min(1).max(4000) },
     },
     tool("that repository", async (api, args: { repoId: string; question: string }) => {
@@ -427,7 +427,7 @@ export function createServer(): McpServer {
           lines.push(`- ${c.label}${where ? ` (${where})` : ""}`);
         }
       }
-      if (message.judgment) lines.push("", "Judgment: the model's reading of the code, with no finding behind it. Worth checking.");
+      if (message.judgment) lines.push("", "Judgment: the model's reading of the code, with no finding behind it. Verify before acting on it.");
       return text(lines.join("\n"));
     }),
   );

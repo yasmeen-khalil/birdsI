@@ -12,7 +12,7 @@ export function DemoTopBar() {
       <Wordmark href="/" className="max-[900px]:hidden!" />
       <Wordmark href="/" markOnly className="min-[901px]:hidden!" />
       <span className="inline-flex min-w-0 items-center gap-2.5">
-        <span className="tag">Demo</span>
+        <span className="tag">Sample</span>
         <span className="path max-[900px]:hidden" style={{ color: "var(--text)" }}>
           {DEMO_REPO}
         </span>

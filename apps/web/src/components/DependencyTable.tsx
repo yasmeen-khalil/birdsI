@@ -104,7 +104,7 @@ function Problems({ d }: { d: Dependency }) {
 
 function Docs({ d }: { d: Dependency }) {
   const c = d.docsCheck;
-  if (!c) return <span className="t-small c3">Checked in deep scans</span>;
+  if (!c) return <span className="t-small c3">Checked in full scans</span>;
   if (c.status === "current")
     return (
       <span className="t-small c2">

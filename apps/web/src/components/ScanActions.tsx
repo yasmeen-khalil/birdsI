@@ -68,14 +68,14 @@ export function ScanButtons({ repoId, runningKind, layout = "sub" }: { repoId: s
         <button type="button" className="btn btn-secondary btn-sub" disabled={busy} onClick={() => run("light")} aria-describedby={runningKind ? "scan-running-note" : undefined}>
           <span className="inline-flex items-center gap-2">
             {pendingKind === "light" ? <ButtonArc /> : <ScanLine {...icon} />}
-            {label("light", "Light scan")}
+            {label("light", "Quick check")}
           </span>
           <small>{KIND_DURATION.light}</small>
         </button>
         <button type="button" className="btn btn-primary btn-sub" disabled={busy} onClick={() => run("deep")} aria-describedby={runningKind ? "scan-running-note" : undefined}>
           <span className="inline-flex items-center gap-2">
             {pendingKind === "deep" ? <ButtonArc /> : <ScanSearch {...icon} />}
-            {label("deep", "Deep scan")}
+            {label("deep", "Full scan")}
           </span>
           <small>{KIND_DURATION.deep}</small>
         </button>
@@ -136,21 +136,21 @@ export function ScanControls({ repoId, runningKind, syncRunning = false }: { rep
             {pendingKind === "light" ? <ButtonArc /> : <ScanLine {...icon} />}
             <span className="flex flex-col">
               <span>{runningKind === "light" ? "Quick check running" : "Quick check"}</span>
-              <span className="t-small c3">Dependencies, secrets and known problems. {KIND_DURATION.light}.</span>
+              <span className="t-small c3">Packages, exposed keys and known problems. {KIND_DURATION.light}.</span>
             </span>
           </button>
           <button type="button" className="mi" disabled={syncPending || syncRunning} onClick={refreshVendors} style={syncPending || syncRunning ? { opacity: 0.45, cursor: "not-allowed" } : undefined}>
             {syncPending ? <ButtonArc /> : <RefreshCw {...icon} />}
             <span className="flex flex-col">
               <span>{syncRunning ? "Vendors refreshing" : "Refresh vendors"}</span>
-              <span className="t-small c3">Plans, usage and limits only.</span>
+              <span className="t-small c3">Plans, usage, limits and spend only.</span>
             </span>
           </button>
           <Link href={`/app/${repoId}/audit`}>
             <PlaneTakeoff {...icon} />
             <span className="flex flex-col">
               <span>Pre-launch audit</span>
-              <span className="t-small c3">The deepest check, area by area. {KIND_DURATION.audit}.</span>
+              <span className="t-small c3">A launch verdict, area by area. {KIND_DURATION.audit}.</span>
             </span>
           </Link>
         </Dropdown>

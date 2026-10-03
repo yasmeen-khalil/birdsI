@@ -32,7 +32,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
         <div className="flex min-w-0 flex-col gap-2.5" style={{ maxWidth: 720 }}>
           <h1 className="t-h1">Vendors</h1>
           <p className="t-body c2">
-            The services this app runs on, found in the code, with their plans, usage and limits.{" "}
+            Vendors are the outside services this app runs on: hosting, database, payments, email. Each with its plan, usage and limits.{" "}
             {data.lastSyncAt ? (
               <>
                 Last read <LocalTime iso={data.lastSyncAt} />.
@@ -50,7 +50,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
           <h2 className="t-h2" style={{ fontSize: 23 }}>
             No vendors found yet
           </h2>
-          <p className="t-small c2">Run a full scan. birdsI maps the code, finds every service it talks to, then reads their plans and limits. About 6 minutes.</p>
+          <p className="t-small c2">Run a full scan. birdsI maps the code, finds every service it calls, then reads each plan and limit. About 6 minutes.</p>
           <div className="flex justify-end">
             <ScanAgainButton repoId={repo.id} kind="deep" full label={running ? "A scan is running" : "Full scan"} disabled={Boolean(running)} />
           </div>
@@ -70,7 +70,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
                 </p>
               ) : (
                 <p className="t-body c2" style={{ maxWidth: 420 }}>
-                  Spend unknown: connect accounts or answer the questions.
+                  Spend not known yet. Connect an account or answer a question.
                 </p>
               )}
               <p className="t-small c3">
@@ -80,7 +80,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
                     <Link href="/settings#connected-accounts" className="c2">
                       Connect {connectable === 1 ? "one more" : `${connectable} more`}
                     </Link>{" "}
-                    so birdsI reads spend and usage directly.
+                    so birdsI reads spend and usage from the account.
                   </>
                 ) : null}
               </p>
@@ -114,7 +114,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
                   Tracking
                 </h2>
                 <p className="t-body c2" style={{ maxWidth: 720 }}>
-                  Conditions that might happen, not problems yet. birdsI keeps an eye on them and raises an alert only when it sees one happening.
+                  Things that might happen, not problems now: a free plan that pauses, a trial that ends. birdsI alerts you only if one happens.
                 </p>
               </div>
               <WatchList watches={watches} />

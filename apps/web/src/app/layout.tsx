@@ -28,7 +28,7 @@ const mono = Atkinson_Hyperlegible_Mono({
 
 export const metadata: Metadata = {
   title: { default: "birdsI", template: "%s | birdsI" },
-  description: "A bird's-eye codebase auditor. It reads your whole codebase and its dependencies, finds gaps, security holes and contradictions, checks them against current documentation, and fixes what it can.",
+  description: "The operations layer for coding agents. It maps your code and the services it runs on, with plans, limits and spend, audits it against current docs, and asks you only what it cannot know.",
   metadataBase: new URL(process.env["NEXT_PUBLIC_APP_URL"] ?? "http://localhost:3000"),
 };
 

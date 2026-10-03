@@ -31,7 +31,7 @@ export function EmailToggle({ initial }: { initial: boolean }) {
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
         <span className="flex flex-col gap-0.5">
           <span id="email-label" className="t-body">
-            Email me when a deep scan or audit finishes
+            Email me when a full scan or audit finishes
           </span>
           <span className="t-small c3">Sent to the email on your GitHub account</span>
         </span>
@@ -81,7 +81,7 @@ export function RevokeToken({ tokenId, name }: { tokenId: string; name: string }
     <TwoStepButton
       label="Revoke"
       prompt={`Revoke ${name}?`}
-      detail="The terminal or coding AI using it is signed out at once. Run birdsi login to sign in again."
+      detail="The terminal or coding agent using it is signed out at once. Run birdsi login to sign in again."
       confirmLabel="Revoke"
       cancelLabel="Keep it"
       style={{ alignSelf: "flex-start", marginTop: 6, fontSize: 13, minHeight: 32 }}
@@ -118,7 +118,7 @@ export function DeleteAccount({ expected, repoCount }: { expected: string; repoC
         </h3>
         <ul className="t-small c2 flex flex-col gap-1" style={{ margin: 0, paddingLeft: 18 }}>
           <li>{repoCount === 1 ? "1 repository is disconnected" : `${repoCount} repositories are disconnected`}</li>
-          <li>Your findings, scans, chats and tokens are deleted</li>
+          <li>Your findings, scans, vendor details, chats and tokens are deleted</li>
           <li>Pull requests birdsI opened stay on GitHub</li>
         </ul>
         <div className="flex items-center justify-between gap-3" style={{ marginTop: 6 }}>
@@ -201,7 +201,7 @@ export function DisconnectAccount({ connectionId, name }: { connectionId: string
     <TwoStepButton
       label="Disconnect"
       prompt={`Disconnect ${name}?`}
-      detail="birdsI deletes the token and stops reading the account. Facts it already read stay until the next vendor refresh."
+      detail="birdsI deletes the token and stops reading the account. What it already read stays until the next vendor refresh."
       confirmLabel="Disconnect"
       cancelLabel="Keep it"
       style={{ alignSelf: "flex-start", marginTop: 6, fontSize: 13, minHeight: 32 }}

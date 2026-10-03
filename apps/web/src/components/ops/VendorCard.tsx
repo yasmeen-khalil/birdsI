@@ -8,7 +8,7 @@ import { CATEGORY_LABEL, WatchList } from "./OpsParts";
 
 const FACT_ORDER: FactKind[] = ["plan", "cost", "usage", "limit", "billing", "status"];
 const FACT_HEADING: Record<FactKind, string> = { plan: "Plan", cost: "Cost", usage: "Usage", limit: "Limits", billing: "Billing", status: "Status", purpose: "Purpose" };
-const DETECTED_LABEL: Record<Vendor["detectedBy"][number], string> = { package: "package", env: "env", url: "url", config: "config", projects: "Stripe Projects" };
+const DETECTED_LABEL: Record<Vendor["detectedBy"][number], string> = { package: "package", env: "env name", url: "URL", config: "config file", projects: "Stripe Projects" };
 const CALL_SITES_SHOWN = 6;
 
 function UsageBar({ fact }: { fact: VendorFact }) {
@@ -82,7 +82,7 @@ export function VendorCard({ vendor, watches = [], runways = [] }: { vendor: Ven
         {vendor.what && <p className="t-body c2">{vendor.what}</p>}
         {vendor.purpose && (
           <div className="flex flex-col gap-1">
-            <span className="t-label c3">In this app, as birdsI reads it</span>
+            <span className="t-label c3">What this app uses it for</span>
             <p className="t-body">{vendor.purpose}</p>
           </div>
         )}
@@ -135,7 +135,7 @@ export function VendorCard({ vendor, watches = [], runways = [] }: { vendor: Ven
       <div className="flex min-w-0 flex-col gap-4 min-[901px]:col-span-7">
         {groups.length === 0 ? (
           <p className="t-small c3" style={{ padding: "12px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
-            {vendor.connectable && !vendor.connected ? "Nothing known about the plan or usage yet. Connect the account, or answer the questions on the Agent page." : "Nothing known about the plan or usage yet. Answer the questions on the Agent page so birdsI can watch its limits."}
+            {vendor.connectable && !vendor.connected ? "No plan or usage known yet. Connect the account, or answer the questions on the Agent page." : "No plan or usage known yet. Answer the questions on the Agent page so birdsI can track its limits."}
           </p>
         ) : (
           groups.map((g) => (

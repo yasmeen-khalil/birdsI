@@ -68,7 +68,7 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
   if (git?.commitSha) where.push(`at ${git.commitSha.slice(0, 7)}`);
   say();
   say(`${paint.bold(style, `birdsI ${VERSION}`)}  ${where.join(" ")}`);
-  say(`${options.full ? "Full scan: map the code, check docs, audit, sync vendors" : KIND_WORD[kind]}. Signed in as ${login}.`);
+  say(`${options.full ? "Full scan: map the code, check docs, audit, refresh vendors" : KIND_WORD[kind]}. Signed in as ${login}.`);
 
   let scanId: string;
   let repoId: string | null = null;
@@ -156,7 +156,7 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
     return EXIT.stopped;
   }
   if (status === "failed") {
-    const message = failure ?? result?.data.scan.error ?? "birdsI did not say why.";
+    const message = failure ?? result?.data.scan.error ?? "No reason was reported.";
     const step = progress?.currentStepNumber;
     say();
     say(`  ${paint.fail(style, g.failed)} ${paint.bold(style, step ? `Scan stopped at step ${step}.` : "The scan could not finish.")}`);

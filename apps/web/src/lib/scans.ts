@@ -77,7 +77,7 @@ export async function startDemoScan(clientKey: string): Promise<{ scanId: string
   if (!allowed.allowed || !capacity) {
     const latest = await latestDemoScanId();
     if (latest) return { scanId: latest, reused: true };
-    throw new ApiError(429, "capacity", "The demo is busy right now. Try again in a little while.");
+    throw new ApiError(429, "capacity", "The sample scan is busy right now. Try again in a few minutes.");
   }
   const scan = await createScan({ repoId: null, snapshotId: null, ownerUserId: null, kind: "light", source: "demo", branch: "main", appDescription: "Online ordering for a neighbourhood bakery: menu, basket, card checkout with Stripe, order history, and a staff dashboard." });
   await enqueueJob("scan", { scanId: scan.id }, { maxAttempts: 1 });
@@ -111,7 +111,7 @@ export async function loadFinding(findingId: string, user: UserRow | null): Prom
 
 export async function startFix(findingId: string, user: UserRow): Promise<FindingResponse["fix"]> {
   const { finding, scan } = await findingForViewer(findingId, user.id);
-  if (scan.source === "demo") throw new ApiError(403, "demo", "Fixes are not available on the demo repository. Sign in and connect your own to open pull requests.");
+  if (scan.source === "demo") throw new ApiError(403, "demo", "The sample repository is read-only. Sign in and connect your own to open pull requests.");
   if (finding.action_kind !== "fix") throw new ApiError(400, "not_fixable", "This finding needs an action from you rather than a code change.");
   const existing = await latestFixForFinding(finding.id);
   if (existing && (existing.status === "proposed" || existing.status === "testing")) return toFix(existing);
@@ -124,7 +124,7 @@ export async function startFix(findingId: string, user: UserRow): Promise<Findin
 
 export async function dismissFinding(findingId: string, user: UserRow): Promise<void> {
   const { finding, scan } = await findingForViewer(findingId, user.id);
-  if (scan.source === "demo") throw new ApiError(403, "demo", "The demo repository cannot be changed.");
+  if (scan.source === "demo") throw new ApiError(403, "demo", "The sample repository is read-only.");
   await setFindingStatus(finding.id, finding.repo_id, finding.key, "dismissed");
 }
 

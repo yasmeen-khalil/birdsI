@@ -57,15 +57,15 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
       <div className="flex flex-col gap-2.5" style={{ maxWidth: 760 }}>
         <h1 className="t-h1">Agent</h1>
         <p className="t-body c2">
-          Where birdsI and your coding agent come to you: questions only you can answer, and actions that need your yes before anything runs.
+          Where birdsI and your coding agent check with you: questions only you can answer, and commands that wait for your approval.
           {open.length + pending.length > 0 ? ` ${plural(open.length + pending.length, "thing")} waiting for you.` : ""}
         </p>
       </div>
 
       <section className="flex flex-col gap-5" aria-labelledby="questions-title">
-        <SectionHead id="questions-title" title="Questions for you" intro="Plans, budgets and choices birdsI cannot read from the code. Each answer goes straight into what birdsI knows." count={open.length} />
+        <SectionHead id="questions-title" title="Questions" intro="Plans, budgets and choices birdsI cannot read from the code or an account. Each answer is saved as a fact, marked as told by you." count={open.length} />
         {open.length === 0 ? (
-          <Empty>Nothing to answer. birdsI asks here when it cannot know something itself.</Empty>
+          <Empty>Nothing to answer. When birdsI or your agent cannot find something out, the question appears here.</Empty>
         ) : (
           <div className="grid grid-cols-1 gap-4 min-[1200px]:grid-cols-2">
             {open.map((q) => (
@@ -94,9 +94,9 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="approvals-title">
-        <SectionHead id="approvals-title" title="Approvals" intro="Commands your coding agent or birdsI wants to run, like upgrading a plan. Nothing runs until you approve it." count={pending.length} />
+        <SectionHead id="approvals-title" title="Approvals" intro="Commands your coding agent or birdsI proposes, like upgrading a plan. Nothing runs until you approve it." count={pending.length} />
         {pending.length === 0 ? (
-          <Empty>Nothing waiting for approval. When an agent proposes a command, it waits here for your yes.</Empty>
+          <Empty>Nothing to approve. When an agent proposes a command, it waits here until you decide.</Empty>
         ) : (
           <div className="grid grid-cols-1 gap-4 min-[1200px]:grid-cols-2">
             {pending.map((a) => (
@@ -146,7 +146,7 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
 
       <section className="grid grid-cols-1 gap-y-10 min-[901px]:grid-cols-12 min-[901px]:gap-x-6" aria-labelledby="policy-title">
         <div className="flex flex-col gap-5 min-[901px]:col-span-7">
-          <SectionHead id="policy-title" title="What agents may do" intro="Agents can always read what birdsI knows about this app. These settings decide what they can ask for." />
+          <SectionHead id="policy-title" title="What agents may do" intro="Agents can always read what birdsI knows about this app. These settings decide what they can ask you for." />
           <PolicyControls repoId={repo.id} policy={policy} />
         </div>
         <Frame arm={26} bend={12} className="flex flex-col gap-3.5 self-start px-[30px] py-7 min-[901px]:col-span-4 min-[901px]:col-start-9 max-[900px]:px-[22px] max-[900px]:py-6">
@@ -158,14 +158,14 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
             </code>
             <CopyButton text={MCP_ADD} />
           </div>
-          <p className="t-small c2">Any other agent that speaks MCP starts the server with:</p>
+          <p className="t-small c2">Cursor, Codex or any agent that supports MCP starts it with:</p>
           <div className="code flex items-center justify-between gap-2" style={{ padding: "6px 6px 6px 14px" }}>
             <code className="t-mono-s min-w-0 overflow-x-auto whitespace-pre" style={{ color: "var(--text)" }}>
               {MCP_SERVER}
             </code>
             <CopyButton text={MCP_SERVER} />
           </div>
-          <p className="t-small c3">Your agent can then read the vendors, limits, alerts and your vision, ask you questions here, and propose actions for your approval.</p>
+          <p className="t-small c3">MCP is the standard way coding agents connect to tools. Your agent can then read the vendors, limits, alerts and vision, ask you questions, and propose commands.</p>
         </Frame>
       </section>
     </main>

@@ -6,12 +6,12 @@ export const SEVERITY_LABEL: Record<Severity, string> = { critical: "Critical", 
 export const SEVERITY_CLASS: Record<Severity, string> = { critical: "crit", high: "high", medium: "med", low: "low" };
 export const CONFIDENCE_LABEL: Record<Confidence, string> = { proven: "Proven", doc_verified: "Doc-verified", judgment: "Judgment" };
 export const CONFIDENCE_MEANING: Record<Confidence, string> = {
-  proven: "A deterministic rule found this. The same scan will always give the same answer.",
-  doc_verified: "Checked against the current official docs for the version you use. If the docs change, the next deep scan checks again.",
-  judgment: "birdsI’s reading of your code. It may be wrong, so read the evidence before you act.",
+  proven: "A fixed rule or tool found this, not a model. Run the scan again and you get the same answer.",
+  doc_verified: "Checked against the vendor's current official docs for the version you use. The next full scan checks again.",
+  judgment: "birdsI’s reading of your code. Usually right, but read the evidence before you act on it.",
 };
-export const KIND_LABEL: Record<ScanKind, string> = { light: "Light scan", deep: "Deep scan", audit: "Pre-launch audit" };
-export const KIND_LOWER: Record<ScanKind, string> = { light: "light scan", deep: "deep scan", audit: "pre-launch audit" };
+export const KIND_LABEL: Record<ScanKind, string> = { light: "Quick check", deep: "Full scan", audit: "Pre-launch audit" };
+export const KIND_LOWER: Record<ScanKind, string> = { light: "quick check", deep: "full scan", audit: "pre-launch audit" };
 /** Expected run time in seconds, used for "of about" lines. */
 export const KIND_SECONDS: Record<ScanKind, number> = { light: 60, deep: 360, audit: 1500 };
 export const KIND_DURATION: Record<ScanKind, string> = { light: "About 1 min", deep: "About 6 min", audit: "About 25 min" };

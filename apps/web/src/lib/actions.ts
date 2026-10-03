@@ -23,7 +23,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
     if (error instanceof ApiError) return { ok: false, message: error.message, code: error.code };
     if (error instanceof Error && error.message === "Not signed in") return { ok: false, message: "Sign in to continue.", code: "unauthorized" };
     console.error(error);
-    return { ok: false, message: "Something went wrong. Try again in a moment." };
+    return { ok: false, message: "birdsI hit an error. Try again in a moment." };
   }
 }
 
@@ -141,7 +141,7 @@ export async function startFixAction(findingId: string): Promise<ActionResult<{ 
   return run(async () => {
     const user = await requireUser();
     const fix = await startFix(findingId, user);
-    if (!fix) throw new ApiError(500, "server_error", "The fix could not be started.");
+    if (!fix) throw new ApiError(500, "server_error", "The fix did not start. Try again in a moment.");
     return { fixId: fix.id };
   });
 }

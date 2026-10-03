@@ -342,7 +342,7 @@ export function toCliError(error: unknown, what?: string): CliError {
         return new CliError(
           `birdsI did not start this because it would go over your budget.${detail ? ` ${sentence(detail)}` : ""}`,
           EXIT.failed,
-          "Try a light scan, or check your plan on the birdsI website.",
+          "Try a quick check, or see your usage in Settings on the birdsI website.",
         );
       case 429:
         return new CliError("birdsI is getting too many requests from you right now.", EXIT.failed, "Wait a minute, then try again.");
@@ -357,7 +357,7 @@ export function toCliError(error: unknown, what?: string): CliError {
           );
         }
         return new CliError(
-          `birdsI refused the request (HTTP ${error.status}).${detail ? ` ${sentence(detail)}` : ""}`,
+          `birdsI did not accept the request (HTTP ${error.status}).${detail ? ` ${sentence(detail)}` : ""}`,
           EXIT.failed,
         );
     }

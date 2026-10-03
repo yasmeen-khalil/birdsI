@@ -111,6 +111,8 @@ export async function deviceLoginByUserCode(userCode: string): Promise<DeviceLog
 export async function approveDeviceLogin(userCode: string, userId: string, tokenName: string): Promise<"approved" | "expired" | "not_found" | "already_used"> {
   const row = await deviceLoginByUserCode(userCode);
   if (!row) return "not_found";
+  // Approving twice (a double click, a refresh) is the same approval.
+  if ((row.status === "approved" || row.status === "claimed") && row.approved_by === userId) return "approved";
   if (row.status !== "pending") return "already_used";
   if (new Date(row.expires_at) < new Date()) return "expired";
   const { token, row: tokenRow } = await createApiToken(userId, tokenName);

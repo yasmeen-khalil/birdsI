@@ -33,13 +33,13 @@ export function buildProgram(): Command {
   const program = new Command();
   program
     .name("birdsi")
-    .description("birdsI: the operations layer for coding agents. Run it in a project to map the code, the vendors it runs on, their limits, and what needs you.")
+    .description("birdsI: the operations layer for coding agents. Run it in a project to map the code, the vendors (outside services) it runs on, their limits and spend, and what needs you.")
     .version(VERSION, "-v, --version", "print the version")
     .helpOption("-h, --help", "show help")
     .showHelpAfterError("(run birdsi --help for the full list)")
     .exitOverride()
     .argument("[path]", "folder to scan (default: the current one)")
-    .option("--quick", "a quick check instead of the full scan")
+    .option("--quick", "a quick check (about a minute) instead of the full scan")
     .option("--describe <text>", "what the app does, in a sentence or two")
     .option("--no-open", "do not open the dashboard in the browser")
     .option("--no-fix-prompt", "do not offer fixes after the scan")
@@ -70,11 +70,11 @@ export function buildProgram(): Command {
 
   program
     .command("scan")
-    .description("scan a folder (default: the current one)")
+    .description("scan a folder: a quick check unless you add a flag (default folder: the current one)")
     .argument("[path]", "folder to scan")
-    .option("--full", "the whole pipeline in order, then the vendor sync (the default when you run birdsi with no command)")
-    .option("--deep", "deep scan: reads all the code")
-    .option("--audit", "pre-launch audit: the deepest scan")
+    .option("--full", "full scan: map the code, check docs, audit, refresh vendors (what birdsi with no command runs)")
+    .option("--deep", "read all the code, without refreshing vendors")
+    .option("--audit", "pre-launch audit: a launch verdict, area by area")
     .option("--open", "open the dashboard in the browser")
     .option("--describe <text>", "what the app does, in a sentence or two")
     .option("--branch <name>", "branch name to record, if not the current one")
@@ -159,7 +159,7 @@ export function buildProgram(): Command {
 
   program
     .command("approvals")
-    .description("actions your agent proposed: list, approve, deny, or run approved ones here")
+    .description("commands your agent proposed: list, approve, deny, or run approved ones here")
     .argument("[action]", "approve | deny | run")
     .argument("[id]", "request id")
     .option("-y, --yes", "run approved commands without asking")
@@ -188,7 +188,7 @@ export function buildProgram(): Command {
 
   program
     .command("mcp")
-    .description("run the birdsI MCP server over stdio, for coding assistants")
+    .description("run the birdsI MCP server over stdio, for coding agents")
     .option("--install-hint", "print the config snippets for Claude Code, Cursor and Codex")
     .action(
       run(async (options: { installHint?: boolean }) => {

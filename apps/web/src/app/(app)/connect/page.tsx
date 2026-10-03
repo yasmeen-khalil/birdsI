@@ -63,17 +63,17 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
       </header>
       <main className="grid flex-grow grid-cols-1 gap-y-10 px-16 pt-[72px] pb-12 max-[900px]:px-5 max-[900px]:pt-8 min-[901px]:grid-cols-12 min-[901px]:gap-x-6">
         <section className="flex flex-col gap-5 min-[901px]:col-span-5">
-          <h1 className="t-h1">Choose a repository to watch</h1>
-          <p className="t-body-l c2">birdsI connects through its GitHub App. On GitHub you pick which repositories it may read, and birdsI sees only those. You can add more at any time.</p>
+          <h1 className="t-h1">Choose a repository</h1>
+          <p className="t-body-l c2">birdsI connects through its GitHub App. On GitHub you choose which repositories it may read, and it sees only those. You can add more at any time.</p>
 
           {status === "connected" && (
             <Banner tone="ok" title={Number.isFinite(connectedCount) && connectedCount > 0 ? `${plural(connectedCount, "repository", "repositories")} connected` : "The GitHub App is installed"}>
-              {Number.isFinite(connectedCount) && connectedCount > 0 ? "Choose one and start its first scan." : "No repositories were shared with it yet. Change that on GitHub."}
+              {Number.isFinite(connectedCount) && connectedCount > 0 ? "Choose one and start its first scan." : "No repositories are shared with it yet. Choose some on GitHub."}
             </Banner>
           )}
           {status === "requested" && (
             <Banner tone="info" title="Your request was sent">
-              An owner of the GitHub organization has to approve the birdsI app. Once they do, its repositories appear here.
+              An owner of the GitHub organization needs to approve the birdsI app. Once they do, its repositories appear here.
             </Banner>
           )}
           {status === "missing" && (
@@ -92,7 +92,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
               <span className="t-body" style={{ fontWeight: 600 }}>
                 GitHub is not connected on this server yet
               </span>
-              <span className="t-small c2">The person who runs this copy of birdsI has not added its GitHub App settings. Until they do, repositories cannot be connected here. The sample scan and the terminal tool still work.</span>
+              <span className="t-small c2">Whoever runs this copy of birdsI has not added its GitHub App settings yet. Until then, repositories cannot be connected here. The sample scan and the terminal tool still work.</span>
             </div>
           ) : active.length > 0 ? (
             active.map((inst) => {
@@ -118,7 +118,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
               <h2 className="t-h2" style={{ fontSize: 23 }}>
                 Install the birdsI GitHub App
               </h2>
-              <p className="t-small c2">birdsI reads code only through its GitHub App. On GitHub, pick the repositories it may read. It takes about a minute.</p>
+              <p className="t-small c2">birdsI reads code only through its GitHub App. On GitHub, choose the repositories it may read. It takes about a minute.</p>
               <div className="flex justify-end">
                 <a className="btn btn-primary btn-sm" href={install}>
                   Install on GitHub

@@ -51,7 +51,7 @@ export function PipelineStrip({ stages }: { stages: StageState[] }) {
         <h2 id="pipeline-title" className="t-label c2">
           Pipeline
         </h2>
-        <p className="t-small c3">Stages run in this order. A full scan runs all four; refreshing a later stage first refreshes anything stale before it.</p>
+        <p className="t-small c3">Stages run in this order. A full scan runs all four. Refreshing one stage first refreshes any out of date stage before it.</p>
       </div>
       <ol className="pipe m-0 grid list-none grid-cols-1 p-0 min-[901px]:grid-cols-4">
         {stages.map((s, i) => {
@@ -130,7 +130,7 @@ export function AlertList({ alerts, vendorsHref, limit }: { alerts: Alert[]; ven
       ))}
       {vendorsHref && (
         <Link className="t-small c2 inline-flex items-center gap-1.5 self-start" href={vendorsHref} style={{ marginTop: 12, minHeight: 32 }}>
-          {limit && sorted.length > limit ? `See all ${sorted.length} alerts on the vendors page` : "See the vendors"}
+          {limit && sorted.length > limit ? `See all ${sorted.length} alerts on the Vendors page` : "See the vendors"}
           <ArrowRight {...icon14} />
         </Link>
       )}

@@ -66,12 +66,12 @@ export async function runFix(
 
   const result = sandboxResult(fix);
   if (fix.status === "failed") {
-    say(`  ${paint.fail(style, g.failed)} The fix did not pass in the sandbox${fix.error ? `: ${fix.error}` : "."}`);
+    say(`  ${paint.fail(style, g.failed)} The fix did not pass its tests on a separate copy${fix.error ? `: ${fix.error}` : "."}`);
     if (result && result !== fix.error) say(paint.dim(style, `    ${result}`));
     say(paint.dim(style, "    Nothing in your files changed."));
     return { kind: "failed", fix };
   }
-  say(`  ${paint.ok(style, g.done)} Tested in a sandbox${result ? `: ${result}` : "."}`);
+  say(`  ${paint.ok(style, g.done)} Tested on a separate copy${result ? `: ${result}` : "."}`);
 
   const followUp = (): void => {
     const items = finding.fixPlan?.followUp ?? [];

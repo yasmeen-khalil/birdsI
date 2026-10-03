@@ -167,7 +167,7 @@ export function ActionCard({ action, repoId }: { action: ActionRequest; repoId: 
           prompt="Approve this command?"
           detail={
             <>
-              Approved commands run on your computer when you run <span className="t-mono">birdsi approvals run</span>. Nothing runs on birdsI&apos;s servers.
+              It runs on your own computer the next time you type <span className="t-mono">birdsi approvals run</span>. Nothing runs on birdsI&apos;s servers.
             </>
           }
           confirmLabel="Approve"
@@ -212,7 +212,7 @@ export function PolicyControls({ repoId, policy }: { repoId: string; policy: Age
       const r = await updatePolicyAction(repoId, { autoApproveUnderUsd: parsed });
       if (!r.ok) setNotice({ tone: "error", text: r.message });
       else {
-        setNotice({ tone: "ok", text: parsed === null ? "Saved. birdsI will always ask." : `Saved. Requests at or under $${parsed} a month are approved without asking.` });
+        setNotice({ tone: "ok", text: parsed === null ? "Saved. birdsI always asks you first." : `Saved. Commands at or under $${parsed} a month are approved without asking.` });
         router.refresh();
       }
     });
@@ -222,9 +222,9 @@ export function PolicyControls({ repoId, policy }: { repoId: string; policy: Age
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4" style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
         <span className="flex flex-col gap-0.5">
           <span id="allow-label" className="t-body">
-            Agents may ask questions and propose actions
+            Agents may ask questions and propose commands
           </span>
-          <span className="t-small c3">When off, agents can still read what birdsI knows, but cannot add to the queues above.</span>
+          <span className="t-small c3">When off, agents can still read what birdsI knows, but cannot add to Questions or Approvals.</span>
         </span>
         <span className="inline-flex items-center justify-center" style={{ minWidth: 44, minHeight: 44 }}>
           <button type="button" className="switch" role="switch" aria-checked={allow} aria-labelledby="allow-label" disabled={pending} onClick={toggle} />
@@ -256,7 +256,7 @@ export function PolicyControls({ repoId, policy }: { repoId: string; policy: Age
             </button>
           </div>
           <span id="auto-limit-hint" className="t-small c3">
-            {invalid ? "Write a number, like 5, or leave it empty to always ask." : "Leave it empty and birdsI always asks you first."}
+            {invalid ? "Write a number, like 5, or leave it empty to always ask." : "Leave it empty and every command waits for you."}
           </span>
         </div>
         <div className="flex flex-col gap-1.5">

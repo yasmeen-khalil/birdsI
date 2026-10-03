@@ -194,7 +194,7 @@ export function FindingDetail({
                 <h2 className="t-h2">What to do</h2>
                 {finding.steps.length > 0 && <span className="t-small c3">{plural(finding.steps.length, "step")}</span>}
               </div>
-              {finding.steps.length > 0 ? <StepsChecklist findingId={finding.id} steps={finding.steps} /> : <p className="t-body c2">birdsI did not write steps for this one. Ask birdsI about it and it will walk you through the change.</p>}
+              {finding.steps.length > 0 ? <StepsChecklist findingId={finding.id} steps={finding.steps} /> : <p className="t-body c2">birdsI has no steps for this one yet. Ask birdsI about it in chat and it walks you through the change.</p>}
             </section>
           )}
         </article>
@@ -258,8 +258,8 @@ export function FindingDetail({
               <h2 className="t-h3">{finding.actionKind === "fix" ? "birdsI can fix this" : "You need to do this"}</h2>
               <p className="t-body c2">
                 {finding.actionKind === "fix"
-                  ? "On your own repository, birdsI writes this change, tests it in a sandbox, and opens a pull request you approve. Fixes need a repository you connect, so the sample cannot be changed."
-                  : "On your own repository, you get these steps with tick boxes and a Check again button that confirms the fix. The sample cannot be changed."}
+                  ? "On your own repository, birdsI writes this change, tests it on a separate copy, and opens a pull request you approve. The sample is read-only, so nothing here changes."
+                  : "On your own repository, you get these steps with tick boxes and a Check again button that confirms the fix. The sample is read-only."}
               </p>
               <div className={ACTION_BAR}>
                 <span />
@@ -276,7 +276,7 @@ export function FindingDetail({
               <ul className="t-small flex flex-col gap-2.5" style={{ listStyle: "none", margin: 0, padding: 0 }}>
                 <li className="flex gap-2.5">
                   <Check {...icon} className="i c2" />
-                  <span className="c2">Tested in a sandbox before the pull request opens</span>
+                  <span className="c2">Tested on a separate copy of your code before the pull request opens</span>
                 </li>
                 <li className="flex gap-2.5">
                   <Check {...icon} className="i c2" />
@@ -311,7 +311,7 @@ export function FindingDetail({
 
           <p className="t-small c3" style={{ padding: "0 4px" }}>
             Found in the {mode === "demo" ? "sample scan" : KIND_LOWER[scan.kind]} <LocalTime iso={scan.finishedAt ?? scan.createdAt} style="sentence" />.
-            {mode === "app" && finding.actionKind === "steps" && ` Check again runs a ${KIND_LOWER[checkKind]} so this check runs again. ${KIND_DURATION[checkKind]}.`}
+            {mode === "app" && finding.actionKind === "steps" && ` Check again runs a ${KIND_LOWER[checkKind]} to confirm the fix. ${KIND_DURATION[checkKind]}.`}
           </p>
         </aside>
       </main>

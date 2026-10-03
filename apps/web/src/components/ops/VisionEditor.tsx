@@ -60,7 +60,7 @@ export function VisionEditor({ repoId, initial, updatedAt }: { repoId: string; i
           }}
         >
           <label htmlFor="vision-text" className="t-small c2">
-            What is this app for, who is it for, and where is it going? Plain words are best.
+            What is this app for, who uses it, and where is it going? Your own words are best.
           </label>
           <textarea id="vision-text" className="input" rows={6} value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={20000} autoFocus disabled={pending} style={{ minHeight: 150 }} />
           {error && (
@@ -81,7 +81,7 @@ export function VisionEditor({ repoId, initial, updatedAt }: { repoId: string; i
       ) : empty ? (
         <div className="panel flex flex-col gap-3" style={{ padding: "22px 24px", maxWidth: 640 }}>
           <p className="t-body">No vision written yet.</p>
-          <p className="t-small c2">birdsI judges every finding against what you are building. Write it in your own words.</p>
+          <p className="t-small c2">The vision is what you are building and why. birdsI weighs every finding against it, and your agent reads it too.</p>
           <div className="flex justify-end">
             <button type="button" className="btn btn-primary btn-sm" onClick={open}>
               Write the vision
@@ -100,7 +100,7 @@ export function VisionEditor({ repoId, initial, updatedAt }: { repoId: string; i
           )}
         </div>
       )}
-      {saved && <Toast onClose={() => setSaved(false)}>Vision saved. birdsI reads it on the next scan, and your coding agent can read it now.</Toast>}
+      {saved && <Toast onClose={() => setSaved(false)}>Vision saved. Your coding agent can read it now, and birdsI uses it from the next scan.</Toast>}
     </section>
   );
 }

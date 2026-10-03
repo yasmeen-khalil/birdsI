@@ -97,9 +97,9 @@ export const CONFIDENCE_WORD: Record<Confidence, string> = {
 };
 
 export const CONFIDENCE_MEANING: Record<Confidence, string> = {
-  proven: "A tool or rule proved this. You can trust it outright.",
-  doc_verified: "Checked against a current official document, cited below.",
-  judgment: "birdsI's reading of the code, with no tool or document behind it. Worth checking yourself.",
+  proven: "A fixed rule or tool found this, not a model. Same answer every run.",
+  doc_verified: "Checked against the current official docs, cited below.",
+  judgment: "birdsI's reading of the code, with no rule or doc behind it. Usually right, worth a look.",
 };
 
 export function severityWord(severity: Severity): string {
@@ -113,8 +113,8 @@ export function paintSeverity(severity: Severity, style: Style, text: string = s
 }
 
 export const KIND_WORD: Record<ScanKind, string> = {
-  light: "Light scan",
-  deep: "Deep scan",
+  light: "Quick check",
+  deep: "Full scan",
   audit: "Pre-launch audit",
 };
 
@@ -124,13 +124,13 @@ export const STEP_LABEL: Record<ScanStep, string> = {
   inventory: "Read the repository",
   dependencies: "Map dependencies",
   vendors: "Find the services it runs on",
-  secrets: "Look for committed secrets",
+  secrets: "Look for exposed keys",
   vulnerabilities: "Check known problems",
   docs: "Check against current docs",
   review: "Read the code",
-  crosscheck: "Cross-check the code",
-  audit: "Pre-launch audit",
-  rank: "Verify and sort",
+  crosscheck: "Compare files against each other",
+  audit: "Judge launch readiness",
+  rank: "Verify and sort findings",
 };
 
 /** What a step counts, for "212 files", "43 packages". */
@@ -373,14 +373,14 @@ export function formatFindingsList(findings: readonly Finding[], style: Style): 
 
 const AUDIT_AREA_WORD: Record<AuditReport["areas"][number]["area"], string> = {
   auth: "Sign-in and access",
-  secrets: "Secrets",
-  data: "Data",
-  dependencies: "Dependencies",
-  errors: "Error handling",
-  config: "Configuration",
+  secrets: "Keys and secrets",
+  data: "User data",
+  dependencies: "Packages",
+  errors: "Failure handling",
+  config: "Deployment settings",
   operations: "Services and limits",
   legal: "Legal pages",
-  tests: "Tests",
+  tests: "Tests and checks",
 };
 
 export const AUDIT_VERDICT_WORD = { pass: "Pass", attention: "Needs attention", blocker: "Blocker" } as const;
@@ -464,13 +464,13 @@ export function fixStatusLine(fix: Fix): string {
     case "proposed":
       return "Queued. birdsI is writing the fix.";
     case "testing":
-      return "Testing the fix in a sandbox.";
+      return "Testing the fix on a separate copy of your code.";
     case "tested":
-      return "Tested in a sandbox.";
+      return "Tested on a separate copy, and it passed.";
     case "pr_open":
       return fix.prNumber ? `Pull request #${fix.prNumber} is open.` : "The pull request is open.";
     case "failed":
-      return `The fix did not work${fix.error ? `: ${fix.error}` : "."}`;
+      return `The fix did not pass${fix.error ? `: ${fix.error}` : "."}`;
   }
 }
 
@@ -487,7 +487,7 @@ export function sandboxResult(fix: Fix): string | null {
 }
 
 export function formatRepos(repos: readonly Repo[], style: Style): string {
-  if (repos.length === 0) return "No repositories are connected. Connect one on the birdsI website.";
+  if (repos.length === 0) return "No repositories connected yet. Connect one on the birdsI website, or run birdsi in a project folder.";
   const width = Math.max(...repos.map((r) => r.fullName.length));
   return repos
     .map((r) => `  ${r.fullName.padEnd(width)}  ${paint.dim(style, `${r.private ? "private" : "public "}  ${r.id}`)}`)

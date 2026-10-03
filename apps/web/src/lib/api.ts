@@ -28,7 +28,7 @@ export function errorResponse(error: unknown): NextResponse {
   // Missing and forbidden look identical so nothing about other users' data leaks.
   if (error instanceof NotFoundError || error instanceof ForbiddenError) return json({ error: { code: "not_found", message: "Not found." } }, { status: 404 });
   console.error(error);
-  return json({ error: { code: "server_error", message: "Something went wrong on our side. Try again in a moment." } }, { status: 500 });
+  return json({ error: { code: "server_error", message: "birdsI hit an error on its side. Try again in a moment." } }, { status: 500 });
 }
 
 /** Resolves the caller. Throws 401 when nobody is signed in. */

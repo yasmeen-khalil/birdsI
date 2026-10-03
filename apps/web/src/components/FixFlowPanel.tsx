@@ -113,7 +113,7 @@ export function FixFlowPanel({
             setToast({ tone: "ok", text: `Pull request #${body.fix.prNumber ?? ""} is open`, ...(safeUrl(body.fix.prUrl) ? { href: safeUrl(body.fix.prUrl)! } : {}) });
             router.refresh();
           } else if (body.fix.status === "failed" && before !== "failed") {
-            setToast({ tone: "error", text: "The fix did not pass. Nothing was opened." });
+            setToast({ tone: "error", text: "The fix did not pass its tests. No pull request was opened." });
           }
           if (!isWorking(body.fix, Date.now())) return;
         }
@@ -233,7 +233,7 @@ export function FixFlowPanel({
               ))}
             </div>
           )}
-          <p className="t-small c3">birdsI writes the change, then tests it in a sandbox with your project’s own build and test commands. The pull request opens only if they pass. birdsI never merges it.</p>
+          <p className="t-small c3">birdsI writes the change, then runs your project’s own build and tests on a separate copy (a sandbox). The pull request opens only if they pass. birdsI never merges it.</p>
           {error && (
             <p className="t-small" role="alert" style={{ color: "var(--critical)" }}>
               {error}
@@ -265,7 +265,7 @@ export function FixFlowPanel({
           </div>
           <ol className="t-small flex flex-col" style={{ listStyle: "none", margin: 0, padding: 0 }} aria-live="polite">
             <StepLine state={stage > 0 ? "done" : "running"} label={files.length > 0 ? `Write the change to ${files.length === 1 ? "1 file" : `${files.length} files`}` : "Write the change"} />
-            <StepLine state={stage > 1 ? "done" : stage === 1 ? "running" : "waiting"} label="Test it in a sandbox: install, build, run your tests" />
+            <StepLine state={stage > 1 ? "done" : stage === 1 ? "running" : "waiting"} label="Test it on a separate copy: install, build, run tests" />
             <StepLine state={stage === 2 ? "running" : "waiting"} label="Open the pull request" last />
           </ol>
           {fix.testLog && (
@@ -307,7 +307,7 @@ export function FixFlowPanel({
           }
         >
           <h2 className="t-h2">Pull request #{fix.prNumber} is open</h2>
-          <p className="t-small c2">It passed its checks and waits for you on GitHub; birdsI never merges.</p>
+          <p className="t-small c2">It passed its tests and is waiting for you on GitHub. birdsI never merges.</p>
           {prUrl && (
             <a className="path" href={prUrl} target="_blank" rel="noreferrer" style={{ color: "var(--text)", whiteSpace: "normal", wordBreak: "break-all" }}>
               {prUrl.replace(/^https?:\/\//, "")}
@@ -344,7 +344,7 @@ export function FixFlowPanel({
           }
         >
           <h2 className="t-h2">The change is ready, but no pull request was opened</h2>
-          <p className="t-small c2">birdsI has no GitHub App access to open pull requests on {fullName}. Reinstall the app from Connect to let it open them, or apply the change below yourself.</p>
+          <p className="t-small c2">birdsI does not have permission to open pull requests on {fullName}. Reinstall the GitHub App from Connect to allow it, or apply the change below yourself.</p>
           {fix.testLog && <p className="t-small c3">{fix.testLog.split("\n").slice(-1)[0]}</p>}
           {fix.patch && <DiffView patch={fix.patch} />}
         </Sheet>
@@ -380,7 +380,7 @@ export function FixFlowPanel({
           }
         >
           <h2 className="t-h2">{fix.testLog ? "The fix did not pass your tests" : "birdsI could not make this change"}</h2>
-          <p className="t-small c2">{fix.error ?? "The change could not be finished."} Nothing in your repository changed.</p>
+          <p className="t-small c2">{fix.error ?? "birdsI stopped before the change was finished."} Nothing in your repository changed.</p>
           {fix.testLog && (
             <div className="code" style={{ fontSize: 12, lineHeight: 1.6 }}>
               <div className="bd" style={{ padding: "10px 14px", whiteSpace: "pre-wrap", color: "var(--text-2)", maxHeight: showLog ? 480 : 132, overflowY: "auto" }}>

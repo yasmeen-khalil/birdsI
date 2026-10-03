@@ -33,7 +33,7 @@ export function AuditStartForm({ repoId, disabled, intro, checklist }: { repoId:
           </label>
           <textarea id="audit-about" className="input" rows={3} maxLength={2000} value={about} onChange={(e) => setAbout(e.target.value)} placeholder="Class bookings for a yoga studio. Customers sign in, book a class and pay with Stripe." style={{ resize: "vertical" }} aria-describedby="audit-about-hint" />
           <span id="audit-about-hint" className="t-small c3">
-            This helps birdsI judge what matters most for your launch.
+            A sentence or two helps birdsI judge what matters most for your launch.
           </span>
         </div>
       </section>

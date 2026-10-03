@@ -37,7 +37,8 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
   if (scan.status === "done" || scan.status === "stopped") return;
 
   await updateScan(scanId, { status: "running", started_at: new Date().toISOString(), error: null });
-  let seq = 0;
+  // A retried scan (a worker died mid-run) continues the event log where it stopped.
+  let seq = await lastEventSeq(scanId);
   const controller = new AbortController();
   const emit = async (event: ScanEvent) => {
     seq += 1;
@@ -109,6 +110,13 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
     clearInterval(ticker);
     await (snapshot as Snapshot | null)?.cleanup();
   }
+}
+
+async function lastEventSeq(scanId: string): Promise<number> {
+  const { getDb } = await import("@birdsi/db");
+  const { data, error } = await getDb().from("scan_events").select("seq").eq("scan_id", scanId).order("seq", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error(`lastEventSeq: ${error.message}`);
+  return (data as { seq: number } | null)?.seq ?? 0;
 }
 
 /** What earlier syncs learned about the app's services, for the audit's operations area. Null before the first sync. */

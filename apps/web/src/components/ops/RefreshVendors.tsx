@@ -18,9 +18,9 @@ export function useRefreshVendors(repoId: string) {
       setNotice(null);
       const r = await syncVendorsAction(repoId);
       if (!r.ok) setNotice({ tone: "error", text: r.message });
-      else if (!r.data.queued) setNotice({ tone: "error", text: r.data.reason ?? "The vendor refresh could not start." });
+      else if (!r.data.queued) setNotice({ tone: "error", text: r.data.reason ?? "The vendor refresh did not start. Try again in a minute." });
       else {
-        setNotice({ tone: "ok", text: "Refreshing vendors. Plans, usage and limits update in a minute or two." });
+        setNotice({ tone: "ok", text: "Refreshing vendors. Plans, usage, limits and spend update in a minute or two." });
         router.refresh();
       }
     });

@@ -17,7 +17,7 @@ export default function PrivacyPage() {
       effective={EFFECTIVE_DATE}
       intro={
         <>
-          birdsI reads code so it can find problems in it. This policy says what it keeps, for how long, who else processes it, and how you remove it. birdsI is run by {OPERATOR_NAME} (“the operator”).
+          birdsI reads your code, and the vendor accounts you connect, to find problems and track the services your app runs on. This policy says what it keeps, for how long, who else processes it, and how you remove it. birdsI is run by {OPERATOR_NAME} (“the operator”).
         </>
       }
     >
@@ -25,8 +25,8 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             "A copy of your code exists only while a scan runs, then it is deleted.",
-            "Findings, dependency lists and chats are kept until you delete your account.",
-            "Your code is sent to Nebius Token Factory to be read by AI models, and search queries about your packages go to Tavily. Your code is never used to train models unless you opt in, and birdsI offers no such opt-in today.",
+            "Findings, vendor details, answers to questions, approvals and chats are kept until you delete your account.",
+            "Your code is sent to an AI model provider to be read, and search queries about your packages and vendors go to Tavily. Your code is never used to train models unless you opt in, and birdsI offers no such opt-in today.",
             "You can disconnect a repository or delete everything from Settings at any time.",
           ]}
         />
@@ -48,19 +48,19 @@ export default function PrivacyPage() {
               <b>Findings and scan results.</b> Each finding’s title, explanation, file path and line, and a short code excerpt as evidence, with secrets masked. Also the scan’s progress log, summary, and pre-launch audit report.
             </>,
             <>
-              <b>Dependency lists.</b> The packages your code uses, their versions, known problems and documentation checks.
+              <b>Dependency and vendor lists.</b> The packages and outside services your code uses, with versions, plans, usage, limits, spend, known problems and documentation checks. Your answers to questions and your vision text are stored with them.
             </>,
             <>
               <b>Chat.</b> Your questions and birdsI’s answers, and short passages of your code indexed so chat can find the right files.
             </>,
             <>
-              <b>Fixes.</b> The change birdsI proposed, the output of the sandbox test, and the pull request it opened.
+              <b>Fixes and approvals.</b> The change birdsI proposed, the output of its test, the pull request it opened, and each command proposed to you with your decision and its output.
             </>,
             <>
               <b>Usage records.</b> Which AI models were called for you, how much text they read and wrote, and when. These enforce fair-use limits.
             </>,
             <>
-              <b>Terminal and MCP tokens.</b> Stored only as one-way hashes, with their name and when they were last used.
+              <b>Tokens.</b> Terminal and MCP tokens are stored only as one-way hashes. Vendor account tokens you connect are stored encrypted, so birdsI can read plans and usage.
             </>,
             <>
               <b>Sample scans.</b> Visitors who try the sample are not asked to sign in. birdsI keeps a one-way hash of the network address and browser name for an hour, to limit how often the sample runs.
@@ -86,13 +86,13 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             <>
-              <b>Nebius Token Factory</b> runs the AI models (NVIDIA Nemotron) that read your code, write fixes and answer chat. It receives the code passages being read.
+              <b>Anthropic</b> runs the Claude models that read your code, write fixes and answer chat. It receives the code passages being read. When the operator turns it on, <b>Nebius Token Factory</b> runs the models or the search behind chat instead, and receives the same passages.
             </>,
             <>
-              <b>Nebius sandboxes</b> run your project’s build and tests on a proposed fix before a pull request opens. They receive a copy of the repository for that test.
+              <b>Nebius sandboxes</b>, when enabled, run your project’s build and tests on a proposed fix before a pull request opens. They receive a copy of the repository for that test.
             </>,
             <>
-              <b>Tavily</b> searches current documentation. It receives search queries built from your package names and versions, not your source files.
+              <b>Tavily</b> searches current documentation and vendor pricing pages. It receives search queries built from package and vendor names, not your source files. <b>Vendors you connect</b> receive read-only requests made with your token.
             </>,
             <>
               <b>LangSmith</b>, when enabled by the operator, records model calls, including the passages sent, to measure how accurate findings are.

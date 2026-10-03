@@ -17,7 +17,7 @@ export default function DeletedPage() {
       <main className="flex flex-grow items-start py-16">
         <Frame arm={40} bend={20} bracket="var(--text-2)" className="flex w-full flex-col gap-5 px-8 py-12 min-[901px]:px-16" style={{ maxWidth: 760 }}>
           <h1 className="t-display">Your account is deleted</h1>
-          <p className="t-body-l c2">birdsI removed your findings, scans and chats. To remove its GitHub App as well, uninstall it on GitHub.</p>
+          <p className="t-body-l c2">birdsI removed your findings, scans, vendor details and chats. To remove its GitHub App as well, uninstall it on GitHub.</p>
           <div className="flex flex-wrap justify-end gap-3" style={{ marginTop: 8 }}>
             <a className="btn btn-secondary" href="https://github.com/settings/installations" target="_blank" rel="noreferrer">
               Open GitHub settings

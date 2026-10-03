@@ -88,7 +88,7 @@ export async function startVendorSync(repoId: string, user: UserRow): Promise<{ 
   const repo = await repoForUser(repoId, user.id);
   const latest = await latestDoneScan(repo.id);
   if (!latest) return { queued: false, reason: "Run a scan first: the vendor list comes from the code." };
-  if (await jobActive("vendor_sync", "repoId", repo.id)) return { queued: false, reason: "A vendor sync is already running." };
+  if (await jobActive("vendor_sync", "repoId", repo.id)) return { queued: false, reason: "A vendor refresh is already running." };
   await assertSpendCap();
   await enqueueJob("vendor_sync", { repoId: repo.id, ownerUserId: user.id, hints: null }, { maxAttempts: 1 });
   return { queued: true };
@@ -142,7 +142,7 @@ export async function dismissQuestion(questionId: string, user: UserRow): Promis
 export async function askOwner(repoId: string, user: UserRow, input: AskOwnerRequest): Promise<Question> {
   const repo = await repoForUser(repoId, user.id);
   const policy = await policyForRepo(repo.id);
-  if (!policy.allowPropose) throw new ApiError(403, "policy", "Agents may not ask questions in this repository. Change the policy in the Agent page.");
+  if (!policy.allowPropose) throw new ApiError(403, "policy", "Agents may not ask questions in this repository. The owner can allow it on the Agent page.");
   const vendor = input.vendorSlug ? await vendorBySlug(repo.id, input.vendorSlug) : null;
   const row = await askQuestion(repo.id, {
     vendorId: vendor?.id ?? null,
@@ -168,9 +168,9 @@ export async function loadActions(repoId: string, user: UserRow, status?: Action
 export async function requestAction(repoId: string, user: UserRow, input: RequestActionRequest, requestedBy: ActionRequest["requestedBy"]): Promise<ActionRequest> {
   const repo = await repoForUser(repoId, user.id);
   const policy = await policyForRepo(repo.id);
-  if (requestedBy === "agent" && !policy.allowPropose) throw new ApiError(403, "policy", "Agents may not request actions in this repository. Change the policy in the Agent page.");
+  if (requestedBy === "agent" && !policy.allowPropose) throw new ApiError(403, "policy", "Agents may not propose commands in this repository. The owner can allow it on the Agent page.");
   const command = input.command.trim();
-  if (/[;&|`$<>]/.test(command) || /\n/.test(command)) throw new ApiError(400, "bad_request", "The command must be a single plain command without shell operators.");
+  if (/[;&|`$<>]/.test(command) || /\n/.test(command)) throw new ApiError(400, "bad_request", "Send one plain command, without shell operators such as ; | & or $.");
   const vendor = input.vendorSlug ? await vendorBySlug(repo.id, input.vendorSlug) : null;
   const monthly = input.estimatedMonthlyUsd ?? null;
   const once = input.estimatedOnceUsd ?? null;

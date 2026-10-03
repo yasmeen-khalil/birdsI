@@ -116,7 +116,7 @@ export default async function SettingsPage() {
         </Section>
 
         <Section id="connected-accounts" title="Connected accounts">
-          <p className="t-small c2">With a read-only token, birdsI reads a service&apos;s plan, usage and spend itself, so it can warn you before a limit is reached.</p>
+          <p className="t-small c2">Connect a vendor account with a read-only token, a key that can look but not change. birdsI reads the plan, usage and spend, and alerts you near a limit.</p>
           {connections.length === 0 ? (
             <p className="t-small c3" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
               No accounts connected yet.
@@ -145,12 +145,12 @@ export default async function SettingsPage() {
             </div>
           )}
           <ConnectAccount catalog={catalog} connected={connections.map((c) => c.vendorSlug)} />
-          <p className="t-small c3">Tokens are encrypted on birdsI&apos;s servers and only ever read by the vendor connectors. Use read-only tokens.</p>
+          <p className="t-small c3">Tokens are encrypted on birdsI&apos;s servers and used only to read that account. Use read-only tokens where offered.</p>
         </Section>
 
         <Section title="Terminal and MCP">
           <p className="t-small c2">
-            Each sign-in from the terminal tool creates a token. Your coding AI uses the same token through <span className="t-mono">npx birdsi mcp</span>.
+            Each sign-in from the terminal tool creates a token. Your coding agent uses the same token through <span className="t-mono">npx birdsi mcp</span>.
           </p>
           {liveTokens.length === 0 ? (
             <p className="t-small c3" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
@@ -202,7 +202,7 @@ export default async function SettingsPage() {
 
         <Section title="Delete account" muted last>
           <p className="t-small c2" style={{ maxWidth: 560 }}>
-            Removes your findings, scan history and chats from birdsI, and disconnects every repository. Your code on GitHub is not touched.
+            Removes your findings, scans, vendor details, questions and chats from birdsI, and disconnects every repository. Your code on GitHub is not touched.
           </p>
           <DeleteAccount expected={login} repoCount={repos.length} />
         </Section>

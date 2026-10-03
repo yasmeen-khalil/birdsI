@@ -27,7 +27,7 @@ export default function TermsPage() {
 
       <LegalSection title="What birdsI does">
         <LegalP>
-          birdsI reads the code in repositories you connect, checks it and its dependencies against current documentation and vulnerability databases, and reports what it finds. For some findings it writes a fix, tests it in a sandbox, and opens a pull request. For others it gives you steps to follow.
+          birdsI reads the code in repositories you connect, finds the outside services (vendors) it runs on, checks the code against current documentation and vulnerability databases, and reports what it finds. With accounts you connect, it reads plans, usage, limits and spend. For some findings it writes a fix, tests it on a separate copy, and opens a pull request. For others it gives you steps to follow.
         </LegalP>
         <LegalP>Every finding says how sure birdsI is: Proven, Doc-verified, or Judgment. Judgment findings are an AI model’s reading of your code and may be wrong.</LegalP>
       </LegalSection>
@@ -44,7 +44,7 @@ export default function TermsPage() {
 
       <LegalSection title="Fixes and pull requests">
         <LegalP>
-          A fix is a proposal. birdsI opens it as a pull request on a new branch and never merges it or pushes to your main branch. You decide whether to merge, and you are responsible for reviewing the change first. A passing sandbox test lowers the risk of a broken change; it does not remove it.
+          A fix is a proposal. birdsI opens it as a pull request on a new branch and never merges it or pushes to your main branch. You decide whether to merge, and you are responsible for reviewing the change first. A passing test lowers the risk of a broken change but does not remove it. Commands a coding agent or birdsI proposes run only after you approve them, on your own computer, and you are responsible for what they do, including plan changes and charges.
         </LegalP>
       </LegalSection>
 

@@ -51,7 +51,7 @@ export function SiteFooter() {
         </span>
         <span className="t-small c3">Open source under MPL 2.0.</span>
       </div>
-      <p className="t-small c2 min-[901px]:col-span-5 min-[901px]:col-start-5">Scans run on NVIDIA Nemotron models through Nebius Token Factory. Current documentation comes from Tavily. Your code is never used to train models.</p>
+      <p className="t-small c2 min-[901px]:col-span-5 min-[901px]:col-start-5">Scans run on Claude models from Anthropic. Current docs and vendor pricing come from Tavily. Your code is never used to train models.</p>
       <nav className="t-small flex flex-wrap gap-x-6 gap-y-2 min-[901px]:col-span-3 min-[901px]:col-start-10 min-[901px]:justify-end" style={{ fontSize: 13 }} aria-label="Footer">
         <a href={GITHUB_REPO_URL} style={{ color: "var(--text-2)" }}>
           GitHub

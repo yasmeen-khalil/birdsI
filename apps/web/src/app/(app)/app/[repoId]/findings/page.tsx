@@ -51,7 +51,7 @@ export default async function FindingsPage({ params, searchParams }: { params: P
           <h2 className="t-h2" style={{ fontSize: 23 }}>
             {running ? "The first scan is running" : "No findings yet"}
           </h2>
-          <p className="t-small c2">{running ? "Findings appear here as soon as it finishes." : "Run a scan and every finding shows up here, grouped by how serious it is."}</p>
+          <p className="t-small c2">{running ? "Findings appear here as soon as it finishes." : "A finding is a problem birdsI found in the code. Run a scan and each one shows here, most serious first."}</p>
           {running ? (
             <div className="flex justify-end">
               <Link className="btn btn-secondary btn-sm" href={`${base}/scans/${running.id}`}>

@@ -11,8 +11,9 @@ export function installHint(): string {
     },
   };
   return [
-    "Add birdsI to your coding assistant. Replace bsi_... with your token,",
-    "or leave the env block out if you ran birdsi login on this computer.",
+    "Add birdsI to your coding agent. MCP is how agents connect to tools.",
+    "Replace bsi_... with your token, or leave the env block out if you",
+    "ran birdsi login on this computer.",
     "",
     "Claude Code, in .mcp.json at the project root:",
     "",
@@ -29,8 +30,8 @@ export function installHint(): string {
     'args = ["-y", "birdsi", "mcp"]',
     'env = { BIRDSI_TOKEN = "bsi_..." }',
     "",
-    "Keep the token out of files you commit. .mcp.json is often committed:",
-    "set BIRDSI_TOKEN in your shell instead and drop the env block.",
+    "Keep the token out of files you commit. .mcp.json is often committed,",
+    "so set BIRDSI_TOKEN in your shell instead and drop the env block.",
     "",
   ].join("\n");
 }
