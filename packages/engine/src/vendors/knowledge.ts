@@ -120,7 +120,16 @@ export async function learnVendor(config: EngineConfig, slug: string, name: stri
     const d = docs.get(u)!;
     return { url: d.url, title: d.title, ...(d.publishedAt ? { publishedAt: d.publishedAt } : {}) };
   });
-  const tiers: PlanTier[] = learned.tiers.map((t) => ({ name: t.name, priceUsd: t.priceUsd, priceNote: t.priceNote, limits: t.limits }));
+  // One tier per name; the model sometimes repeats a tier per billing period.
+  const seen = new Set<string>();
+  const tiers: PlanTier[] = learned.tiers
+    .filter((t) => {
+      const key = t.name.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((t) => ({ name: t.name.trim(), priceUsd: t.priceUsd, priceNote: t.priceNote, limits: t.limits }));
   return {
     slug,
     name,

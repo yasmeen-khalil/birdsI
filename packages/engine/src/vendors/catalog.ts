@@ -20,6 +20,8 @@ export interface CatalogEntry {
   dashboardUrl: string | null;
   /** The connector slug when birdsI can read the account. */
   connector: string | null;
+  /** Pay-as-you-go services have no plan to ask about; their tiers are add-ons or consumer products. */
+  planless: boolean;
 }
 
 const e = (slug: string, name: string, category: VendorCategory, what: string, rest: Partial<Omit<CatalogEntry, "slug" | "name" | "category" | "what">>): CatalogEntry => ({
@@ -35,6 +37,7 @@ const e = (slug: string, name: string, category: VendorCategory, what: string, r
   docsUrl: rest.docsUrl ?? null,
   dashboardUrl: rest.dashboardUrl ?? null,
   connector: rest.connector ?? null,
+  planless: rest.planless ?? false,
 });
 
 export const CATALOG: readonly CatalogEntry[] = [
@@ -74,6 +77,7 @@ export const CATALOG: readonly CatalogEntry[] = [
     docsUrl: "https://docs.stripe.com",
     dashboardUrl: "https://dashboard.stripe.com",
     connector: "stripe",
+    planless: true,
   }),
   e("resend", "Resend", "email", "Sends transactional email from an app, with domains and templates.", {
     packages: [/^resend$/],
@@ -88,10 +92,11 @@ export const CATALOG: readonly CatalogEntry[] = [
     packages: [/^@anthropic-ai\//, /^anthropic$/],
     envVars: [/^ANTHROPIC_/],
     domains: ["api.anthropic.com", "anthropic.com"],
-    pricingUrl: "https://www.anthropic.com/pricing",
+    pricingUrl: "https://platform.claude.com/docs/en/about-claude/pricing",
     docsUrl: "https://platform.claude.com/docs",
     dashboardUrl: "https://platform.claude.com/usage",
     connector: "anthropic",
+    planless: true,
   }),
   e("openai", "OpenAI", "ai", "GPT models, embeddings and image generation through the OpenAI API.", {
     packages: [/^openai$/],
@@ -100,6 +105,7 @@ export const CATALOG: readonly CatalogEntry[] = [
     pricingUrl: "https://openai.com/api/pricing",
     docsUrl: "https://platform.openai.com/docs",
     dashboardUrl: "https://platform.openai.com/usage",
+    planless: true,
   }),
   e("nebius", "Nebius Token Factory", "ai", "Open models (Nemotron, DeepSeek, Qwen) served through an OpenAI-compatible API.", {
     envVars: [/^NEBIUS_/],

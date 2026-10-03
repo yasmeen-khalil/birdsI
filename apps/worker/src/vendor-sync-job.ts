@@ -165,6 +165,7 @@ async function queueQuestions(repoId: string, v: VendorRow, knowledge: { tiers: 
   const facts = await factsForVendors([v.id]);
   const hasPlan = facts.some((f) => f.kind === "plan");
   const entry = CATALOG_BY_SLUG.get(v.slug);
+  if (entry?.planless) return;
   if (!hasPlan && knowledge && knowledge.tiers.length > 0) {
     await askQuestion(repoId, {
       vendorId: v.id,
