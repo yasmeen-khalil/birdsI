@@ -18,10 +18,12 @@ describe("computeAlerts", () => {
     expect(alerts[0]?.level).toBe("critical");
   });
 
-  it("asks for the plan only when tiers are known, and suggests Stripe Projects upgrades", () => {
+  it("never alerts about unknown plans or unconnected accounts, and suggests Stripe Projects upgrades", () => {
     const knowledge = new Map([["acme", { slug: "acme", name: "Acme", what: "", pricingUrl: null, tiers: [{ name: "Free", priceUsd: 0, priceNote: null, limits: [] }], sources: [], fetchedAt: new Date().toISOString() }]]);
+    const quiet = computeAlerts([vendor({ connectable: true })], knowledge, new Map());
+    expect(quiet).toEqual([]);
     const alerts = computeAlerts([vendor({ detectedBy: ["projects"], facts: [fact({ numeric: 90, limitNumeric: 100, value: "90 of 100" })] })], knowledge, new Map());
-    expect(alerts.find((a) => a.id.endsWith(":plan"))).toBeTruthy();
+    expect(alerts).toHaveLength(1);
     expect(alerts[0]?.suggestedCommand).toBe("stripe projects upgrade acme");
   });
 });

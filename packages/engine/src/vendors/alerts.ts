@@ -15,7 +15,7 @@ export interface Observation {
  * that might happen (a free plan that pauses, a trial that ends) are
  * watches, not alerts, until the evidence says they are happening.
  */
-export function computeAlerts(vendors: Vendor[], knowledge: Map<string, VendorKnowledge>, connectionErrors: Map<string, string>, runways: Map<string, Runway[]> = new Map()): Alert[] {
+export function computeAlerts(vendors: Vendor[], _knowledge: Map<string, VendorKnowledge>, connectionErrors: Map<string, string>, runways: Map<string, Runway[]> = new Map()): Alert[] {
   const alerts: Alert[] = [];
   for (const v of vendors) {
     const error = connectionErrors.get(v.slug);
@@ -43,14 +43,8 @@ export function computeAlerts(vendors: Vendor[], knowledge: Map<string, VendorKn
         alerts.push({ id: `${v.id}:${f.metric}:rate`, vendorId: v.id, vendorName: v.name, level: "warning", title: `${v.name}: ${f.label.toLowerCase()} runs out in about ${Math.max(1, Math.round(runway.daysLeft))} days at the current rate`, detail: `${f.value}${f.unit ? ` ${f.unit}` : ""} now, about ${Math.round(runway.perDay)} a day over the last ${runway.observations} readings.`, suggestedCommand: upgradeCommand(v), runsOutAt: runsOut });
       }
     }
-    const hasPlan = v.facts.some((f) => f.kind === "plan");
-    const k = knowledge.get(v.slug);
-    if (!hasPlan && k && k.tiers.length > 0) {
-      alerts.push({ id: `${v.id}:plan`, vendorId: v.id, vendorName: v.name, level: "info", title: `${v.name}: plan unknown`, detail: v.connectable && !v.connected ? "Connect the account, or answer the question in the queue, so birdsI can watch its limits." : "Answer the question in the queue so birdsI can watch its limits.", suggestedCommand: null, runsOutAt: null });
-    }
-    if (v.connectable && !v.connected && hasPlan === false) {
-      alerts.push({ id: `${v.id}:connect`, vendorId: v.id, vendorName: v.name, level: "info", title: `Connect ${v.name}`, detail: "With a read-only token birdsI reads the plan, usage and spend itself.", suggestedCommand: null, runsOutAt: null });
-    }
+    // Unknown plans and unconnected accounts are not alerts: the vendor card says
+    // "connect" and the question queue asks for the plan. Alerts stay for what is true now.
   }
   const order: Record<Alert["level"], number> = { critical: 0, warning: 1, info: 2 };
   return alerts.sort((a, b) => order[a.level] - order[b.level] || a.title.localeCompare(b.title));
