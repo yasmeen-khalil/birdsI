@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import { CliError, EXIT } from "./exit";
 
-export const DEFAULT_API_URL = "https://birdsi.vercel.app";
+export const DEFAULT_API_URL = "https://birds-i.vercel.app";
 
 const StoredConfig = z.object({
   token: z.string().optional(),

@@ -42,7 +42,7 @@ Code: `packages/engine/src/models/client.ts` (inference), `packages/engine/src/f
 
 ## Trying it
 
-- Live demo: https://birdsi.vercel.app, press "Scan a sample repo". No sign-in.
+- Live demo: https://birds-i.vercel.app, press "Scan a sample repo". No sign-in.
 - Sign in with GitHub to connect a repository and open real pull requests.
 - Terminal: `npx birdsi scan` in any project.
 - MCP: `npx birdsi mcp` (configuration snippets in `packages/cli/README.md`).
