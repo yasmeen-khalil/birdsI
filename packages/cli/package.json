@@ -6,7 +6,7 @@
   "author": "yasmeen-khalil",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yasmeen-khalil/birdsI"
+    "url": "git+https://github.com/yasmeen-khalil/birdsI.git"
   },
   "homepage": "https://github.com/yasmeen-khalil/birdsI",
   "keywords": [
@@ -19,7 +19,7 @@
   ],
   "type": "module",
   "bin": {
-    "birdsi": "./dist/birdsi.js"
+    "birdsi": "dist/birdsi.js"
   },
   "files": [
     "dist",
