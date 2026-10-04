@@ -9,7 +9,7 @@ import { envInt } from "./env";
  * server before a job is queued.
  */
 export async function assertSpendCap(): Promise<void> {
-  const capUsd = envInt("BIRDSI_DAILY_SPEND_CAP_USD", 5);
+  const capUsd = envInt("BIRDSI_DAILY_SPEND_CAP_USD", 50);
   const spent = await totalSpend(new Date(Date.now() - 86_400_000));
   if (spent >= capUsd * 1_000_000) {
     throw new ApiError(402, "capacity", "birdsI has reached its daily scan budget. Scans open again within 24 hours.");
