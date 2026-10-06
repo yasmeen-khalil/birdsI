@@ -1,19 +1,17 @@
+import { VERSION } from "../version";
+
 /** Config snippets for adding the birdsI MCP server to coding assistants. */
 export function installHint(): string {
-  const claude = {
-    mcpServers: {
-      birdsi: { type: "stdio", command: "npx", args: ["-y", "birdsi", "mcp"], env: { BIRDSI_TOKEN: "bsi_..." } },
-    },
-  };
-  const cursor = {
-    mcpServers: {
-      birdsi: { command: "npx", args: ["-y", "birdsi", "mcp"], env: { BIRDSI_TOKEN: "bsi_..." } },
-    },
-  };
+  const args = ["-y", `birdsi@${VERSION}`, "mcp"];
+  const claude = { mcpServers: { birdsi: { type: "stdio", command: "npx", args } } };
+  const cursor = { mcpServers: { birdsi: { command: "npx", args } } };
   return [
     "Add birdsI to your coding agent. MCP is how agents connect to tools.",
-    "Replace bsi_... with your token, or leave the env block out if you",
-    "ran birdsi login on this computer.",
+    "",
+    "No token goes in any file: the server reads the one birdsi login saved",
+    "on this computer. In CI or a sandbox, set BIRDSI_TOKEN in the environment.",
+    `The version is pinned (${VERSION}) so a release never changes what your`,
+    "agent runs until you choose it. This command prints the current pin.",
     "",
     "Claude Code, in .mcp.json at the project root:",
     "",
@@ -27,11 +25,10 @@ export function installHint(): string {
     "",
     "[mcp_servers.birdsi]",
     'command = "npx"',
-    'args = ["-y", "birdsi", "mcp"]',
-    'env = { BIRDSI_TOKEN = "bsi_..." }',
+    `args = ${JSON.stringify(args)}`,
     "",
-    "Keep the token out of files you commit. .mcp.json is often committed,",
-    "so set BIRDSI_TOKEN in your shell instead and drop the env block.",
+    "A skill that tells the agent when to read birdsI: skills/birdsi/SKILL.md",
+    "in the birdsI repository.",
     "",
   ].join("\n");
 }

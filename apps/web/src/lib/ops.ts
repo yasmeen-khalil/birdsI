@@ -12,6 +12,7 @@ import {
   factsForVendors,
   findingsForScan,
   isSecretsKeyConfigured,
+  scanForViewer,
   jobActive,
   knowledgeFor,
   latestDoneScan,
@@ -34,7 +35,8 @@ import {
   type UserRow,
 } from "@birdsi/db";
 import { computeAlerts, computeRunway, computeWatches, CONNECTOR_BY_SLUG, connectorInfo, monthlySpend, stageStates } from "@birdsi/engine";
-import type { ActionRequest, ActionsResponse, AskOwnerRequest, InventoryResponse, Question, RequestActionRequest, UpdatePolicyRequest, Vendor, VendorsResponse, Vision } from "@birdsi/shared";
+import { diffFindings } from "@birdsi/shared";
+import type { ActionRequest, ActionsResponse, AskOwnerRequest, ChangesResponse, InventoryResponse, Question, RequestActionRequest, UpdatePolicyRequest, Vendor, VendorsResponse, Vision } from "@birdsi/shared";
 import { ALLOWED_COMMANDS, isAllowedCommand } from "@birdsi/shared";
 import { ApiError } from "./api";
 import { assertSpendCap, assertUserSpendCap } from "./limits";
@@ -305,4 +307,24 @@ function hash(s: string): string {
     h = Math.imul(h, 16777619) >>> 0;
   }
   return h.toString(16);
+}
+
+/** New and resolved findings between a scan and the latest finished one, by stable key. */
+export async function changesSince(repoId: string, user: UserRow, sinceScanId: string | null): Promise<ChangesResponse> {
+  const repo = await repoForUser(repoId, user.id);
+  const done = (await scansForRepo(repo.id, 50)).filter((s) => s.status === "done");
+  const latest = done[0];
+  if (!latest) throw new ApiError(404, "no_scan", "This repository has not been scanned yet.");
+  let from = sinceScanId ? await scanForViewer(sinceScanId, user.id) : (done[1] ?? null);
+  if (from && from.repo_id !== repo.id) throw new ApiError(400, "bad_request", "That scan belongs to another repository.");
+  if (from && from.id === latest.id) from = done[1] ?? null;
+  const toRows = await findingsForScan(latest.id);
+  const fromRows = from ? await findingsForScan(from.id) : [];
+  const like = (f: (typeof toRows)[number]) => ({ id: f.id, key: f.key, title: f.title, severity: f.severity, confidence: f.confidence, status: f.status, path: f.location?.path ?? null });
+  return {
+    repoId: repo.id,
+    from: from ? { scanId: from.id, finishedAt: from.finished_at } : null,
+    to: { scanId: latest.id, finishedAt: latest.finished_at },
+    ...diffFindings(fromRows.map(like), toRows.map(like)),
+  };
 }

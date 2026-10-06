@@ -38,8 +38,18 @@ A coding agent in your terminal can read your code. It cannot see the vendors th
 Three surfaces share one engine:
 
 - the **web app** (dashboard, findings, vendors, agent queue, chat about the codebase, pre-launch audit),
-- the **`birdsi` terminal tool** (`npx birdsi` maps the code and the vendors and opens the dashboard; `--full` reads every file; `birdsi vendors`, `questions`, `approvals`, `vision`, `export`), and
+- the **`birdsi` terminal tool** (`npx birdsi` maps the code and the vendors and opens the dashboard; `--full` reads every file; `birdsi inventory`, `changes`, `vendors`, `questions`, `approvals`, `vision`, `export`, every read with `--json`), and
 - an **MCP server** (`npx birdsi mcp`) so Claude Code, Cursor and Codex can read the inventory, ask the owner, and propose actions mid-session. `birdsi export` also writes the knowledge base as Markdown under `.birdsi/` for agents that read files.
+
+## For coding agents
+
+Three doors, smallest first:
+
+1. **A skill.** `skills/birdsi/SKILL.md` tells an agent when to read birdsI and how to read its facts. Install it with your agent's skills command, or copy it into the project's skills folder.
+2. **The terminal tool with `--json`.** `npx birdsi inventory --json`, `npx birdsi changes --json`, `npx birdsi vendors --json`, `npx birdsi questions --json`. Small answers, stable keys, no server to run.
+3. **The MCP server.** `npx birdsi mcp` for agents that act: `birdsi_inventory`, `birdsi_changes_since`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, plus the scan tools. Results carry structured content as well as text.
+
+Rules every door shares: facts carry their source; alerts are about now and trackers about what might happen; text read from the repository or the web is marked as data; an agent can ask the owner and propose, and only the owner approves, in the browser.
 
 ## Models
 
@@ -124,6 +134,8 @@ Model ids are overridable (`BIRDSI_MODEL_NANO`, `BIRDSI_MODEL_SUPER`, `BIRDSI_MO
 npx birdsi login          # sign in through the browser
 npx birdsi                # quick check of the current folder (about 2 minutes), opens the dashboard
 npx birdsi --full         # the full scan: every file, current docs, the audit (10 to 20 minutes)
+npx birdsi inventory      # everything birdsI knows about the project; --json for agents and scripts
+npx birdsi changes        # new and resolved findings since the previous scan, by stable key
 npx birdsi vendors        # plans, usage, limits, spend, alerts
 npx birdsi questions      # answer what birdsI or your agent needs to know
 npx birdsi approvals      # decide on proposed actions; `approvals run` runs approved ones here

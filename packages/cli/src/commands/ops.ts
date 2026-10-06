@@ -379,3 +379,53 @@ export function formatNeedsYou(openQuestions: number, pendingActions: number, al
   if (dashboardUrl) lines.push(paint.dim(style, `Dashboard: ${dashboardUrl}`));
   return lines.join("\n");
 }
+
+/** The whole knowledge base in one read: vision, vendors, alerts, stages, what needs the owner. */
+export async function inventoryCommand(options: PrintOptions): Promise<number> {
+  const style = styleFor(process.stdout, options);
+  const { api } = await ApiClient.fromEnvironment();
+  api.requireAuth();
+  try {
+    const repo = await resolveRepo(api, options.repo);
+    const result = await api.inventory(repo.id);
+    if (options.json) {
+      printJson(result.raw);
+      return EXIT.ok;
+    }
+    const inv = result.data;
+    println(paint.bold(style, inv.repo.fullName));
+    println(wrap(inv.vision.text ? `Vision: ${inv.vision.text}` : "Vision: not written yet (birdsi vision \"...\")", style, ""));
+    println(paint.dim(style, `Stages: ${inv.stages.map((s) => `${s.label} ${s.freshness}`).join(", ")}`));
+    if (inv.latestScan) println(paint.dim(style, `Latest scan: ${inv.latestScan.kind}, ${plural(inv.latestScan.findings, "open finding")}`));
+    println();
+    println(formatVendors(inv.vendors, inv.alerts, null, style, inv.watches));
+    println();
+    println(formatNeedsYou(inv.openQuestions, inv.pendingActions, inv.alerts, `${api.baseUrl}/app/${repo.id}`, style));
+    return EXIT.ok;
+  } catch (error) {
+    throw toCliError(error, "the inventory");
+  }
+}
+
+/** New and resolved findings since the previous scan, by stable key. */
+export async function changesCommand(since: string | undefined, options: PrintOptions): Promise<number> {
+  const style = styleFor(process.stdout, options);
+  const { api } = await ApiClient.fromEnvironment();
+  api.requireAuth();
+  try {
+    const repo = await resolveRepo(api, options.repo);
+    const result = await api.changes(repo.id, since);
+    if (options.json) {
+      printJson(result.raw);
+      return EXIT.ok;
+    }
+    const c = result.data;
+    println(paint.bold(style, `${plural(c.newFindings.length, "new finding")}, ${c.resolved.length} resolved, ${c.stillOpen} still open, ${c.dismissed} dismissed`));
+    println(paint.dim(style, c.from ? `Since scan ${c.from.scanId.slice(0, 8)} (${c.from.finishedAt ?? "unknown"})` : "No earlier scan to compare with."));
+    for (const f of c.newFindings) println(`  + ${f.severity.padEnd(8)} ${f.title}${f.path ? paint.dim(style, `  ${f.path}`) : ""}`);
+    for (const f of c.resolved) println(paint.dim(style, `  - ${f.severity.padEnd(8)} ${f.title}${f.path ? `  ${f.path}` : ""}`));
+    return EXIT.ok;
+  } catch (error) {
+    throw toCliError(error, "the changes");
+  }
+}

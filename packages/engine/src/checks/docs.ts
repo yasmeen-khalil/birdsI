@@ -44,11 +44,13 @@ export const docsCheck: Check = {
     for (const dep of candidates) {
       if (ctx.signal.aborted) break;
       try {
-        const hits = await searchDocs(client, dep, ctx.signal);
+        const { hits, sources } = await searchDocs(client, dep, ctx.signal);
         const usage = await findUsage(ctx, dep);
         const now = new Date().toISOString();
-        if (hits.length === 0) {
-          dep.docsCheck = { status: "unknown", note: "No current documentation was found for this package.", checkedAt: now };
+        if (!sources) {
+          dep.docsCheck = { status: "unknown", note: "birdsI does not know where this package's official documentation lives yet, so nothing was checked.", checkedAt: now };
+        } else if (hits.length === 0) {
+          dep.docsCheck = { status: "unknown", note: `No current page on ${sources.domains.join(", ")} matched this version, so nothing was checked.`, checkedAt: now };
         } else {
           const allowed = new Map(hits.map((h) => [h.url, { title: h.title, ...(h.publishedAt ? { publishedAt: h.publishedAt } : {}) }]));
           const result = await ctx.models.complete({
@@ -114,23 +116,130 @@ function pickDependencies(ctx: CheckContext, max: number): Dependency[] {
     .map((x) => x.d);
 }
 
-async function searchDocs(client: TavilyClient, dep: Dependency, signal: AbortSignal): Promise<DocHit[]> {
+export interface OfficialSources {
+  /** Hostnames the package's own documentation lives on. */
+  domains: string[];
+  /** owner/repo when the package is on GitHub, so only that repository's pages count. */
+  githubRepo: string | null;
+}
+
+const sourcesCache = new Map<string, OfficialSources | null>();
+
+export function hostOf(url: string | undefined | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url.replace(/^git\+/, "").replace(/^git:\/\//, "https://").replace(/\.git$/, "")).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+export function githubRepoOf(url: string | undefined | null): string | null {
+  if (!url) return null;
+  const m = url.match(/github\.com[/:]([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?]|$)/);
+  return m ? `${m[1]}/${m[2]}`.toLowerCase() : null;
+}
+
+async function fetchJson(url: string, signal: AbortSignal): Promise<Record<string, unknown> | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const onAbort = () => controller.abort();
+    signal.addEventListener("abort", onAbort, { once: true });
+    try {
+      const res = await fetch(url, { headers: { accept: "application/json" }, signal: controller.signal });
+      if (!res.ok) return null;
+      return (await res.json()) as Record<string, unknown>;
+    } finally {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+    }
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Where a package's own documentation lives, from its registry record. A
+ * blog post about a package is not its documentation, so hits from anywhere
+ * else are dropped before the model sees them.
+ */
+async function officialSources(dep: Dependency, signal: AbortSignal): Promise<OfficialSources | null> {
+  const key = `${dep.ecosystem}:${dep.name}`;
+  if (sourcesCache.has(key)) return sourcesCache.get(key) ?? null;
+  const domains = new Set<string>();
+  let githubRepo: string | null = null;
+  const take = (url: unknown) => {
+    if (typeof url !== "string") return;
+    const host = hostOf(url);
+    if (!host) return;
+    githubRepo = githubRepo ?? githubRepoOf(url);
+    if (!/^(github\.com|gitlab\.com|bitbucket\.org|npmjs\.com|pypi\.org|crates\.io|pkg\.go\.dev|rubygems\.org|packagist\.org|nuget\.org|hex\.pm|pub\.dev)$/.test(host)) domains.add(host);
+  };
+  if (dep.ecosystem === "npm") {
+    const meta = await fetchJson(`https://registry.npmjs.org/${encodeURIComponent(dep.name).replace("%40", "@")}`, signal);
+    if (meta) {
+      take(meta["homepage"]);
+      const repo = meta["repository"];
+      take(typeof repo === "string" ? repo : repo && typeof repo === "object" ? (repo as { url?: unknown }).url : undefined);
+      const bugs = meta["bugs"];
+      take(bugs && typeof bugs === "object" ? (bugs as { url?: unknown }).url : bugs);
+    }
+  } else if (dep.ecosystem === "PyPI") {
+    const meta = await fetchJson(`https://pypi.org/pypi/${encodeURIComponent(dep.name)}/json`, signal);
+    const info = meta?.["info"] as Record<string, unknown> | undefined;
+    if (info) {
+      take(info["home_page"]);
+      take(info["docs_url"]);
+      const urls = info["project_urls"] as Record<string, unknown> | null | undefined;
+      for (const v of Object.values(urls ?? {})) take(v);
+    }
+  } else if (dep.ecosystem === "crates.io") {
+    const meta = await fetchJson(`https://crates.io/api/v1/crates/${encodeURIComponent(dep.name)}`, signal);
+    const crate = meta?.["crate"] as Record<string, unknown> | undefined;
+    if (crate) {
+      take(crate["homepage"]);
+      take(crate["repository"]);
+      take(crate["documentation"]);
+    }
+  } else if (dep.ecosystem === "Go") {
+    githubRepo = githubRepoOf(`https://${dep.name}`);
+  }
+  if (githubRepo) domains.add("github.com");
+  const result = domains.size > 0 ? { domains: [...domains], githubRepo } : null;
+  sourcesCache.set(key, result);
+  return result;
+}
+
+export function isOfficialHit(url: string, sources: OfficialSources): boolean {
+  const host = hostOf(url);
+  if (!host || !sources.domains.includes(host)) return false;
+  if (host !== "github.com") return true;
+  const path = new URL(url).pathname.toLowerCase();
+  if (path === "/advisories" || path.startsWith("/advisories/")) return true;
+  return sources.githubRepo !== null && (path === `/${sources.githubRepo}` || path.startsWith(`/${sources.githubRepo}/`));
+}
+
+async function searchDocs(client: TavilyClient, dep: Dependency, signal: AbortSignal): Promise<{ hits: DocHit[]; sources: OfficialSources | null }> {
+  const sources = await officialSources(dep, signal);
+  if (!sources) return { hits: [], sources: null };
   const major = dep.versionInUse.split(".")[0];
+  const minor = dep.versionInUse.split(".").slice(0, 2).join(".");
   const queries = [
-    `${dep.name} ${dep.ecosystem} ${major ? `v${major}` : ""} breaking changes deprecated migration guide`.replace(/\s+/g, " "),
-    `${dep.name} security advisory ${new Date().getFullYear()}`,
+    `${dep.name} ${major ? `${major}.x` : ""} changelog release notes breaking changes deprecated`.replace(/\s+/g, " "),
+    `${dep.name} ${minor} security advisory migration guide`.replace(/\s+/g, " "),
   ];
   const hits = new Map<string, DocHit>();
   for (const query of queries) {
     if (signal.aborted) break;
-    const result = await client.search(query, { searchDepth: "basic", maxResults: 4, timeRange: "year", includeAnswer: false });
+    const result = await client.search(query, { searchDepth: "basic", maxResults: 5, includeAnswer: false, includeDomains: sources.domains });
     for (const r of result.results) {
-      if (!hits.has(r.url)) {
+      if (!hits.has(r.url) && isOfficialHit(r.url, sources)) {
         hits.set(r.url, { url: r.url, title: r.title, content: r.content, ...(r.publishedDate ? { publishedAt: r.publishedDate } : {}) });
       }
     }
   }
-  return [...hits.values()].slice(0, 6);
+  return { hits: [...hits.values()].slice(0, 6), sources };
 }
 
 /** Import lines and a little context, so the model sees how the package is called. */

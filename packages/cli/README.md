@@ -35,6 +35,16 @@ birdsi logout            # remove the saved token from this computer
 
 ## Commands
 
+Every read command takes `--json` for agents and scripts, and `--repo owner/name` to pick a repository other than the one you scanned last.
+
+### `birdsi inventory`
+
+Everything birdsI knows about the project in one read: the vision, every vendor with plan, limits, usage and spend, the alerts, the trackers, the pipeline stages and their freshness, what needs you, the latest scan. Agents start here.
+
+### `birdsi changes [scanId]`
+
+New and resolved findings since the previous finished scan, by stable key (an id changes per scan; a key does not). Pass a scan id to compare from an earlier scan. Findings in files unchanged since the last scan are carried into every scan, so a quick check after a full scan does not make the full scan's findings disappear.
+
 ### `birdsi vendors`
 
 The services the app runs on: what each is, what the app uses it for, the plan, usage against limits, spend, and alerts. `--sync` refreshes from connected accounts and current pricing pages first. `--repo owner/name` picks a repository other than the one you scanned last.
@@ -132,11 +142,11 @@ Every command that prints data accepts `--json`, which prints the API response e
 
 ## MCP server
 
-`birdsi mcp` runs the birdsI MCP server over stdio, so coding assistants can scan, read findings and apply fixes mid-session. It uses the token from `birdsi login`, or `BIRDSI_TOKEN`.
+`birdsi mcp` runs the birdsI MCP server over stdio, so coding assistants can read the project's operational record, ask the owner, propose actions, scan and apply fixes mid-session. It uses the token from `birdsi login`, or `BIRDSI_TOKEN` in the environment.
 
-Tools: `birdsi_inventory` (call this first: vision, vendors, alerts, stages, what needs the owner), `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, `birdsi_sync_vendors`, `birdsi_scan` (with `full`), `birdsi_scan_status`, `birdsi_findings`, `birdsi_finding`, `birdsi_fix`, `birdsi_repos`, `birdsi_ask`.
+Tools: `birdsi_inventory` (call this first: vision, vendors, alerts, stages, what needs the owner), `birdsi_changes_since` (new and resolved findings by stable key), `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, `birdsi_sync_vendors`, `birdsi_scan` (with `full`; returns after four minutes if the scan is still running), `birdsi_scan_status`, `birdsi_findings`, `birdsi_finding`, `birdsi_fix`, `birdsi_repos`, `birdsi_ask`. The inventory, vendor and changes tools return structured content as well as text. Text read from a repository or the web is marked between `«` and `»` in every result.
 
-`birdsi mcp --install-hint` prints these snippets. Keep tokens out of files you commit: if you ran `birdsi login`, leave the `env` block out.
+`birdsi mcp --install-hint` prints these snippets with the current version pinned, so a release never changes what your agent runs until you choose it. No token goes in any file: the server reads the one `birdsi login` saved. In CI or a sandbox, set `BIRDSI_TOKEN` in the environment.
 
 Claude Code, `.mcp.json` at the project root:
 
@@ -146,8 +156,7 @@ Claude Code, `.mcp.json` at the project root:
     "birdsi": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "birdsi", "mcp"],
-      "env": { "BIRDSI_TOKEN": "bsi_..." }
+      "args": ["-y", "birdsi@0.2.0", "mcp"]
     }
   }
 }
@@ -160,8 +169,7 @@ Cursor, `.cursor/mcp.json`:
   "mcpServers": {
     "birdsi": {
       "command": "npx",
-      "args": ["-y", "birdsi", "mcp"],
-      "env": { "BIRDSI_TOKEN": "bsi_..." }
+      "args": ["-y", "birdsi@0.2.0", "mcp"]
     }
   }
 }
@@ -172,9 +180,10 @@ Codex, `~/.codex/config.toml`:
 ```toml
 [mcp_servers.birdsi]
 command = "npx"
-args = ["-y", "birdsi", "mcp"]
-env = { BIRDSI_TOKEN = "bsi_..." }
+args = ["-y", "birdsi@0.2.0", "mcp"]
 ```
+
+A skill that tells an agent when to read birdsI and how to read its facts: `skills/birdsi/SKILL.md` in the repository.
 
 ## Exit codes
 

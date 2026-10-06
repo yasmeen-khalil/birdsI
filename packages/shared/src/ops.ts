@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Severity } from "./domain";
 
 /**
  * Everything outside the code that makes an app run: vendors, their plans,
@@ -390,3 +391,42 @@ export const InventoryResponse = z.object({
     .nullable(),
 });
 export type InventoryResponse = z.infer<typeof InventoryResponse>;
+
+/** What changed between two scans of one repository, by stable finding key. */
+export const ChangesResponse = z.object({
+  repoId: z.string(),
+  from: z.object({ scanId: z.string(), finishedAt: z.string().nullable() }).nullable(),
+  to: z.object({ scanId: z.string(), finishedAt: z.string().nullable() }),
+  newFindings: z.array(z.object({ id: z.string(), key: z.string(), title: z.string(), severity: Severity, confidence: z.string(), path: z.string().nullable() })),
+  resolved: z.array(z.object({ key: z.string(), title: z.string(), severity: Severity, path: z.string().nullable() })),
+  stillOpen: z.number().int().nonnegative(),
+  dismissed: z.number().int().nonnegative(),
+});
+export type ChangesResponse = z.infer<typeof ChangesResponse>;
+
+/** The least a finding row needs to be compared across scans. */
+export interface FindingLike {
+  id: string;
+  key: string;
+  title: string;
+  severity: Severity;
+  confidence: string;
+  status: string;
+  path: string | null;
+}
+
+/**
+ * New, resolved and unchanged findings between two scans, by stable key.
+ * Dismissed findings are neither new nor resolved; fixed ones are not open.
+ */
+export function diffFindings(from: FindingLike[], to: FindingLike[]): Pick<ChangesResponse, "newFindings" | "resolved" | "stillOpen" | "dismissed"> {
+  const fromKeys = new Set(from.map((f) => f.key));
+  const toKeys = new Set(to.map((f) => f.key));
+  const open = to.filter((f) => f.status !== "dismissed" && f.status !== "fixed");
+  return {
+    newFindings: open.filter((f) => !fromKeys.has(f.key)).map(({ id, key, title, severity, confidence, path }) => ({ id, key, title, severity, confidence, path })),
+    resolved: from.filter((f) => !toKeys.has(f.key) && f.status !== "dismissed").map(({ key, title, severity, path }) => ({ key, title, severity, path })),
+    stillOpen: open.filter((f) => fromKeys.has(f.key)).length,
+    dismissed: to.filter((f) => f.status === "dismissed").length,
+  };
+}

@@ -82,7 +82,34 @@ export const reviewCheck: Check = {
       done += 1;
       await ctx.emit({ type: "step_progress", step: "review", done, total: files.length });
     }
-    if (carried > 0) await ctx.note(`${carried} of ${files.length} files were unchanged since the last scan and were not read again.`);
+    // Files this tier did not select, or the budget stopped before: when they are
+    // unchanged since the last scan, that scan's findings still stand. Without this
+    // a quick check after a full scan would lose the full scan's findings, and
+    // "what changed" would call them resolved.
+    let kept = 0;
+    if (ctx.previousReview) {
+      const processed = new Set(index.map((f) => f.path));
+      for (const [path, previousHash] of ctx.previousReview.hashes) {
+        if (ctx.signal.aborted) break;
+        if (processed.has(path) || !knownPaths.has(path)) continue;
+        let hash: string;
+        try {
+          hash = await ctx.fileHash(path);
+        } catch {
+          continue;
+        }
+        if (hash !== previousHash) continue;
+        index.push({ path, hash });
+        for (const draft of ctx.previousReview.findingsByPath.get(path) ?? []) {
+          findings.push(draft);
+          await ctx.emit({ type: "finding", finding: { ...draft, id: draft.key } });
+        }
+        kept += 1;
+      }
+    }
+    if (carried + kept > 0) {
+      await ctx.note(`${carried + kept} files were unchanged since the last scan and kept that scan's findings instead of being read again${kept > 0 ? ` (${kept} of them outside this tier's read list of ${files.length})` : ""}.`);
+    }
     await ctx.emit({ type: "review_index", files: index });
     return findings;
   },

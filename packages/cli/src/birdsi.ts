@@ -3,7 +3,7 @@ import { toCliError } from "./api";
 import { askCommand, dismissCommand, explainCommand, findingsCommand, reposCommand } from "./commands/findings";
 import { fixCommand } from "./commands/fix";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth";
-import { approvalsCommand, exportCommand, questionsCommand, vendorsCommand, visionCommand } from "./commands/ops";
+import { approvalsCommand, changesCommand, exportCommand, inventoryCommand, questionsCommand, vendorsCommand, visionCommand } from "./commands/ops";
 import { scanCommand } from "./commands/scan";
 import { CliError, EXIT } from "./exit";
 import { installInterruptHandler } from "./interrupt";
@@ -137,6 +137,23 @@ export function buildProgram(): Command {
     .argument("<question...>", "your question")
     .addOption(jsonOption())
     .action(run((repo: string, question: string[], options: { json?: boolean }) => askCommand(repo, question, options)));
+
+  program
+    .command("inventory")
+    .description("everything birdsI knows about the project in one read: vision, vendors, alerts, stages, what needs you")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((options: { repo?: string; json?: boolean; ascii?: boolean }) => inventoryCommand(options)));
+
+  program
+    .command("changes")
+    .description("new and resolved findings since the previous scan, by stable key")
+    .argument("[scanId]", "compare from this scan instead of the previous one")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((since: string | undefined, options: { repo?: string; json?: boolean; ascii?: boolean }) => changesCommand(since, options)));
 
   program
     .command("vendors")

@@ -27,8 +27,8 @@ function q(text: string | null | undefined): string {
   return `\u00ab${text.replace(/[\u00ab\u00bb]/g, "")}\u00bb`;
 }
 
-function text(body: string): ToolResult {
-  return { content: [{ type: "text", text: body }] };
+function text(body: string, structured?: Record<string, unknown>): ToolResult {
+  return { content: [{ type: "text", text: body }], ...(structured ? { structuredContent: structured } : {}) };
 }
 
 function failure(error: unknown, what?: string): ToolResult {
@@ -140,9 +140,9 @@ export function createServer(): McpServer {
       if (args.wait === false) {
         return text(`Started ${KIND_WORD[kind].toLowerCase()} ${scan.id} on ${sent.walk.files.length} files${scan.repoId ? ` (repository id ${scan.repoId})` : ""}. Check it with birdsi_scan_status.${scan.dashboardUrl ? ` Dashboard: ${scan.dashboardUrl}` : ""}`);
       }
-      const status = await followScan(api, scan.id, { onEvents: () => undefined, timeoutMs: 30 * 60_000 });
+      const status = await followScan(api, scan.id, { onEvents: () => undefined, timeoutMs: 4 * 60_000 });
       if (status !== "done" && status !== "failed" && status !== "stopped") {
-        return text(`Scan ${scan.id} is still running after 30 minutes. Check it with birdsi_scan_status.`);
+        return text(`Scan ${scan.id} is still running after 4 minutes and continues on birdsI. Check it with birdsi_scan_status; vendors are already visible through birdsi_inventory.${scan.dashboardUrl ? ` Dashboard: ${scan.dashboardUrl}` : ""}`);
       }
       return text(summarize((await api.scan(scan.id)).data));
     }),
@@ -285,7 +285,7 @@ export function createServer(): McpServer {
       }
       lines.push("", `Open questions for the owner: ${inv.openQuestions}. Pending approvals: ${inv.pendingActions}.`);
       lines.push("", "Facts carry a source: found in the code, from the connected account, from the vendor's current docs, estimated, or told by the owner. Call birdsi_vendor for one vendor's full facts with sources.", LEGEND);
-      return text(lines.join("\n"));
+      return text(lines.join("\n"), inv as unknown as Record<string, unknown>);
     }),
   );
 
@@ -306,7 +306,7 @@ export function createServer(): McpServer {
       if (v.facts.length === 0) lines.push("- none yet");
       if (v.callSites.length > 0) lines.push("", "Used in:", ...v.callSites.slice(0, 15).map((c) => `- ${c.path}:${c.line}  ${q(c.excerpt)}`));
       lines.push("", LEGEND);
-      return text(lines.join("\n"));
+      return text(lines.join("\n"), v as unknown as Record<string, unknown>);
     }),
   );
 
@@ -388,6 +388,23 @@ export function createServer(): McpServer {
     tool("that request", async (api, args: { actionId: string }) => {
       const { action } = (await api.action(args.actionId)).data;
       return text(`${action.title}: ${action.status}${action.autoApproved ? " (auto-approved)" : ""}.${action.decidedAt ? ` Decided ${action.decidedAt}.` : ""}${action.result ? `\nOutput:\n${action.result}` : ""}`);
+    }),
+  );
+
+  server.registerTool(
+    "birdsi_changes_since",
+    {
+      title: "What changed since a scan",
+      description: "New and resolved findings between a scan and the latest finished one, by stable key, so an agent that looked earlier reads only the difference. Omit scanId to compare the last two scans.",
+      inputSchema: { ...repoArg, scanId: z.string().optional().describe("The earlier scan to compare from. Default: the finished scan before the latest.") },
+    },
+    tool("the changes", async (api, args: { repoId?: string | undefined; scanId?: string | undefined }) => {
+      const c = (await api.changes(await repoIdFrom(api, args.repoId), args.scanId)).data;
+      const lines = [`From ${c.from ? `scan ${c.from.scanId} (${c.from.finishedAt ?? "unknown"})` : "no earlier scan"} to scan ${c.to.scanId} (${c.to.finishedAt ?? "running"}).`, `New: ${c.newFindings.length}. Resolved: ${c.resolved.length}. Still open: ${c.stillOpen}. Dismissed: ${c.dismissed}.`, ""];
+      for (const f of c.newFindings.slice(0, 40)) lines.push(`+ [${f.severity}/${f.confidence}] ${q(f.title)}${f.path ? ` (${f.path})` : ""} id: ${f.id} key: ${f.key}`);
+      for (const f of c.resolved.slice(0, 40)) lines.push(`- [${f.severity}] ${q(f.title)}${f.path ? ` (${f.path})` : ""} key: ${f.key}`);
+      lines.push("", LEGEND);
+      return text(lines.join("\n"), c as unknown as Record<string, unknown>);
     }),
   );
 

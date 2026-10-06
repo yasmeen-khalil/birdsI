@@ -44,8 +44,8 @@ Code: `packages/engine/src/models/client.ts` (inference), `packages/engine/src/f
 
 - Live demo: https://birdsi.vercel.app, press "Scan a sample repo". No sign-in.
 - Sign in with GitHub to connect a repository and open real pull requests.
-- Terminal: `npx birdsi scan` in any project.
-- MCP: `npx birdsi mcp` (configuration snippets in `packages/cli/README.md`).
+- Terminal: `npx birdsi` in any project (a quick check; `--full` reads every file). `npx birdsi inventory --json` and `npx birdsi changes --json` are the reads built for agents.
+- MCP: `npx birdsi mcp --install-hint` prints the configuration for Claude Code, Cursor and Codex. `skills/birdsi/SKILL.md` tells an agent when to read birdsI.
 
 ## Feedback on the tools
 

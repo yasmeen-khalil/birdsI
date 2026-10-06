@@ -4,6 +4,39 @@
 
 The operations layer for coding agents.
 
+### Since the submission (2026-10-04 and 2026-10-05)
+
+Trust, before any user beyond the owner:
+- The terminal tool never uploads `.env` files, private keys, certificates or credential files, whatever `.gitignore` says.
+- Uploaded snapshots are kept seven days, then deleted by an hourly sweep, and deleted at once with the account. The privacy page and SECURITY.md say exactly that.
+- Approvals are decided in the browser only; a bearer token (the one an agent holds) is refused.
+- `approvals run` only runs allowlisted programs (stripe, npm, npx, pnpm, yarn, bun, vercel, supabase, railway, fly, flyctl, gh, git, node), with a minimal environment, each after a yes.
+- Text read from the repository or the web is marked between « and » in every agent-facing result.
+- A per-user daily spend cap (default $5) beside the global one (default $50); the no-sign-in demo replays a finished run from the last six hours instead of starting a new one.
+- gitleaks in CI; `sk-ant-`, `bsi_` and `rk_` shapes in the pre-commit hook.
+
+Cheaper and faster scans:
+- The repository digest and context notes are cached by the provider across a scan's calls (prompt caching).
+- Files unchanged since the last finished scan keep that scan's findings instead of being read again, in every tier; the review emits an index of file hashes for the next scan.
+- Vendors are stored the moment they are found, so the inventory is visible within the first half minute of a scan.
+- The bare `birdsi` is the quick check; `--full` is the full scan; every time claim matches the measured runs.
+
+Usage made real:
+- Supabase: database size, file storage and monthly active users read with read-only SQL through the Management API, against the plan's allowances.
+- Anthropic: cost and usage reports read in full (paginated), cached tokens counted.
+- Usage the owner typed expires after thirty days and is asked again.
+- A daily vendor sync at 06:00 UTC (`/api/cron/sync`, behind `CRON_SECRET`) for every repository whose vendors were synced more than twenty hours ago.
+
+Built for agents:
+- `birdsi inventory` and `birdsi changes`, both with `--json`; every read command takes `--json`.
+- MCP: `birdsi_changes_since` (new and resolved findings by stable key); `birdsi_inventory`, `birdsi_vendor` and `birdsi_changes_since` return structured content as well as text; `birdsi_scan` returns after four minutes if the scan is still running.
+- `GET /api/v1/repos/:id/changes?since=<scanId>`.
+- A skill, `skills/birdsi/SKILL.md`, that tells an agent when to read birdsI and how to read its facts.
+- `birdsi mcp --install-hint` pins the version and puts no token in any file.
+- The docs check only reads the package's own documentation: domains from the registry record (npm, PyPI, crates.io; the repository for Go), GitHub only for the package's repository and advisories. A package without a known official source is reported as unknown, not checked against a blog post.
+
+### The 2026-10-03 release
+
 - Vendors: every outside service found from packages, env names, URL domains, config files and Stripe Projects state; unknown services named from their env var; what each is used for, from the call sites.
 - Connectors for Vercel, Supabase, Stripe, Anthropic, Tavily, Supadata and Resend: plan, usage, limits, spend, read with a token the owner connects once (tested before saving, encrypted at rest).
 - Vendor knowledge: what a service is and its plan tiers, read from its current pricing page and cached for a week; the plan's limits become facts with the source cited.

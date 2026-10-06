@@ -24,7 +24,7 @@ export default function PrivacyPage() {
       <LegalSection title="The short version">
         <LegalList
           items={[
-            "A copy of your code exists only while a scan runs, then it is deleted.",
+            "Code uploaded by the terminal tool is kept for up to seven days so a fix can be applied, then deleted; your environment files and private keys are never uploaded at all.",
             "Findings, vendor details, answers to questions, approvals and chats are kept until you delete your account.",
             "Your code is sent to an AI model provider to be read, and search queries about your packages and vendors go to Tavily. Your code is never used to train models unless you opt in, and birdsI offers no such opt-in today.",
             "You can disconnect a repository or delete everything from Settings at any time.",
@@ -42,7 +42,7 @@ export default function PrivacyPage() {
               <b>Repositories you connect.</b> Their names, default branches, and the GitHub App installation that grants access.
             </>,
             <>
-              <b>Repository snapshots.</b> A copy of the repository, fetched from GitHub or uploaded by the birdsI terminal tool, used only for the duration of a scan or a fix.
+              <b>Repository snapshots.</b> A copy of the repository, fetched from GitHub for the duration of a scan, or uploaded by the birdsI terminal tool and kept for up to seven days so a fix can be applied to the same code. The terminal tool never uploads environment files or private keys.
             </>,
             <>
               <b>Findings and scan results.</b> Each finding’s title, explanation, file path and line, and a short code excerpt as evidence, with secrets masked. Also the scan’s progress log, summary, and pre-launch audit report.

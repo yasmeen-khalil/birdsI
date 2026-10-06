@@ -2,6 +2,7 @@ import {
   ActionRequest,
   ActionsResponse,
   ApiError,
+  ChangesResponse,
   ChatMessage,
   CreateScanResponse,
   InventoryResponse,
@@ -254,6 +255,10 @@ export class ApiClient {
 
   reportAction(actionId: string, ok: boolean, output: string): Promise<Result<z.infer<typeof ActionEnvelope>>> {
     return this.request("POST", `/actions/${enc(actionId)}/report`, { schema: ActionEnvelope, body: { ok, output: output.slice(0, 20_000) } });
+  }
+
+  changes(repoId: string, since?: string): Promise<Result<ChangesResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/changes${since ? `?since=${enc(since)}` : ""}`, { schema: ChangesResponse });
   }
 
   vision(repoId: string): Promise<Result<VisionResponse>> {
