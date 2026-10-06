@@ -70,3 +70,37 @@ export async function deleteSnapshotFile(row: SnapshotRow): Promise<void> {
   const db = getDb();
   await db.storage.from(BUCKET).remove([row.storage_path]);
 }
+
+/** Removes every stored snapshot file of a user; the rows keep an empty path. Used when the account is deleted. */
+export async function purgeSnapshotsForUser(userId: string): Promise<number> {
+  const db = getDb();
+  let removed = 0;
+  for (;;) {
+    const { data, error } = await db.storage.from(BUCKET).list(userId, { limit: 100 });
+    if (error) throw new Error(`purgeSnapshotsForUser list: ${error.message}`);
+    const names = (data ?? []).map((f) => `${userId}/${f.name}`);
+    if (names.length === 0) break;
+    const { error: rmError } = await db.storage.from(BUCKET).remove(names);
+    if (rmError) throw new Error(`purgeSnapshotsForUser remove: ${rmError.message}`);
+    removed += names.length;
+    if (names.length < 100) break;
+  }
+  const { error: rowError } = await db.from("snapshots").update({ storage_path: "" }).eq("owner_user_id", userId);
+  if (rowError) throw new Error(`purgeSnapshotsForUser rows: ${rowError.message}`);
+  return removed;
+}
+
+/** Deletes snapshot files older than the retention window, in small batches. Returns how many were removed. */
+export async function purgeOldSnapshots(retentionDays = 7, batch = 50): Promise<number> {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - retentionDays * 86_400_000).toISOString();
+  const { data, error } = await db.from("snapshots").select("id, storage_path").neq("storage_path", "").lt("created_at", cutoff).limit(batch);
+  if (error) throw new Error(`purgeOldSnapshots: ${error.message}`);
+  const rows = (data ?? []) as Array<{ id: string; storage_path: string }>;
+  if (rows.length === 0) return 0;
+  const { error: rmError } = await db.storage.from(BUCKET).remove(rows.map((r) => r.storage_path));
+  if (rmError) throw new Error(`purgeOldSnapshots remove: ${rmError.message}`);
+  const { error: upError } = await db.from("snapshots").update({ storage_path: "" }).in("id", rows.map((r) => r.id));
+  if (upError) throw new Error(`purgeOldSnapshots rows: ${upError.message}`);
+  return rows.length;
+}

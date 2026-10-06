@@ -48,7 +48,6 @@ describe("walkSnapshot", () => {
     const walk = await walkSnapshot(root);
     expect(walk.files).toEqual(
       [
-        ".env",
         ".gitignore",
         "README.md",
         "package-lock.json",

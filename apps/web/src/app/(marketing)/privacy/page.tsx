@@ -72,7 +72,7 @@ export default function PrivacyPage() {
       <LegalSection title="How long it is kept">
         <LegalList
           items={[
-            "Repository snapshots are deleted as soon as the scan or fix that needed them ends, whether it finished, failed or was stopped.",
+            "Repository snapshots uploaded by the terminal tool are kept for up to seven days, so a fix can be applied to the same code, then deleted. They are deleted at once when you delete your account. Environment files and private keys are never uploaded in the first place.",
             "Findings, scan results, dependency lists, chats and fixes are kept until you delete your account. Disconnecting a repository stops birdsI from reading it; its earlier results stay until your account is deleted.",
             "Usage records are kept for cost accounting. When you delete your account they stay without anything that identifies you.",
             "Indexed code passages for chat are replaced on every scan and deleted with the repository or your account.",

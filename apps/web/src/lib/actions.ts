@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { approveDeviceLogin, deleteRepo, deleteUser, denyDeviceLogin, revokeToken, updateUserPreferences } from "@birdsi/db";
+import { approveDeviceLogin, deleteRepo, deleteUser, denyDeviceLogin, purgeSnapshotsForUser, revokeToken, updateUserPreferences } from "@birdsi/db";
 import { ScanKind } from "@birdsi/shared";
 import { ApiError } from "./api";
 import { requireUser } from "./auth";
@@ -205,6 +205,8 @@ export async function deleteAccountAction(typed: string): Promise<ActionResult> 
     const user = await requireUser();
     const expected = user.github_login ?? user.email ?? "";
     if (!expected || typed.trim() !== expected) throw new ApiError(400, "confirm", "The name you typed does not match.");
+    // The uploaded code goes first, so a failure here never leaves files behind an account that is gone.
+    await purgeSnapshotsForUser(user.id);
     await deleteUser(user.id);
     return undefined;
   });

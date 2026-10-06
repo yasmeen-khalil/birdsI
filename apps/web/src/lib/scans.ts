@@ -10,6 +10,7 @@ import {
   findingForViewer,
   findingsForScan,
   latestDemoScanId,
+  latestDoneDemoScan,
   latestDoneScan,
   latestFixForFinding,
   localRepoFor,
@@ -29,7 +30,7 @@ import { answerQuestion, loadEngineConfig, ModelClient } from "@birdsi/engine";
 import type { ChatMessage, CreateScanRequest, FindingResponse, ScanResponse } from "@birdsi/shared";
 import { ApiError } from "./api";
 import { envInt } from "./env";
-import { assertSpendCap, assertUserScanQuota, runningScanForRepo } from "./limits";
+import { assertSpendCap, assertUserScanQuota, assertUserSpendCap, runningScanForRepo } from "./limits";
 import { loadInventory } from "./ops";
 
 /**
@@ -39,6 +40,7 @@ import { loadInventory } from "./ops";
 export async function startScan(user: UserRow, input: CreateScanRequest, source: "web" | "cli" | "mcp"): Promise<ScanResponse["scan"]> {
   if (!input.repoId && !input.snapshotId) throw new ApiError(400, "bad_request", "Choose a connected repository or upload a snapshot first.");
   await assertSpendCap();
+  await assertUserSpendCap(user.id);
   await assertUserScanQuota(user.id, input.kind);
   let branch = input.branch ?? null;
   let repoId = input.repoId ?? null;
@@ -68,6 +70,9 @@ export async function startScan(user: UserRow, input: CreateScanRequest, source:
 
 /** A demo scan for a visitor. Rate limited; over the limit, the newest finished demo is shown instead. */
 export async function startDemoScan(clientKey: string): Promise<{ scanId: string; reused: boolean }> {
+  // A finished demo from the last six hours is the demo: the sample does not change, so a fresh run would only spend credits.
+  const recent = await latestDoneDemoScan();
+  if (recent && Date.now() - new Date(recent.created_at).getTime() < 6 * 3_600_000) return { scanId: recent.id, reused: true };
   const allowed = await allowDemo(clientKey, { perClientPerHour: envInt("BIRDSI_DEMO_PER_CLIENT_PER_HOUR", 3), globalPerHour: envInt("BIRDSI_DEMO_GLOBAL_PER_HOUR", 30) });
   let capacity = true;
   try {
@@ -118,6 +123,7 @@ export async function startFix(findingId: string, user: UserRow): Promise<Findin
   if (existing && (existing.status === "proposed" || existing.status === "testing")) return toFix(existing);
   if (existing && existing.status === "pr_open") return toFix(existing);
   await assertSpendCap();
+  await assertUserSpendCap(user.id);
   const fix = await createFix(finding.id, user.id);
   await enqueueJob("fix", { fixId: fix.id }, { maxAttempts: 1 });
   return toFix(fix);
@@ -140,6 +146,7 @@ export async function askRepo(repoId: string, user: UserRow, question: string): 
   if (trimmed.length === 0) throw new ApiError(400, "bad_request", "Ask a question first.");
   if (trimmed.length > 2000) throw new ApiError(400, "bad_request", "Keep questions under 2,000 characters.");
   await assertSpendCap();
+  await assertUserSpendCap(user.id);
   const config = loadEngineConfig();
   const latest = await latestDoneScan(repo.id);
   const findings = latest ? (await findingsForScan(latest.id)).map(toFinding) : [];

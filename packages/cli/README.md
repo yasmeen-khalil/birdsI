@@ -45,7 +45,7 @@ What birdsI or your agent needs you to answer. On a terminal it asks them one by
 
 ### `birdsi approvals [approve|deny|run] [id]`
 
-Actions your agent proposed, with the command, the reason and the cost. `approve <id>` and `deny <id>` decide. `run` runs every approved command on this computer, one at a time, each after a yes (`--yes` skips the question), and reports the output back so the agent can read it. Nothing ever runs on birdsI's servers.
+Actions your agent proposed, with the command, the reason and the cost. Deciding happens in the browser only (`approve` and `deny` open the Agent page), so an agent can never approve its own request. `run` runs every approved command on this computer, one at a time, each after a yes (`--yes` skips the question), with a minimal environment, and reports the output back so the agent can read it. Only these programs may be run: stripe, npm, npx, pnpm, yarn, bun, vercel, supabase, railway, fly, flyctl, gh, git, node. Nothing ever runs on birdsI's servers.
 
 ### `birdsi vision [text...]`
 
@@ -57,7 +57,7 @@ Writes the knowledge base as Markdown under `.birdsi/` (vision, vendors, alerts,
 
 ### `birdsi scan [path]`
 
-Scans a folder (default: the current one). birdsI packs the folder, leaving out everything your `.gitignore` files exclude (at every level) plus build output, dependencies and binary files, uploads it, and streams progress as the scan runs.
+Scans a folder (default: the current one). birdsI packs the folder, leaving out everything your `.gitignore` files exclude (at every level) plus build output, dependencies, binary files, and always your `.env` files and private keys, whatever `.gitignore` says; uploads it; and streams progress as the scan runs. Uploaded code is kept for up to seven days so fixes can be applied, then deleted.
 
 ```sh
 birdsi scan                                  # light scan of the current folder

@@ -30,3 +30,10 @@ export async function latestDemoScanId(): Promise<string | null> {
   if (error) throw new Error(`latestDemoScanId: ${error.message}`);
   return (data as { id: string } | null)?.id ?? null;
 }
+
+export async function latestDoneDemoScan(): Promise<{ id: string; created_at: string } | null> {
+  const db = getDb();
+  const { data, error } = await db.from("scans").select("id, created_at").eq("source", "demo").eq("status", "done").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error(`latestDoneDemoScan: ${error.message}`);
+  return (data as { id: string; created_at: string } | null) ?? null;
+}

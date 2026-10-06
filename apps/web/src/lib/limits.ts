@@ -1,4 +1,4 @@
-import { getDb, totalSpend } from "@birdsi/db";
+import { getDb, totalSpend, usageForUser } from "@birdsi/db";
 import type { ScanKind } from "@birdsi/shared";
 import { ApiError } from "./api";
 import { envInt } from "./env";
@@ -13,6 +13,15 @@ export async function assertSpendCap(): Promise<void> {
   const spent = await totalSpend(new Date(Date.now() - 86_400_000));
   if (spent >= capUsd * 1_000_000) {
     throw new ApiError(402, "capacity", "birdsI has reached its daily scan budget. Scans open again within 24 hours.");
+  }
+}
+
+/** One user's model spend per rolling day. Protects everyone else's day from one heavy user. */
+export async function assertUserSpendCap(userId: string): Promise<void> {
+  const capUsd = envInt("BIRDSI_USER_DAILY_SPEND_CAP_USD", 5);
+  const usage = await usageForUser(userId, new Date(Date.now() - 86_400_000));
+  if (usage.costMicrodollars >= capUsd * 1_000_000) {
+    throw new ApiError(402, "user_capacity", `You have used today's scan budget ($${capUsd}). It opens again within 24 hours.`);
   }
 }
 

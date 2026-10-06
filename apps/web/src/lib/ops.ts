@@ -35,8 +35,9 @@ import {
 } from "@birdsi/db";
 import { computeAlerts, computeRunway, computeWatches, CONNECTOR_BY_SLUG, connectorInfo, monthlySpend, stageStates } from "@birdsi/engine";
 import type { ActionRequest, ActionsResponse, AskOwnerRequest, InventoryResponse, Question, RequestActionRequest, UpdatePolicyRequest, Vendor, VendorsResponse, Vision } from "@birdsi/shared";
+import { ALLOWED_COMMANDS, isAllowedCommand } from "@birdsi/shared";
 import { ApiError } from "./api";
-import { assertSpendCap } from "./limits";
+import { assertSpendCap, assertUserSpendCap } from "./limits";
 
 /**
  * The operations layer: vendors and their facts, alerts, the pipeline
@@ -90,6 +91,7 @@ export async function startVendorSync(repoId: string, user: UserRow): Promise<{ 
   if (!latest) return { queued: false, reason: "Run a scan first: the vendor list comes from the code." };
   if (await jobActive("vendor_sync", "repoId", repo.id)) return { queued: false, reason: "A vendor refresh is already running." };
   await assertSpendCap();
+  await assertUserSpendCap(user.id);
   await enqueueJob("vendor_sync", { repoId: repo.id, ownerUserId: user.id, hints: null }, { maxAttempts: 1 });
   return { queued: true };
 }
@@ -170,7 +172,7 @@ export async function requestAction(repoId: string, user: UserRow, input: Reques
   const policy = await policyForRepo(repo.id);
   if (requestedBy === "agent" && !policy.allowPropose) throw new ApiError(403, "policy", "Agents may not propose commands in this repository. The owner can allow it on the Agent page.");
   const command = input.command.trim();
-  if (/[;&|`$<>]/.test(command) || /\n/.test(command)) throw new ApiError(400, "bad_request", "Send one plain command, without shell operators such as ; | & or $.");
+  if (!isAllowedCommand(command)) throw new ApiError(400, "bad_request", `Send one plain command that starts with one of ${ALLOWED_COMMANDS.join(", ")}, without shell operators or output redirection.`);
   const vendor = input.vendorSlug ? await vendorBySlug(repo.id, input.vendorSlug) : null;
   const monthly = input.estimatedMonthlyUsd ?? null;
   const once = input.estimatedOnceUsd ?? null;

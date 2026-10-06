@@ -40,6 +40,9 @@ secret_patterns=(
   'xox[baprs]-[A-Za-z0-9-]{10,}'
   'AIza[0-9A-Za-z_-]{35}'
   'postgres(ql)?://[^:]+:[^@]+@'
+  'sk-ant-[A-Za-z0-9_-]{20,}'
+  'bsi_[A-Za-z0-9_-]{20,}'
+  'rk_(live|test)_[A-Za-z0-9]{20,}'
 )
 
 local_file="$(git rev-parse --show-toplevel)/.githooks/local-patterns"

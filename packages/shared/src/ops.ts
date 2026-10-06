@@ -255,6 +255,18 @@ export const AgentPolicy = z.object({
 });
 export type AgentPolicy = z.infer<typeof AgentPolicy>;
 
+/** The only programs an approved command may start. Everything else is refused when requested and when run. */
+export const ALLOWED_COMMANDS = ["stripe", "npm", "npx", "pnpm", "yarn", "bun", "vercel", "supabase", "railway", "fly", "flyctl", "gh", "git", "node"] as const;
+
+export function commandProgram(command: string): string {
+  return command.trim().split(/\s+/)[0] ?? "";
+}
+
+export function isAllowedCommand(command: string): boolean {
+  const program = commandProgram(command);
+  return (ALLOWED_COMMANDS as readonly string[]).includes(program) && !/[;&|`$<>\\]/.test(command) && !/\n/.test(command) && !/(^|\s)--?(output|out|o)(=|\s)/.test(command);
+}
+
 export const DEFAULT_AUTO_APPROVE_PREFIXES = ["stripe projects status", "stripe projects spend", "stripe projects catalog", "stripe projects llm-context"];
 
 export const Vision = z.object({

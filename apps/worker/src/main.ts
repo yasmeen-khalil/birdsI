@@ -1,5 +1,5 @@
 import { hostname } from "node:os";
-import { claimJob, completeJob, failJob, heartbeat, type JobRow } from "@birdsi/db";
+import { claimJob, completeJob, failJob, heartbeat, purgeOldSnapshots, type JobRow } from "@birdsi/db";
 import { loadEngineConfig } from "@birdsi/engine";
 import { runEmbedJob } from "./embed-job";
 import { runFixJob } from "./fix-job";
@@ -27,9 +27,25 @@ async function handle(job: JobRow): Promise<void> {
   throw new Error(`unknown job kind ${job.kind}`);
 }
 
+const SWEEP_MS = 3_600_000;
+let lastSweep = 0;
+
+/** Snapshot files older than the retention window are removed once an hour, as the privacy policy says. */
+async function sweep(): Promise<void> {
+  if (Date.now() - lastSweep < SWEEP_MS) return;
+  lastSweep = Date.now();
+  try {
+    const removed = await purgeOldSnapshots(7);
+    if (removed > 0) console.log(`[worker] removed ${removed} snapshot file(s) past retention`);
+  } catch (error) {
+    console.error(`[worker] snapshot sweep failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function loop(): Promise<void> {
   console.log(`[worker ${workerId}] started`);
   while (!stopping) {
+    await sweep();
     let job: JobRow | null = null;
     try {
       job = await claimJob(workerId, ["scan", "fix", "embed", "vendor_sync"]);

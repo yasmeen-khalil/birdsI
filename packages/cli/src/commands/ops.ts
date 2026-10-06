@@ -2,13 +2,14 @@ import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { ActionRequest, Alert, Question, Vendor, VendorFact, Watch } from "@birdsi/shared";
-import { FACT_SOURCE_LABEL } from "@birdsi/shared";
+import { FACT_SOURCE_LABEL, commandProgram, isAllowedCommand } from "@birdsi/shared";
 import { ApiClient, toCliError } from "../api";
 import { readConfig } from "../config";
 import { EXIT } from "../exit";
 import { glyphs, paint, plural, styleFor, wrap, type Style } from "../format";
 import { isInteractive, printJson, println, usageError } from "../output";
 import { askText, askYesNo } from "../prompt";
+import { openBrowser } from "./auth";
 
 /**
  * The operations layer from the terminal: vendors and limits, the questions
@@ -174,9 +175,26 @@ function actionBlock(a: ActionRequest, style: Style): string {
   return lines.join("\n");
 }
 
-/** Runs one approved command on this machine and reports the outcome. The command is shown first and runs only after a yes. */
+/** The environment a command sees: enough to find its tools and its own config, none of this shell's secrets. */
+function commandEnv(): NodeJS.ProcessEnv {
+  const keep = ["PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR", "XDG_CONFIG_HOME", "APPDATA", "LOCALAPPDATA", "SYSTEMROOT", "USERPROFILE"];
+  const env: NodeJS.ProcessEnv = { NO_COLOR: "1" };
+  for (const k of keep) if (process.env[k]) env[k] = process.env[k];
+  return env;
+}
+
+/**
+ * Runs one approved command on this machine and reports the outcome. The
+ * command is shown verbatim and runs only after a yes, only when its program
+ * is on the allowlist, and with a minimal environment.
+ */
 async function runApproved(api: ApiClient, a: ActionRequest, cwd: string, style: Style, yes: boolean): Promise<void> {
   println(actionBlock(a, style));
+  if (!isAllowedCommand(a.command)) {
+    println(`  ${paint.fail(style, glyphs(style).failed)} Not run: "${commandProgram(a.command)}" is not an allowed program, or the command contains shell operators.`);
+    await api.reportAction(a.id, false, `Refused by the terminal tool: ${commandProgram(a.command)} is not an allowed program.`);
+    return;
+  }
   if (!yes) {
     const ok = await askYesNo(paint.accent(style, "Run this command here now? [y/N]"));
     if (!ok) {
@@ -187,7 +205,7 @@ async function runApproved(api: ApiClient, a: ActionRequest, cwd: string, style:
   const [command, ...args] = a.command.split(/\s+/);
   const output = await new Promise<{ ok: boolean; text: string }>((done) => {
     try {
-      execFile(command!, args, { cwd, timeout: 10 * 60_000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NO_COLOR: "1" } }, (error, stdout, stderr) => {
+      execFile(command!, args, { cwd, timeout: 10 * 60_000, maxBuffer: 8 * 1024 * 1024, env: commandEnv() }, (error, stdout, stderr) => {
         done({ ok: !error, text: `${stdout ?? ""}${stderr ? `\n${stderr}` : ""}${error && !stdout && !stderr ? `\n${error.message}` : ""}`.trim() });
       });
     } catch (error) {
@@ -206,10 +224,11 @@ export async function approvalsCommand(sub: string | undefined, id: string | und
   try {
     const repo = await resolveRepo(api, options.repo);
     if (sub === "approve" || sub === "deny") {
-      if (!id) throw usageError(`Which request? birdsi approvals ${sub} <id>`);
-      const { action } = (await api.decideAction(id, sub === "approve" ? "approve" : "deny")).data;
-      if (options.json) printJson({ action });
-      else println(`${action.status === "approved" ? paint.ok(style, "Approved") : "Denied"}: ${action.title}${action.status === "approved" ? `. Run it here with: birdsi approvals run` : ""}`);
+      // Deciding is a person's act and happens in the browser, never with this token.
+      const url = `${api.baseUrl}/app/${repo.id}/agent`;
+      println(`Approvals are decided in the browser, so an agent can never approve its own request.`);
+      println(paint.dim(style, `Open: ${url}`));
+      if (process.stdout.isTTY) openBrowser(url);
       return EXIT.ok;
     }
     if (sub === "run") {

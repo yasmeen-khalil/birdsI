@@ -252,10 +252,6 @@ export class ApiClient {
     return this.request("GET", `/actions/${enc(actionId)}`, { schema: ActionEnvelope });
   }
 
-  decideAction(actionId: string, decision: "approve" | "deny"): Promise<Result<z.infer<typeof ActionEnvelope>>> {
-    return this.request("POST", `/actions/${enc(actionId)}/decide`, { schema: ActionEnvelope, body: { decision } });
-  }
-
   reportAction(actionId: string, ok: boolean, output: string): Promise<Result<z.infer<typeof ActionEnvelope>>> {
     return this.request("POST", `/actions/${enc(actionId)}/report`, { schema: ActionEnvelope, body: { ok, output: output.slice(0, 20_000) } });
   }

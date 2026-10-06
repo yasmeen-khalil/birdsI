@@ -166,6 +166,7 @@ export async function resolveSnapshot(config: EngineConfig, repoId: string | nul
   if (snapshotId) {
     const row = await snapshotById(snapshotId);
     if (!row || !row.uploaded_at) throw new Error("The uploaded code snapshot is missing or incomplete.");
+    if (!row.storage_path) throw new Error("The uploaded code was deleted after the retention window (seven days). Run birdsi again to upload it.");
     const dir = await mkdtemp(join(tmpdir(), "birdsi-snap-"));
     const tarPath = join(dir, "snapshot.tgz");
     await downloadSnapshot(row, tarPath);

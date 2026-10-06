@@ -12,6 +12,28 @@ import { CliError, EXIT } from "./exit";
  * them for exact dependency versions, so they must be in the snapshot.
  */
 export const ALWAYS_IGNORED: readonly string[] = [
+  // Secrets never leave the machine, whatever .gitignore says. .env.example is a template and stays.
+  ".env",
+  ".env.*",
+  "!.env.example",
+  "!.env.sample",
+  "!.env.template",
+  "*.pem",
+  "*.key",
+  "*.p12",
+  "*.pfx",
+  "*.jks",
+  "*.keystore",
+  "id_rsa*",
+  "id_ed25519*",
+  "id_ecdsa*",
+  ".npmrc",
+  ".netrc",
+  ".aws/",
+  ".ssh/",
+  "credentials.json",
+  "service-account*.json",
+  "*-service-account*.json",
   ".git/",
   "node_modules/",
   ".next/",
