@@ -84,3 +84,11 @@ export async function markConnectionProbed(connectionId: string, status: "ok" | 
   const { error: err } = await db.from("connections").update({ last_probed_at: new Date().toISOString(), last_status: status, last_error: error ? error.slice(0, 500) : null }).eq("id", connectionId);
   if (err) throw new Error(`markConnectionProbed: ${err.message}`);
 }
+
+/** Owners with at least one connected account; their repositories sync hourly. */
+export async function userIdsWithConnections(): Promise<string[]> {
+  const db = getDb();
+  const { data, error } = await db.from("connections").select("owner_user_id");
+  if (error) throw new Error(`userIdsWithConnections: ${error.message}`);
+  return [...new Set(((data ?? []) as Array<{ owner_user_id: string }>).map((r) => r.owner_user_id))];
+}

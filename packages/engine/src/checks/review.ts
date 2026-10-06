@@ -1,6 +1,7 @@
 import type { FindingDraft } from "@birdsi/shared";
 import { numberLines } from "../scan/digest";
 import { filterModelFindings, MODEL_FINDINGS_JSON_SCHEMA, ModelFindings, REVIEW_VOICE, toDraft } from "./model-findings";
+import { runPool } from "./pool";
 import type { Check, CheckContext } from "./types";
 
 const SYSTEM = `You are birdsI, a careful reviewer reading one file of an application in the context of the whole codebase. ${REVIEW_VOICE}
@@ -31,27 +32,31 @@ export const reviewCheck: Check = {
     const files = ctx.filesToRead;
     const index: Array<{ path: string; hash: string }> = [];
     let carried = 0;
-    await ctx.emit({ type: "step_started", step: "review", label: reviewCheck.label, total: files.length });
     let done = 0;
-    for (const file of files) {
-      if (ctx.signal.aborted) break;
-      const hash = await ctx.fileHash(file.path);
-      index.push({ path: file.path, hash });
-      // Unchanged since the last scan: keep what that scan found instead of paying to read it again.
-      const previous = ctx.previousReview;
-      if (previous && previous.hashes.get(file.path) === hash) {
-        for (const draft of previous.findingsByPath.get(file.path) ?? []) {
-          findings.push(draft);
-          await ctx.emit({ type: "finding", finding: { ...draft, id: draft.key } });
-        }
-        carried += 1;
-        done += 1;
-        await ctx.emit({ type: "step_progress", step: "review", done, total: files.length });
-        continue;
-      }
-      await ctx.emit({ type: "file_reading", step: "review", path: file.path, checks: ["security holes", "gaps", "inconsistencies"] });
-      const content = await ctx.read(file.path);
+    let stopped = false;
+    await ctx.emit({ type: "step_started", step: "review", label: reviewCheck.label, total: files.length });
+    const progress = async (): Promise<void> => {
+      done += 1;
+      await ctx.emit({ type: "step_progress", step: "review", done, total: files.length });
+    };
+    const reviewFile = async (file: (typeof files)[number]): Promise<void> => {
+      if (stopped || ctx.signal.aborted) return;
       try {
+        const hash = await ctx.fileHash(file.path);
+        index.push({ path: file.path, hash });
+        // Unchanged since the last scan: keep what that scan found instead of paying to read it again.
+        const previous = ctx.previousReview;
+        if (previous && previous.hashes.get(file.path) === hash) {
+          for (const draft of previous.findingsByPath.get(file.path) ?? []) {
+            findings.push(draft);
+            await ctx.emit({ type: "finding", finding: { ...draft, id: draft.key } });
+          }
+          carried += 1;
+          await progress();
+          return;
+        }
+        await ctx.emit({ type: "file_reading", step: "review", path: file.path, checks: ["security holes", "gaps", "inconsistencies"] });
+        const content = await ctx.read(file.path);
         const result = await ctx.models.complete({
           tier: ctx.budget.reviewModel,
           fast: ctx.budget.fast,
@@ -74,14 +79,19 @@ export const reviewCheck: Check = {
         }
       } catch (error) {
         if (isBudget(error)) {
-          await ctx.note(`Stopped reading files early: the scan budget for this tier was reached after ${done} files.`);
-          break;
+          if (!stopped) {
+            stopped = true;
+            await ctx.note(`Stopped reading files early: the scan budget for this tier was reached after ${done} files.`);
+          }
+          return;
         }
         await ctx.note(`Could not review ${file.path}: ${errorMessage(error)}`);
       }
-      done += 1;
-      await ctx.emit({ type: "step_progress", step: "review", done, total: files.length });
-    }
+      await progress();
+    };
+    // Several files at once; the budget is checked before every call, so the
+    // overshoot is at most the calls in flight when it runs out.
+    await runPool(files, ctx.budget.concurrency, reviewFile);
     // Files this tier did not select, or the budget stopped before: when they are
     // unchanged since the last scan, that scan's findings still stand. Without this
     // a quick check after a full scan would lose the full scan's findings, and

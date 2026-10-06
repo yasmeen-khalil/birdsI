@@ -3,8 +3,9 @@ import { ApiError, handler, json } from "@/lib/api";
 import { env } from "@/lib/env";
 
 /**
- * The daily vendor sync. Vercel Cron calls this with the CRON_SECRET; without
- * the secret the route refuses, so nothing can trigger syncs from outside.
+ * A manual trigger for the vendor sync, for an outside scheduler that holds
+ * CRON_SECRET; without the secret the route refuses. The worker schedules the
+ * same syncs itself every hour, so nothing depends on this route.
  * Every repository with vendors and a sync older than twenty hours is queued.
  */
 export const GET = handler(async (request) => {

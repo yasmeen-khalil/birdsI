@@ -1,4 +1,5 @@
 import { getDb, unwrap } from "./client";
+import { schemaHas } from "./schema";
 
 export type JobKind = "scan" | "fix" | "embed" | "vendor_sync";
 
@@ -18,10 +19,51 @@ export interface JobRow {
   finished_at: string | null;
 }
 
-export async function enqueueJob(kind: JobKind, payload: Record<string, unknown>, options: { maxAttempts?: number } = {}): Promise<JobRow> {
+/** Jobs a person is waiting on run first: quick checks 10, fixes 5, everything else 0. */
+export const JOB_PRIORITY = { interactive: 10, fix: 5, background: 0 } as const;
+
+export async function enqueueJob(kind: JobKind, payload: Record<string, unknown>, options: { maxAttempts?: number; priority?: number } = {}): Promise<JobRow> {
   const db = getDb();
-  const result = await db.from("jobs").insert({ kind, payload, max_attempts: options.maxAttempts ?? 2 }).select().single();
+  const row: Record<string, unknown> = { kind, payload, max_attempts: options.maxAttempts ?? 2 };
+  if (options.priority !== undefined && options.priority !== 0 && (await schemaHas("jobs.priority"))) row["priority"] = options.priority;
+  const result = await db.from("jobs").insert(row).select().single();
   return unwrap(result, "enqueueJob") as JobRow;
+}
+
+export interface WorkerPresence {
+  id: string;
+  hostname: string;
+  version: string | null;
+  currentJobId: string | null;
+}
+
+/** A worker process reporting in; nothing happens until the workers table exists. */
+export async function workerSeen(presence: WorkerPresence): Promise<void> {
+  if (!(await schemaHas("workers"))) return;
+  const db = getDb();
+  const { error } = await db
+    .from("workers")
+    .upsert({ id: presence.id, hostname: presence.hostname, version: presence.version, current_job_id: presence.currentJobId, last_seen_at: new Date().toISOString() }, { onConflict: "id" });
+  if (error) throw new Error(`workerSeen: ${error.message}`);
+}
+
+/** When any worker last reported in; null when none has, or before the migration. */
+export async function lastWorkerSeenAt(): Promise<string | null> {
+  if (!(await schemaHas("workers"))) return null;
+  const db = getDb();
+  const { data, error } = await db.from("workers").select("last_seen_at").order("last_seen_at", { ascending: false }).limit(1);
+  if (error) throw new Error(`lastWorkerSeenAt: ${error.message}`);
+  return ((data ?? []) as Array<{ last_seen_at: string }>)[0]?.last_seen_at ?? null;
+}
+
+/** Removes presence rows of processes not seen for this many days. */
+export async function purgeStaleWorkers(days: number): Promise<number> {
+  if (!(await schemaHas("workers"))) return 0;
+  const db = getDb();
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+  const { data, error } = await db.from("workers").delete().lt("last_seen_at", cutoff).select("id");
+  if (error) throw new Error(`purgeStaleWorkers: ${error.message}`);
+  return ((data ?? []) as unknown[]).length;
 }
 
 /** Claims the oldest runnable job with SKIP LOCKED semantics (see claim_job in the migration). */

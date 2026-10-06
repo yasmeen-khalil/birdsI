@@ -6,6 +6,7 @@ import type { ScanEventRecord, ScanKind, ScanStatus } from "@birdsi/shared";
 import { stopScanAction } from "@/lib/actions";
 import { aboutTime, clock, KIND_LABEL, KIND_SECONDS } from "../format";
 import { useElapsed, useScanEvents } from "./useScanEvents";
+import { scannerNote } from "@birdsi/shared";
 
 /** The overview's compact view of a running scan, with a link to the full live view. */
 export function ScanProgressCard({
@@ -27,7 +28,8 @@ export function ScanProgressCard({
   stepLabels: Record<string, string>;
   hasEarlierResults: boolean;
 }) {
-  const { view, status } = useScanEvents({ scanId, initialEvents, initialCursor, initialStatus, stepLabels });
+  const { view, status, workerSeenAt } = useScanEvents({ scanId, initialEvents, initialCursor, initialStatus, stepLabels });
+  const scanner = scannerNote(workerSeenAt);
   const running = status === "running" || status === "queued";
   const elapsed = useElapsed(view.startedAt, running && view.startedAt !== null);
   const [pending, start] = useTransition();
@@ -53,7 +55,7 @@ export function ScanProgressCard({
       </div>
       <p className="t-small c2" id="scan-running-note">
         {queued ? (
-          "Waiting for a free scanner. It starts in a moment."
+          (scanner ?? "Waiting for a free scanner. It starts in a moment.")
         ) : step ? (
           <>
             Step {view.runningIndex + 1} of {view.steps.length}, {step.label.charAt(0).toLowerCase() + step.label.slice(1)}.

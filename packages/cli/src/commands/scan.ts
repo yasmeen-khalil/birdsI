@@ -15,6 +15,7 @@ import { followScan, sendSnapshot, startScan, withRetry } from "../workflow";
 import { openBrowser } from "./auth";
 import { runFix } from "./fix";
 import { formatNeedsYou } from "./ops";
+import { scannerNote } from "@birdsi/shared";
 
 export interface ScanOptions {
   deep?: boolean;
@@ -114,6 +115,7 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
   };
   const controller = new AbortController();
   let stopRequested = false;
+  let scannerLine: string | null = null;
   const ticker = progress && process.stdout.isTTY ? setInterval(() => progress.tick(), 1000) : null;
   let status: ScanStatus;
   try {
@@ -130,7 +132,19 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
           controller.abort();
         }
       },
-      () => followScan(api, scanId, { onEvents, signal: controller.signal }),
+      () =>
+        followScan(api, scanId, {
+          onEvents,
+          onPresence: (workerSeenAt, status) => {
+            if (stopRequested || !progress) return;
+            const note = status === "queued" ? scannerNote(workerSeenAt) : null;
+            if (note !== scannerLine) {
+              scannerLine = note;
+              progress.setStatus(note);
+            }
+          },
+          signal: controller.signal,
+        }),
     );
   } catch (error) {
     progress?.finish("running");

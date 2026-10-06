@@ -21,10 +21,11 @@ export function useScanEvents({
   initialCursor: number;
   initialStatus: ScanStatus;
   stepLabels: Record<string, string>;
-}): { view: ScanView; status: ScanStatus; events: ScanEventRecord[]; connectionLost: boolean } {
+}): { view: ScanView; status: ScanStatus; events: ScanEventRecord[]; connectionLost: boolean; workerSeenAt: string | null } {
   const router = useRouter();
   const [events, setEvents] = useState(initialEvents);
   const [status, setStatus] = useState<ScanStatus>(initialStatus);
+  const [workerSeenAt, setWorkerSeenAt] = useState<string | null>(null);
   const [failures, setFailures] = useState(0);
   const cursor = useRef(initialCursor);
 
@@ -44,6 +45,7 @@ export function useScanEvents({
         }
         setFailures(0);
         setStatus(body.status);
+        setWorkerSeenAt(body.workerSeenAt ?? null);
         if (isTerminal(body.status)) {
           router.refresh();
           return;
@@ -61,7 +63,7 @@ export function useScanEvents({
   }, [scanId, initialStatus, router]);
 
   const view = useMemo(() => deriveScanView(events, stepLabels), [events, stepLabels]);
-  return { view, status, events, connectionLost: failures >= 3 };
+  return { view, status, events, connectionLost: failures >= 3, workerSeenAt };
 }
 
 /** Seconds since a time, ticking once a second while `running`. */

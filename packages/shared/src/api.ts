@@ -51,6 +51,8 @@ export const ScanEventsResponse = z.object({
   /** Pass back as `after` to fetch only newer events. */
   cursor: z.number().int().nonnegative(),
   status: Scan.shape.status,
+  /** When a worker last reported in, while the scan is queued; null when unknown. */
+  workerSeenAt: z.string().nullable().optional(),
 });
 export type ScanEventsResponse = z.infer<typeof ScanEventsResponse>;
 

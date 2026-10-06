@@ -106,6 +106,8 @@ export async function followScan(
   scanId: string,
   options: {
     onEvents: (events: ScanEventRecord[]) => void;
+    /** Each poll: when a worker last reported in (null when unknown) and the scan's status. */
+    onPresence?: (workerSeenAt: string | null, status: ScanStatus) => void;
     onTick?: () => void;
     signal?: AbortSignal;
     intervalMs?: number;
@@ -124,6 +126,7 @@ export async function followScan(
     const { events, status } = page.data;
     cursor = Math.max(cursor, page.data.cursor);
     if (events.length > 0) options.onEvents(events);
+    options.onPresence?.(page.data.workerSeenAt ?? null, status);
     if (TERMINAL_SCAN.includes(status)) {
       // One more read, so events written just before the status changed are not lost.
       if (events.length > 0) {

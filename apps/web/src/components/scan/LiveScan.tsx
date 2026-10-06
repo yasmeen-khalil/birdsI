@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition, type ReactNode } from "react";
 import { Check, X } from "lucide-react";
-import { AUDIT_AREAS, type ScanEventRecord, type ScanKind, type ScanStatus } from "@birdsi/shared";
+import { AUDIT_AREAS, scannerNote, type ScanEventRecord, type ScanKind, type ScanStatus } from "@birdsi/shared";
 import { stopDemoScanAction, stopScanAction } from "@/lib/actions";
 import { Arc } from "../Arc";
 import { BirdsEyeMap, hitsFromFindings, MapLegend } from "../BirdsEyeMap";
@@ -98,7 +98,8 @@ function StopButton({ scanId, mode, label }: { scanId: string; mode: "demo" | "a
 
 export function LiveScan(props: LiveScanProps) {
   const { scanId, kind, mode, repoId, stepLabels, expectedSeconds } = props;
-  const { view, status, connectionLost } = useScanEvents({ scanId, initialEvents: props.initialEvents, initialCursor: props.initialCursor, initialStatus: props.initialStatus, stepLabels });
+  const { view, status, connectionLost, workerSeenAt } = useScanEvents({ scanId, initialEvents: props.initialEvents, initialCursor: props.initialCursor, initialStatus: props.initialStatus, stepLabels });
+  const scanner = scannerNote(workerSeenAt);
   const running = status === "running" || status === "queued";
   const elapsed = useElapsed(view.startedAt, running && view.startedAt !== null);
   const now = view.startedAt ? new Date(view.startedAt).getTime() + elapsed * 1000 : 0;
@@ -150,7 +151,7 @@ export function LiveScan(props: LiveScanProps) {
       <>
         <h1 className="t-h1">{mode === "demo" ? "Your sample scan is next" : `Your ${KIND_LOWER[kind]} is next`}</h1>
         <p className="t-body c2" style={{ marginTop: 14, maxWidth: 460 }}>
-          {props.intro} It starts as soon as a scanner is free, then runs for about {aboutTime(expectedSeconds)}.
+          {props.intro} {scanner ?? `It starts as soon as a scanner is free, then runs for about ${aboutTime(expectedSeconds)}.`}
         </p>
       </>
     );

@@ -7,6 +7,7 @@ import {
   createScan,
   dependenciesForScan,
   enqueueJob,
+  JOB_PRIORITY,
   findingForViewer,
   findingsForScan,
   latestDemoScanId,
@@ -64,7 +65,7 @@ export async function startScan(user: UserRow, input: CreateScanRequest, source:
     if (running) throw new ApiError(409, "already_running", "A scan of this repository is already running. Wait for it to finish or stop it first.");
   }
   const scan = await createScan({ repoId, snapshotId: input.snapshotId ?? null, ownerUserId: user.id, kind: input.kind, source, branch, appDescription: input.appDescription ?? null });
-  await enqueueJob("scan", { scanId: scan.id });
+  await enqueueJob("scan", { scanId: scan.id }, { priority: input.kind === "light" ? JOB_PRIORITY.interactive : JOB_PRIORITY.background });
   return toScan(scan);
 }
 
@@ -86,7 +87,7 @@ export async function startDemoScan(clientKey: string): Promise<{ scanId: string
     throw new ApiError(429, "capacity", "The sample scan is busy right now. Try again in a few minutes.");
   }
   const scan = await createScan({ repoId: null, snapshotId: null, ownerUserId: null, kind: "light", source: "demo", branch: "main", appDescription: "Online ordering for a neighbourhood bakery: menu, basket, card checkout with Stripe, order history, and a staff dashboard." });
-  await enqueueJob("scan", { scanId: scan.id }, { maxAttempts: 1 });
+  await enqueueJob("scan", { scanId: scan.id }, { maxAttempts: 1, priority: JOB_PRIORITY.interactive });
   return { scanId: scan.id, reused: false };
 }
 
@@ -125,7 +126,7 @@ export async function startFix(findingId: string, user: UserRow): Promise<Findin
   await assertSpendCap();
   await assertUserSpendCap(user.id);
   const fix = await createFix(finding.id, user.id);
-  await enqueueJob("fix", { fixId: fix.id }, { maxAttempts: 1 });
+  await enqueueJob("fix", { fixId: fix.id }, { maxAttempts: 1, priority: JOB_PRIORITY.fix });
   return toFix(fix);
 }
 

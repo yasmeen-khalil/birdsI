@@ -1,4 +1,4 @@
-import { eventsAfter, scanForViewer } from "@birdsi/db";
+import { eventsAfter, lastWorkerSeenAt, scanForViewer } from "@birdsi/db";
 import type { ScanEventsResponse } from "@birdsi/shared";
 import { handler, json, optionalCaller } from "@/lib/api";
 
@@ -11,5 +11,6 @@ export const GET = handler(async (request, { params }) => {
   const after = Math.max(0, Number.parseInt(url.searchParams.get("after") ?? "0", 10) || 0);
   const events = await eventsAfter(scan.id, after);
   const cursor = events.length > 0 ? events[events.length - 1]!.seq : after;
-  return json({ events, cursor, status: scan.status } satisfies ScanEventsResponse, { headers: { "cache-control": "no-store" } });
+  const workerSeenAt = scan.status === "queued" ? await lastWorkerSeenAt() : null;
+  return json({ events, cursor, status: scan.status, workerSeenAt } satisfies ScanEventsResponse, { headers: { "cache-control": "no-store" } });
 });

@@ -66,6 +66,8 @@ export interface ScanBudget {
   audit: boolean;
   /** Use the fast flavor for the review model (interactive tiers). */
   fast: boolean;
+  /** Model calls in flight at once while reading files and checking docs. */
+  concurrency: number;
 }
 
 const NEBIUS_MODELS = {
@@ -102,6 +104,7 @@ const DEFAULT_BUDGETS: Record<ScanKind, ScanBudget> = {
     crosscheckModel: null,
     audit: false,
     fast: true,
+    concurrency: 4,
   },
   deep: {
     maxFilesRead: 400,
@@ -112,6 +115,7 @@ const DEFAULT_BUDGETS: Record<ScanKind, ScanBudget> = {
     crosscheckModel: "super",
     audit: false,
     fast: false,
+    concurrency: 3,
   },
   audit: {
     maxFilesRead: 600,
@@ -122,6 +126,7 @@ const DEFAULT_BUDGETS: Record<ScanKind, ScanBudget> = {
     crosscheckModel: "ultra",
     audit: true,
     fast: false,
+    concurrency: 3,
   },
 };
 
@@ -177,9 +182,9 @@ export function loadEngineConfig(overrides: Partial<EngineConfig> = {}): EngineC
   if (models.embedding && !prices[models.embedding]) prices[models.embedding] = DEFAULT_PRICES[NEBIUS_MODELS.embedding]!;
 
   const budgets: Record<ScanKind, ScanBudget> = {
-    light: { ...DEFAULT_BUDGETS.light, maxInputTokens: envInt("BIRDSI_BUDGET_LIGHT_TOKENS", DEFAULT_BUDGETS.light.maxInputTokens) },
-    deep: { ...DEFAULT_BUDGETS.deep, maxInputTokens: envInt("BIRDSI_BUDGET_DEEP_TOKENS", DEFAULT_BUDGETS.deep.maxInputTokens) },
-    audit: { ...DEFAULT_BUDGETS.audit, maxInputTokens: envInt("BIRDSI_BUDGET_AUDIT_TOKENS", DEFAULT_BUDGETS.audit.maxInputTokens) },
+    light: { ...DEFAULT_BUDGETS.light, maxInputTokens: envInt("BIRDSI_BUDGET_LIGHT_TOKENS", DEFAULT_BUDGETS.light.maxInputTokens), concurrency: envInt("BIRDSI_SCAN_CONCURRENCY", DEFAULT_BUDGETS.light.concurrency) },
+    deep: { ...DEFAULT_BUDGETS.deep, maxInputTokens: envInt("BIRDSI_BUDGET_DEEP_TOKENS", DEFAULT_BUDGETS.deep.maxInputTokens), concurrency: envInt("BIRDSI_SCAN_CONCURRENCY", DEFAULT_BUDGETS.deep.concurrency) },
+    audit: { ...DEFAULT_BUDGETS.audit, maxInputTokens: envInt("BIRDSI_BUDGET_AUDIT_TOKENS", DEFAULT_BUDGETS.audit.maxInputTokens), concurrency: envInt("BIRDSI_SCAN_CONCURRENCY", DEFAULT_BUDGETS.audit.concurrency) },
   };
 
   return {

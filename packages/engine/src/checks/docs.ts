@@ -1,6 +1,7 @@
 import { tavily, type TavilyClient } from "@tavily/core";
 import { findingKey, type Dependency, type FindingDraft } from "@birdsi/shared";
 import { filterModelFindings, MODEL_FINDINGS_JSON_SCHEMA, ModelFindings, REVIEW_VOICE, toDraft } from "./model-findings";
+import { runPool } from "./pool";
 import { errorMessage, isBudget } from "./review";
 import type { Check, CheckContext } from "./types";
 
@@ -41,8 +42,9 @@ export const docsCheck: Check = {
     const candidates = pickDependencies(ctx, ctx.budget.maxDocsChecks);
     await ctx.emit({ type: "step_started", step: "docs", label: docsCheck.label, total: candidates.length });
     let done = 0;
-    for (const dep of candidates) {
-      if (ctx.signal.aborted) break;
+    let stopped = false;
+    const checkDependency = async (dep: Dependency): Promise<void> => {
+      if (stopped || ctx.signal.aborted) return;
       try {
         const { hits, sources } = await searchDocs(client, dep, ctx.signal);
         const usage = await findUsage(ctx, dep);
@@ -87,12 +89,17 @@ export const docsCheck: Check = {
           }
         }
       } catch (error) {
-        if (isBudget(error)) break;
+        if (isBudget(error)) {
+          stopped = true;
+          return;
+        }
         await ctx.note(`Docs check skipped for ${dep.name}: ${errorMessage(error)}`);
       }
       done += 1;
       await ctx.emit({ type: "step_progress", step: "docs", done, total: candidates.length });
-    }
+    };
+    // Several packages at once: each is a search plus one small model call.
+    await runPool(candidates, ctx.budget.concurrency, checkDependency);
     return findings;
   },
 };

@@ -4,7 +4,7 @@
 
 The operations layer for coding agents.
 
-### Since the submission (2026-10-04 and 2026-10-05)
+### Since the submission (from 2026-10-04)
 
 Trust, before any user beyond the owner:
 - The terminal tool never uploads `.env` files, private keys, certificates or credential files, whatever `.gitignore` says.
@@ -34,6 +34,13 @@ Built for agents:
 - A skill, `skills/birdsi/SKILL.md`, that tells an agent when to read birdsI and how to read its facts.
 - `birdsi mcp --install-hint` pins the version and puts no token in any file.
 - The docs check only reads the package's own documentation: domains from the registry record (npm, PyPI, crates.io; the repository for Go), GitHub only for the package's repository and advisories. A package without a known official source is reported as unknown, not checked against a blog post.
+
+Faster, and the worker keeps its own clock (2026-10-06):
+- The review and the docs check run several model calls at once (4 on quick checks, 3 on full scans, `BIRDSI_SCAN_CONCURRENCY`); the budget is checked before every call.
+- The worker schedules vendor syncs itself: hourly for owners with a connected account, daily for everyone. No outside cron and no secret to set; `/api/cron/sync` stays as a manual trigger.
+- A priority lane: quick checks, demo scans and fixes are claimed before full scans and syncs (migration `20261006000000_queue_priority_workers.sql`).
+- Worker presence: each worker reports in every half minute, and a queued scan says plainly when no scanner has reported in for two minutes instead of "starts in a moment".
+- Code deployed before a migration runs keeps working: new columns and tables are probed and used once they exist.
 
 ### The 2026-10-03 release
 
