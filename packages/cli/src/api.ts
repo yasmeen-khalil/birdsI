@@ -373,6 +373,12 @@ export function toCliError(error: unknown, what?: string): CliError {
         return new CliError("birdsI is getting too many requests from you right now.", EXIT.failed, "Wait a minute, then try again.");
       case 413:
         return new CliError(`Your files are too large to send to birdsI.${detail ? ` ${sentence(detail)}` : ""}`, EXIT.failed);
+      case 503:
+        // A feature whose migration the operator has not run yet says so; nothing on the user's side is wrong.
+        if (error.code === "not_ready") {
+          return new CliError(detail ? sentence(detail) : "This birdsI is not set up for that yet.", EXIT.failed, "The operator of this birdsI has a database migration to run. Nothing on your side is wrong.");
+        }
+        return new CliError("birdsI is not available right now (HTTP 503).", EXIT.failed, "Try again in a few minutes. Nothing in your files changed.");
       default:
         if (error.status >= 500) {
           return new CliError(
