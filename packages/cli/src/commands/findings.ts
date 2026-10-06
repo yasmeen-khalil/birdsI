@@ -153,3 +153,18 @@ export async function askCommand(repoRef: string, questionWords: string[], optio
     throw toCliError(error, "that repository");
   }
 }
+
+/** Says the finding is fixed in the code; the next scan is the judge. */
+export async function fixedCommand(ref: string, options: { note?: string; json?: boolean }): Promise<number> {
+  const { api } = await ApiClient.fromEnvironment();
+  api.requireAuth();
+  try {
+    const { findingId } = await resolveFindingRef(api, ref);
+    const result = await api.markFixed(findingId, options.note);
+    if (options.json) printJson(result.raw);
+    else println("Marked fixed. The next scan confirms it, or reopens it.");
+    return EXIT.ok;
+  } catch (error) {
+    throw toCliError(error, "that finding");
+  }
+}

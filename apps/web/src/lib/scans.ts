@@ -26,6 +26,7 @@ import {
   toFix,
   toScan,
   type UserRow,
+  policyForRepo,
 } from "@birdsi/db";
 import { answerQuestion, loadEngineConfig, ModelClient } from "@birdsi/engine";
 import type { ChatMessage, CreateScanRequest, FindingResponse, ScanResponse } from "@birdsi/shared";
@@ -33,6 +34,7 @@ import { ApiError } from "./api";
 import { envInt } from "./env";
 import { assertSpendCap, assertUserScanQuota, assertUserSpendCap, runningScanForRepo } from "./limits";
 import { loadInventory } from "./ops";
+import { note, ownerAuthor, type RecordAuthor } from "./record";
 
 /**
  * Scan and fix operations shared by the web pages and /api/v1. Every
@@ -126,19 +128,38 @@ export async function startFix(findingId: string, user: UserRow): Promise<Findin
   await assertSpendCap();
   await assertUserSpendCap(user.id);
   const fix = await createFix(finding.id, user.id);
+  await note(finding.repo_id, ownerAuthor(user), { kind: "fix_opened", subject: finding.key, text: finding.title, data: { findingId: finding.id, fixId: fix.id } });
   await enqueueJob("fix", { fixId: fix.id }, { maxAttempts: 1, priority: JOB_PRIORITY.fix });
   return toFix(fix);
 }
 
-export async function dismissFinding(findingId: string, user: UserRow): Promise<void> {
+export async function dismissFinding(findingId: string, user: UserRow, author: RecordAuthor = ownerAuthor(user)): Promise<void> {
   const { finding, scan } = await findingForViewer(findingId, user.id);
   if (scan.source === "demo") throw new ApiError(403, "demo", "The sample repository is read-only.");
   await setFindingStatus(finding.id, finding.repo_id, finding.key, "dismissed");
+  await note(finding.repo_id, author, { kind: "finding_dismissed", subject: finding.key, text: finding.title, data: { findingId: finding.id } });
 }
 
-export async function reopenFinding(findingId: string, user: UserRow): Promise<void> {
+export async function reopenFinding(findingId: string, user: UserRow, author: RecordAuthor = ownerAuthor(user)): Promise<void> {
   const { finding } = await findingForViewer(findingId, user.id);
   await setFindingStatus(finding.id, finding.repo_id, finding.key, "open");
+  await note(finding.repo_id, author, { kind: "finding_reopened", subject: finding.key, text: finding.title, data: { findingId: finding.id } });
+}
+
+/**
+ * The writer says the finding is fixed in the code. The mark is recorded with
+ * its author; the next scan is the judge and reopens the finding if it is
+ * still there. Agents need the repo's policy to allow writes.
+ */
+export async function markFindingFixed(findingId: string, user: UserRow, noteText: string | null, author: RecordAuthor): Promise<void> {
+  const { finding, scan } = await findingForViewer(findingId, user.id);
+  if (scan.source === "demo") throw new ApiError(403, "demo", "The sample repository is read-only.");
+  if (author.kind === "agent" && finding.repo_id) {
+    const policy = await policyForRepo(finding.repo_id);
+    if (!policy.allowWrite) throw new ApiError(403, "policy", "Agents may not write to the record in this repository. The owner can allow it on the Agent page.");
+  }
+  await setFindingStatus(finding.id, finding.repo_id, finding.key, "fixed");
+  await note(finding.repo_id, author, { kind: "finding_fixed", subject: finding.key, text: finding.title, why: noteText, data: { findingId: finding.id } });
 }
 
 export async function askRepo(repoId: string, user: UserRow, question: string): Promise<ChatMessage> {

@@ -17,6 +17,7 @@ Rules:
 - Do not report something that is clearly handled elsewhere (for example, auth enforced by a middleware you were told about).
 - certainty is your honest probability that a competent engineer would agree it is a bug or hole.
 - actionKind is "fix" only when a change inside the repository resolves it fully; anything needing a dashboard, a key rotation or a product decision is "steps".
+- At most four findings per file, the most important first. Keep explanation under 60 words and whyItMatters under 30; copy at most six lines into excerpt; at most three steps. A short, exact finding beats a long one.
 - If the file is fine, return an empty findings list. That is a good outcome, not a failure.`;
 
 export const reviewCheck: Check = {

@@ -73,7 +73,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   const signal = input.signal ?? new AbortController().signal;
   const emit = input.onEvent;
   const note = (text: string) => emit({ type: "note", text });
-  const stats: ScanStats = { filesSeen: 0, filesRead: 0, checksRun: 0, dependencies: 0, inputTokens: 0, outputTokens: 0, costMicrodollars: 0, durationMs: 0 };
+  const stats: ScanStats = { filesSeen: 0, filesRead: 0, checksRun: 0, dependencies: 0, inputTokens: 0, cachedTokens: 0, throttledCalls: 0, outputTokens: 0, costMicrodollars: 0, durationMs: 0 };
 
   const models = new ModelClient(config, {
     maxInputTokens: budget.maxInputTokens,
@@ -82,6 +82,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
       stats.inputTokens += usage.inputTokens;
       stats.outputTokens += usage.outputTokens;
       stats.costMicrodollars += usage.costMicrodollars;
+      stats.cachedTokens += usage.cachedTokens;
       await input.onUsage?.(usage);
     },
   });
@@ -240,6 +241,9 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   }
 
   stats.durationMs = Date.now() - started;
+  stats.throttledCalls = models.throttledCalls;
+  if (stats.throttledCalls > 0) await note(`${stats.throttledCalls} model calls were slowed by the provider's rate limit and retried; the scan took longer than the code alone would.`);
+  if (stats.cachedTokens > 0) await note(`${stats.cachedTokens.toLocaleString("en-US")} of ${stats.inputTokens.toLocaleString("en-US")} input tokens were served from the provider's cache.`);
   await emit({ type: "scan_done", findings: ranked.length, durationMs: stats.durationMs });
   return { findings: ranked, dependencies, summary, audit, stats, inventory, vendors, snapshot };
 }

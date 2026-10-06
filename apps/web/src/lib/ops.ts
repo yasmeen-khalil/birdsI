@@ -11,6 +11,11 @@ import {
   factHistory,
   factsForVendors,
   findingsForScan,
+  addRecordEntry,
+  recordAvailable,
+  recordForRepo,
+  schemaHas,
+  toRecordEntry,
   isSecretsKeyConfigured,
   scanForViewer,
   jobActive,
@@ -36,7 +41,8 @@ import {
 } from "@birdsi/db";
 import { computeAlerts, computeRunway, computeWatches, CONNECTOR_BY_SLUG, connectorInfo, monthlySpend, stageStates } from "@birdsi/engine";
 import { diffFindings } from "@birdsi/shared";
-import type { ActionRequest, ActionsResponse, AskOwnerRequest, ChangesResponse, InventoryResponse, Question, RequestActionRequest, UpdatePolicyRequest, Vendor, VendorsResponse, Vision } from "@birdsi/shared";
+import { note, ownerAuthor, type RecordAuthor } from "./record";
+import type { ActionRequest, ActionsResponse, AgentPolicy, AskOwnerRequest, ChangesResponse, RecordEntry, RecordKind, WriteRecordRequest, InventoryResponse, Question, RequestActionRequest, UpdatePolicyRequest, Vendor, VendorsResponse, Vision } from "@birdsi/shared";
 import { ALLOWED_COMMANDS, isAllowedCommand } from "@birdsi/shared";
 import { ApiError } from "./api";
 import { assertSpendCap, assertUserSpendCap } from "./limits";
@@ -113,6 +119,7 @@ export async function answerQuestion(questionId: string, user: UserRow, answer: 
   const trimmed = answer.trim();
   if (!trimmed) throw new ApiError(400, "bad_request", "Write an answer first.");
   const updated = await answerQuestionRow(row.id, trimmed, "answered");
+  await note(row.repo_id, ownerAuthor(user), { kind: "question_answered", subject: row.updates?.metric ?? null, text: trimmed, why: row.question, data: { questionId: row.id } });
   if (row.vendor_id && row.updates) {
     const numeric = Number(trimmed.replace(/[^0-9.]/g, ""));
     await upsertFact(row.vendor_id, {
@@ -140,6 +147,7 @@ export async function dismissQuestion(questionId: string, user: UserRow): Promis
   if (!row) throw new ApiError(404, "not_found", "Not found.");
   await repoForUser(row.repo_id, user.id);
   await answerQuestionRow(row.id, null, "dismissed");
+  await note(row.repo_id, ownerAuthor(user), { kind: "question_dismissed", text: row.question, data: { questionId: row.id } });
 }
 
 /** An agent asks the owner something only a person can answer. */
@@ -200,6 +208,7 @@ export async function decideActionRequest(actionId: string, user: UserRow, decis
   await repoForUser(row.repo_id, user.id);
   if (row.status !== "pending") throw new ApiError(409, "decided", `This request is already ${row.status}.`);
   const updated = await decideAction(row.id, user.id, decision);
+  await note(row.repo_id, ownerAuthor(user), { kind: "action_decided", subject: row.command, text: `${decision === "approve" ? "Approved" : "Denied"}: ${row.title}`, why: row.reason, data: { actionId: row.id, decision } });
   return toAction(updated, null);
 }
 
@@ -209,7 +218,9 @@ export async function reportActionResult(actionId: string, user: UserRow, ok: bo
   if (!row) throw new ApiError(404, "not_found", "Not found.");
   await repoForUser(row.repo_id, user.id);
   if (row.status !== "approved") throw new ApiError(409, "not_approved", `This request is ${row.status}, so there is nothing to report.`);
-  return toAction(await reportAction(row.id, ok, output), null);
+  const updated = await reportAction(row.id, ok, output);
+  await note(row.repo_id, ownerAuthor(user), { kind: "action_run", subject: row.command, text: `${ok ? "Ran" : "Failed"}: ${row.title}`, data: { actionId: row.id, ok, output: output.slice(0, 500) } });
+  return toAction(updated, null);
 }
 
 export async function loadActionForUser(actionId: string, user: UserRow): Promise<ActionRequest> {
@@ -219,9 +230,21 @@ export async function loadActionForUser(actionId: string, user: UserRow): Promis
   return toAction(row, null);
 }
 
+export async function loadPolicy(repoId: string, user: UserRow): Promise<AgentPolicy> {
+  const repo = await repoForUser(repoId, user.id);
+  return policyForRepo(repo.id);
+}
+
 export async function changePolicy(repoId: string, user: UserRow, patch: UpdatePolicyRequest) {
   const repo = await repoForUser(repoId, user.id);
-  return updatePolicy(repo.id, patch);
+  if (patch.allowWrite !== undefined && !(await schemaHas("agent_policies.allow_write"))) throw new ApiError(503, "not_ready", "The record is not set up on this birdsI yet.");
+  const policy = await updatePolicy(repo.id, patch);
+  const parts: string[] = [];
+  if (patch.allowPropose !== undefined) parts.push(`agents may ${patch.allowPropose ? "" : "not "}ask and propose`);
+  if (patch.allowWrite !== undefined) parts.push(`agents may ${patch.allowWrite ? "" : "not "}write to the record`);
+  if (patch.autoApproveUnderUsd !== undefined) parts.push(patch.autoApproveUnderUsd === null ? "always ask before a command" : `approve commands at or under $${patch.autoApproveUnderUsd} a month`);
+  await note(repo.id, ownerAuthor(user), { kind: "policy", text: parts.length ? `Policy: ${parts.join("; ")}.` : "Policy updated.", data: { ...patch } });
+  return policy;
 }
 
 export async function loadVision(repoId: string, user: UserRow): Promise<Vision> {
@@ -231,13 +254,53 @@ export async function loadVision(repoId: string, user: UserRow): Promise<Vision>
 
 export async function saveVision(repoId: string, user: UserRow, text: string): Promise<Vision> {
   const repo = await repoForUser(repoId, user.id);
-  return setVision(repo.id, text);
+  const vision = await setVision(repo.id, text);
+  await note(repo.id, ownerAuthor(user), { kind: "vision", text: text.trim().slice(0, 300) });
+  return vision;
+}
+
+/** The record, newest first. */
+export async function loadRecord(repoId: string, user: UserRow, options: { kind?: RecordKind; limit?: number } = {}): Promise<RecordEntry[]> {
+  const repo = await repoForUser(repoId, user.id);
+  return (await recordForRepo(repo.id, options)).map(toRecordEntry);
+}
+
+/**
+ * A direct write to the record: a decision, or a fact about a vendor in the
+ * writer's own name. Agents need the repo's policy to allow writes.
+ */
+export async function writeRecord(repoId: string, user: UserRow, input: WriteRecordRequest, author: RecordAuthor): Promise<RecordEntry> {
+  const repo = await repoForUser(repoId, user.id);
+  if (!(await recordAvailable())) throw new ApiError(503, "not_ready", "The record is not set up on this birdsI yet.");
+  if (author.kind === "agent") {
+    const policy = await policyForRepo(repo.id);
+    if (!policy.allowWrite) throw new ApiError(403, "policy", "Agents may not write to the record in this repository. The owner can allow it on the Agent page.");
+  }
+  if (input.kind === "decision") {
+    const row = await addRecordEntry(repo.id, { kind: "decision", authorKind: author.kind, authorLabel: author.label, subject: input.subject?.trim() || null, text: input.text.trim(), why: input.why?.trim() || null });
+    return toRecordEntry(row!);
+  }
+  const vendor = await vendorBySlug(repo.id, input.vendorSlug);
+  if (!vendor) throw new ApiError(404, "not_found", `No vendor ${input.vendorSlug} in this repository. birdsi_inventory lists them.`);
+  await upsertFact(vendor.id, {
+    kind: input.factKind,
+    metric: input.metric,
+    label: input.label.trim(),
+    value: input.value.trim(),
+    numeric: input.numeric ?? null,
+    unit: input.unit?.trim() || null,
+    limitNumeric: input.limitNumeric ?? null,
+    source: author.kind === "agent" ? "agent" : "asked",
+    evidence: { note: `${author.kind === "agent" ? "Stated by a coding agent" : "Stated by the owner"} on ${new Date().toISOString().slice(0, 10)}.${input.why ? ` ${input.why.trim()}` : ""}` },
+  });
+  const row = await addRecordEntry(repo.id, { kind: "fact", authorKind: author.kind, authorLabel: author.label, subject: `${vendor.slug}:${input.metric}`, text: `${vendor.name}: ${input.label.trim()} ${input.value.trim()}${input.unit ? ` ${input.unit.trim()}` : ""}`, why: input.why?.trim() || null, data: { vendorSlug: vendor.slug, metric: input.metric, factKind: input.factKind } });
+  return toRecordEntry(row!);
 }
 
 /** Everything an agent needs about a repository in one call. */
 export async function loadInventory(repoId: string, user: UserRow): Promise<InventoryResponse> {
   const repo = await repoForUser(repoId, user.id);
-  const [vendors, vision, questions, actions, latest] = await Promise.all([loadVendors(repo.id, user), visionForRepo(repo.id), questionsForRepo(repo.id, "open"), actionsForRepo(repo.id, "pending"), latestDoneScan(repo.id)]);
+  const [vendors, vision, questions, actions, latest, decisions] = await Promise.all([loadVendors(repo.id, user), visionForRepo(repo.id), questionsForRepo(repo.id, "open"), actionsForRepo(repo.id, "pending"), latestDoneScan(repo.id), recordForRepo(repo.id, { kind: "decision", limit: 20 })]);
   const findings = latest ? await findingsForScan(latest.id) : [];
   return {
     repo: { id: repo.id, fullName: repo.full_name, branch: repo.default_branch },
@@ -248,6 +311,7 @@ export async function loadInventory(repoId: string, user: UserRow): Promise<Inve
     stages: vendors.stages,
     openQuestions: questions.length,
     pendingActions: actions.length,
+    decisions: decisions.map(toRecordEntry),
     latestScan: latest ? { id: latest.id, kind: latest.kind, finishedAt: latest.finished_at, findings: findings.filter((f) => f.status !== "dismissed").length, headline: latest.summary?.headline ?? null } : null,
   };
 }

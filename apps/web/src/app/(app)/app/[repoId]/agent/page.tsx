@@ -5,8 +5,9 @@ import { Frame } from "@/components/Frame";
 import { LocalTime } from "@/components/LocalTime";
 import { plural } from "@/components/format";
 import { ActionCard, costText, PolicyControls, QuestionCard } from "@/components/ops/AgentControls";
+import { RecordPanel } from "@/components/ops/RecordPanel";
 import { repoContext } from "@/components/server/data";
-import { loadActions, loadQuestions } from "@/lib/ops";
+import { loadActions, loadQuestions, loadRecord } from "@/lib/ops";
 
 export const metadata: Metadata = { title: "Agent" };
 
@@ -46,7 +47,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 export default async function AgentPage({ params }: { params: Promise<{ repoId: string }> }) {
   const { repoId } = await params;
   const { user, repo } = await repoContext(repoId);
-  const [questions, { actions, policy }] = await Promise.all([loadQuestions(repo.id, user), loadActions(repo.id, user)]);
+  const [questions, { actions, policy }, record] = await Promise.all([loadQuestions(repo.id, user), loadActions(repo.id, user), loadRecord(repo.id, user, { limit: 30 })]);
   const open = questions.filter((q) => q.status === "open");
   const answered = questions.filter((q) => q.status === "answered").sort((a, b) => (b.answeredAt ?? "").localeCompare(a.answeredAt ?? ""));
   const pending = actions.filter((a) => a.status === "pending");
@@ -144,9 +145,14 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
         )}
       </section>
 
+      <section className="flex flex-col gap-5" aria-labelledby="record-title">
+        <SectionHead id="record-title" title="The record" intro="What was decided, stated, fixed, answered, approved and run for this app, by whom and why. Agents read it before they act." />
+        {record.length === 0 ? <Empty>Nothing on record yet. Decisions, answers, approvals and fixed marks land here.</Empty> : <RecordPanel entries={record} />}
+      </section>
+
       <section className="grid grid-cols-1 gap-y-10 min-[901px]:grid-cols-12 min-[901px]:gap-x-6" aria-labelledby="policy-title">
         <div className="flex flex-col gap-5 min-[901px]:col-span-7">
-          <SectionHead id="policy-title" title="What agents may do" intro="Agents can always read what birdsI knows about this app. These settings decide what they can ask you for." />
+          <SectionHead id="policy-title" title="What agents may do" intro="Agents can always read what birdsI knows about this app. These settings decide what they can ask you for and what they can write to the record." />
           <PolicyControls repoId={repo.id} policy={policy} />
         </div>
         <Frame arm={26} bend={19} className="flex flex-col gap-3.5 self-start px-[30px] py-7 min-[901px]:col-span-4 min-[901px]:col-start-9 max-[900px]:px-[22px] max-[900px]:py-6">
@@ -165,7 +171,7 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
             </code>
             <CopyButton text={MCP_SERVER} />
           </div>
-          <p className="t-small c3">MCP is the standard way coding agents connect to tools. Your agent can then read the vendors, limits, alerts and vision, ask you questions, and propose commands.</p>
+          <p className="t-small c3">MCP is the standard way coding agents connect to tools. Your agent can then read the vendors, limits, alerts and vision, ask you questions, propose commands, and write decisions, facts and fixed marks to the record.</p>
         </Frame>
       </section>
     </main>

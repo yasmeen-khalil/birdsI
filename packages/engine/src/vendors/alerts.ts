@@ -1,5 +1,5 @@
 import type { Alert, Runway, StageId, StageState, Vendor, VendorKnowledge, Watch } from "@birdsi/shared";
-import { STAGE_FRESH_HOURS, STAGE_LABEL } from "@birdsi/shared";
+import { STAGE_FRESH_HOURS, STAGE_LABEL, bestFacts } from "@birdsi/shared";
 
 export interface Observation {
   metric: string;
@@ -22,11 +22,13 @@ export function computeAlerts(vendors: Vendor[], _knowledge: Map<string, VendorK
     if (error) {
       alerts.push({ id: `${v.id}:connection`, vendorId: v.id, vendorName: v.name, level: "warning", title: `${v.name} could not be read`, detail: error, suggestedCommand: null, runsOutAt: null });
     }
-    const paused = v.facts.find((f) => f.metric === "paused_projects" && (f.numeric ?? 0) > 0);
+    // One fact per metric: the account outranks the owner, who outranks an agent, the docs, the code.
+    const facts = bestFacts(v.facts);
+    const paused = facts.find((f) => f.metric === "paused_projects" && (f.numeric ?? 0) > 0);
     if (paused) {
       alerts.push({ id: `${v.id}:paused`, vendorId: v.id, vendorName: v.name, level: "critical", title: `${v.name}: ${paused.numeric === 1 ? "a project is" : `${paused.numeric} projects are`} paused`, detail: `${paused.value}. The app cannot reach a paused project. Restore it in the ${v.name} dashboard, or move to a plan that does not pause.`, suggestedCommand: upgradeCommand(v), runsOutAt: null });
     }
-    const usage = v.facts.filter((f) => f.kind === "usage" && f.numeric !== null && f.limitNumeric !== null && f.limitNumeric > 0);
+    const usage = facts.filter((f) => f.kind === "usage" && f.numeric !== null && f.limitNumeric !== null && f.limitNumeric > 0);
     const vendorRunways = runways.get(v.id) ?? [];
     for (const f of usage) {
       const remainingMetric = /remaining/i.test(f.metric);

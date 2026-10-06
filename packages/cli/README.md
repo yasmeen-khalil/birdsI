@@ -45,6 +45,38 @@ Everything birdsI knows about the project in one read: the vision, every vendor 
 
 New and resolved findings since the previous finished scan, by stable key (an id changes per scan; a key does not). Pass a scan id to compare from an earlier scan. Findings in files unchanged since the last scan are carried into every scan, so a quick check after a full scan does not make the full scan's findings disappear.
 
+### `birdsi record`
+
+The record of the app: decisions, facts stated, findings marked fixed or dismissed, answers, approvals and runs, newest first, each with who wrote it and why. `--kind decision` (or any kind) filters; `--limit 200` at most.
+
+### `birdsi decide <text...>`
+
+Writes a decision to the record in your words, with `--why`, so no agent asks about it again.
+
+### `birdsi fixed <finding>`
+
+Says a finding is fixed in the code (`--note` what was done). The next scan confirms it or reopens it.
+
+### `birdsi policy`
+
+The repository's agent policy in words: whether agents may ask and propose, whether they may write to the record, and what is approved without asking. `--hint` prints the Claude Code hook below.
+
+### `birdsi policy check [command...]`
+
+Exit 0 when a command changes nothing; exit 2, with the reason on stderr, when it changes a vendor account (a plan, an env variable, a deploy, a secret, a pause) and must go through birdsI. With no argument it reads a Claude Code hook payload from stdin. Commands that change nothing never touch the network; when birdsI cannot be reached, account-changing commands stay blocked.
+
+Claude Code, in `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "npx -y birdsi@0.2.0 policy check" }] }
+    ]
+  }
+}
+```
+
 ### `birdsi vendors`
 
 The services the app runs on: what each is, what the app uses it for, the plan, usage against limits, spend, and alerts. `--sync` refreshes from connected accounts and current pricing pages first. `--repo owner/name` picks a repository other than the one you scanned last.
@@ -144,7 +176,7 @@ Every command that prints data accepts `--json`, which prints the API response e
 
 `birdsi mcp` runs the birdsI MCP server over stdio, so coding assistants can read the project's operational record, ask the owner, propose actions, scan and apply fixes mid-session. It uses the token from `birdsi login`, or `BIRDSI_TOKEN` in the environment.
 
-Tools: `birdsi_inventory` (call this first: vision, vendors, alerts, stages, what needs the owner), `birdsi_changes_since` (new and resolved findings by stable key), `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, `birdsi_sync_vendors`, `birdsi_scan` (with `full`; returns after four minutes if the scan is still running), `birdsi_scan_status`, `birdsi_findings`, `birdsi_finding`, `birdsi_fix`, `birdsi_repos`, `birdsi_ask`. The inventory, vendor and changes tools return structured content as well as text. Text read from a repository or the web is marked between `«` and `»` in every result.
+Tools: `birdsi_inventory` (call this first: vision, vendors, alerts, stages, what needs the owner), `birdsi_changes_since` (new and resolved findings by stable key), `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, `birdsi_record` (the record, newest first), `birdsi_record_decision`, `birdsi_record_fact`, `birdsi_mark_fixed` (writes, within the owner's policy, each logged with its author), `birdsi_sync_vendors`, `birdsi_scan` (with `full`; returns after four minutes if the scan is still running), `birdsi_scan_status`, `birdsi_findings`, `birdsi_finding`, `birdsi_fix`, `birdsi_repos`, `birdsi_ask`. The inventory, vendor and changes tools return structured content as well as text. Text read from a repository or the web is marked between `«` and `»` in every result.
 
 `birdsi mcp --install-hint` prints these snippets with the current version pinned, so a release never changes what your agent runs until you choose it. No token goes in any file: the server reads the one `birdsi login` saved. In CI or a sandbox, set `BIRDSI_TOKEN` in the environment.
 

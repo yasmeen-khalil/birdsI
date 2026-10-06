@@ -42,6 +42,20 @@ Faster, and the worker keeps its own clock (2026-10-06):
 - Worker presence: each worker reports in every half minute, and a queued scan says plainly when no scanner has reported in for two minutes instead of "starts in a moment".
 - Code deployed before a migration runs keeps working: new columns and tables are probed and used once they exist.
 
+The record (2026-10-06):
+- Every change outside the code now has an author and a reason, in one append-only record per app: decisions, facts stated, findings marked fixed, dismissed or reopened, fixes started, the vision, the policy, questions answered or dismissed, commands approved or denied, and what happened when they ran.
+- Agents write to it within the owner's policy (a toggle on the Agent page, on by default): `birdsi_record_decision`, `birdsi_record_fact`, `birdsi_mark_fixed`. A fact an agent states carries the source "Your coding agent told birdsI" and is outranked by the connected account and by the owner. A fixed mark is judged by the next scan.
+- Reads: `birdsi_record` and `npx birdsi record --json`; the inventory carries the latest twenty decisions so an agent never asks what was already decided. The owner writes with `npx birdsi decide` and `npx birdsi fixed`, and reads the record on the Agent page.
+- `GET` and `POST /api/v1/repos/:id/record`, `POST /api/v1/findings/:id/fixed`. Migration `20261006000100_record.sql`.
+
+Policy as a rule at the shell (2026-10-06):
+- `birdsi policy` shows the repository's agent policy; `birdsi policy check` is a Claude Code PreToolUse hook (`birdsi policy --hint` prints the snippet). A command that changes a vendor account (Stripe, Vercel, Supabase, Railway, Fly.io, GitHub secrets and releases, npm publish) is stopped with the reason and the agent is told to propose it through birdsI; reads, status, logs and local work pass without a network call. `GET /api/v1/repos/:id/policy`.
+
+Measured and corrected (2026-10-06):
+- A repeat quick check of a 546-file repository takes 21 seconds and costs $0.04; the first after a change reads every changed file (311 seconds and $0.70 for 40 files on the first run). The scan stats now carry `cachedTokens`.
+- Cached input was priced as uncached; reads now cost a tenth and cache writes a quarter more, in the ledger, the spend caps and the stats.
+- The review reports at most four findings per file, short and exact, which halves the output half of each call and removes most repair calls.
+
 ### The 2026-10-03 release
 
 - Vendors: every outside service found from packages, env names, URL domains, config files and Stripe Projects state; unknown services named from their env var; what each is used for, from the call sites.

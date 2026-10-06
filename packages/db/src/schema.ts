@@ -1,9 +1,23 @@
 import { getDb } from "./client";
 
-type Feature = "jobs.priority" | "workers";
+type Feature = "jobs.priority" | "workers" | "record_entries" | "agent_policies.allow_write";
 
 const known = new Map<Feature, { ok: boolean; at: number }>();
 const RECHECK_MS = 10 * 60_000;
+
+function probe(feature: Feature) {
+  const db = getDb();
+  switch (feature) {
+    case "jobs.priority":
+      return db.from("jobs").select("priority").limit(1);
+    case "workers":
+      return db.from("workers").select("id").limit(1);
+    case "record_entries":
+      return db.from("record_entries").select("id").limit(1);
+    case "agent_policies.allow_write":
+      return db.from("agent_policies").select("allow_write").limit(1);
+  }
+}
 
 /**
  * Whether a column or table from a newer migration exists yet. The code can
@@ -16,9 +30,7 @@ export async function schemaHas(feature: Feature): Promise<boolean> {
   if (cached && (cached.ok || Date.now() - cached.at < RECHECK_MS)) return cached.ok;
   let ok = false;
   try {
-    const db = getDb();
-    const probe = feature === "jobs.priority" ? db.from("jobs").select("priority").limit(1) : db.from("workers").select("id").limit(1);
-    const { error } = await probe;
+    const { error } = await probe(feature);
     ok = !error;
   } catch {
     ok = false;

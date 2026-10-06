@@ -11,6 +11,8 @@ export type ModelTier = keyof Omit<ModelIds, "embedding">;
 export interface Usage {
   model: string;
   inputTokens: number;
+  /** Of the input tokens, how many were read from or written to the provider cache. */
+  cachedTokens: number;
   outputTokens: number;
   costMicrodollars: number;
   purpose: string;
@@ -59,7 +61,12 @@ export class EmbeddingsUnavailableError extends Error {
 }
 
 interface RawUsage {
+  /** Uncached input tokens, billed at the model's input price. */
   inputTokens: number;
+  /** Read from the provider's cache: a tenth of the input price. */
+  cacheReadTokens?: number;
+  /** Written to the cache: a quarter more than the input price. */
+  cacheCreationTokens?: number;
   outputTokens: number;
 }
 
@@ -75,6 +82,7 @@ export class ModelClient {
   private readonly anthropic: Anthropic | null;
   private readonly openai: OpenAI | null;
   private inputSpent = 0;
+  private throttled = 0;
 
   constructor(
     private readonly config: EngineConfig,
@@ -84,7 +92,13 @@ export class ModelClient {
       traceMetadata?: Record<string, string>;
     } = {},
   ) {
-    this.anthropic = config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey, maxRetries: 3, timeout: 300_000 }) : null;
+    // Every 429 (rate limit) and 529 (overloaded) answer is counted, so a slow scan can say why.
+    const countingFetch: typeof fetch = async (url, init) => {
+      const response = await fetch(url, init);
+      if (response.status === 429 || response.status === 529) this.throttled += 1;
+      return response;
+    };
+    this.anthropic = config.anthropic.apiKey ? new Anthropic({ apiKey: config.anthropic.apiKey, maxRetries: 3, timeout: 300_000, fetch: countingFetch }) : null;
     if (config.tokenFactory.apiKey) {
       const raw = new OpenAI({ apiKey: config.tokenFactory.apiKey, baseURL: config.tokenFactory.baseUrl, maxRetries: 3, timeout: 180_000 });
       this.openai = config.langsmith.enabled ? wrapOpenAI(raw, { metadata: options.traceMetadata ?? {} }) : raw;
@@ -100,6 +114,11 @@ export class ModelClient {
 
   get inputTokensSpent(): number {
     return this.inputSpent;
+  }
+
+  /** Provider answers that said "slow down" (429) or "overloaded" (529); each one cost a retry and a wait. */
+  get throttledCalls(): number {
+    return this.throttled;
   }
 
   get embeddingsAvailable(): boolean {
@@ -121,11 +140,15 @@ export class ModelClient {
   }
 
   private async record(model: string, purpose: string, usage: RawUsage): Promise<void> {
-    this.inputSpent += usage.inputTokens;
+    const cacheRead = usage.cacheReadTokens ?? 0;
+    const cacheCreation = usage.cacheCreationTokens ?? 0;
+    const totalInput = usage.inputTokens + cacheRead + cacheCreation;
+    this.inputSpent += totalInput;
     const baseId = model.endsWith("-fast") ? model.slice(0, -5) : model;
     const price = this.config.prices[baseId] ?? { input: 0, output: 0 };
-    const costMicrodollars = Math.round((usage.inputTokens * price.input + usage.outputTokens * price.output) / 1_000_000);
-    await this.options.onUsage?.({ model, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, costMicrodollars, purpose });
+    // Cached reads cost a tenth of the input price; writing the cache costs a quarter more.
+    const costMicrodollars = Math.round((usage.inputTokens * price.input + cacheRead * price.input * 0.1 + cacheCreation * price.input * 1.25 + usage.outputTokens * price.output) / 1_000_000);
+    await this.options.onUsage?.({ model, inputTokens: totalInput, cachedTokens: cacheRead + cacheCreation, outputTokens: usage.outputTokens, costMicrodollars, purpose });
   }
 
   /** Wraps a provider call in a LangSmith trace when tracing is on. */
@@ -279,8 +302,12 @@ export class ModelClient {
 }
 
 function usageOf(response: Anthropic.Message): RawUsage {
-  const cached = (response.usage.cache_read_input_tokens ?? 0) + (response.usage.cache_creation_input_tokens ?? 0);
-  return { inputTokens: response.usage.input_tokens + cached, outputTokens: response.usage.output_tokens };
+  return {
+    inputTokens: response.usage.input_tokens,
+    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+    cacheCreationTokens: response.usage.cache_creation_input_tokens ?? 0,
+    outputTokens: response.usage.output_tokens,
+  };
 }
 
 function textOf(response: Anthropic.Message): string {

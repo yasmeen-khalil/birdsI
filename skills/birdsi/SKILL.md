@@ -15,8 +15,9 @@ Prefer the terminal tool; it returns JSON and needs no setup beyond `npx birdsi 
 - `npx birdsi changes --json`: new and resolved findings since the previous scan, by stable `key`. Read this instead of the whole findings list when you looked before.
 - `npx birdsi vendors --json`: the vendors in full, with every fact's source.
 - `npx birdsi questions --json`: what the owner has been asked and what they answered.
+- `npx birdsi record --json`: the record. Decisions, facts stated, findings marked fixed or dismissed, answers, approvals, runs, newest first, with author and reason. Read it before deciding something that may already be decided; the inventory also carries the latest twenty decisions.
 
-Through MCP (`npx birdsi mcp`) the same reads are `birdsi_inventory`, `birdsi_changes_since`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`.
+Through MCP (`npx birdsi mcp`) the same reads are `birdsi_inventory`, `birdsi_changes_since`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_record`.
 
 ## How to read the facts
 
@@ -30,6 +31,17 @@ Through MCP (`npx birdsi mcp`) the same reads are `birdsi_inventory`, `birdsi_ch
 - Something only a person knows (a plan name, a usage number, a decision): `birdsi_ask_owner` through MCP. Ask once, with why. Read the answer later with `npx birdsi questions --json`.
 - Something outside the code that costs money or changes an account (a plan upgrade, a spend limit, a provisioning command): `birdsi_request_action` with the exact command, the reason and the monthly cost. It waits for the owner. You cannot approve it; only the owner can, in the browser. Approved commands run on the owner's machine with `npx birdsi approvals run`, and `birdsi_action_status` shows the result.
 - Never paste tokens, keys or env values into birdsI. Send variable names.
+- Commands that change a vendor account (a plan, an env variable, a deploy, a secret, a pause) are not run from your shell, with or without the hook: propose them with `birdsi_request_action`. `npx birdsi policy check "<command>"` tells you beforehand.
+
+## Write to the record
+
+Within the owner's policy (on by default, visible on the Agent page), you may write three things. Each lands in the record with your name on it, next to the owner's own entries.
+
+- A decision you reached with the owner, or one they gave you: `birdsi_record_decision` with the text and the why. Write it once; it stops anyone asking again.
+- A fact about a vendor you established yourself (a plan you read in a dashboard the owner opened for you, a limit from a document): `birdsi_record_fact` with the vendor slug, a stable snake_case metric, label, value and where you got it. It is shown as told by the coding agent and is outranked by the connected account and by the owner. When only a person can know, ask instead.
+- A finding you fixed in the code: `birdsi_mark_fixed` with a note on what you did. The next scan confirms it or reopens it.
+
+Never write a token, a key or an env value into the record.
 
 ## Running scans
 

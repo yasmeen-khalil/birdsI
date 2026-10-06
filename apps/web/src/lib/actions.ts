@@ -84,7 +84,7 @@ export async function requestActionAction(repoId: string, input: { title: string
   });
 }
 
-export async function updatePolicyAction(repoId: string, patch: { allowPropose?: boolean; autoApproveUnderUsd?: number | null }): Promise<ActionResult> {
+export async function updatePolicyAction(repoId: string, patch: { allowPropose?: boolean; allowWrite?: boolean; autoApproveUnderUsd?: number | null }): Promise<ActionResult> {
   return run(async () => {
     const user = await requireUser();
     await changePolicy(repoId, user, patch);

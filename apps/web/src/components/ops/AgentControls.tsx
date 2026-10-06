@@ -188,6 +188,7 @@ export function ActionCard({ action, repoId }: { action: ActionRequest; repoId: 
 export function PolicyControls({ repoId, policy }: { repoId: string; policy: AgentPolicy }) {
   const router = useRouter();
   const [allow, setAllow] = useState(policy.allowPropose);
+  const [allowWrite, setAllowWrite] = useState(policy.allowWrite);
   const [limit, setLimit] = useState(policy.autoApproveUnderUsd === null ? "" : String(policy.autoApproveUnderUsd));
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, start] = useTransition();
@@ -202,6 +203,17 @@ export function PolicyControls({ repoId, policy }: { repoId: string; policy: Age
       const r = await updatePolicyAction(repoId, { allowPropose: next });
       if (!r.ok) {
         setAllow(!next);
+        setNotice({ tone: "error", text: r.message });
+      } else router.refresh();
+    });
+
+  const toggleWrite = () =>
+    start(async () => {
+      const next = !allowWrite;
+      setAllowWrite(next);
+      const r = await updatePolicyAction(repoId, { allowWrite: next });
+      if (!r.ok) {
+        setAllowWrite(!next);
         setNotice({ tone: "error", text: r.message });
       } else router.refresh();
     });
@@ -228,6 +240,17 @@ export function PolicyControls({ repoId, policy }: { repoId: string; policy: Age
         </span>
         <span className="inline-flex items-center justify-center" style={{ minWidth: 44, minHeight: 44 }}>
           <button type="button" className="switch" role="switch" aria-checked={allow} aria-labelledby="allow-label" disabled={pending} onClick={toggle} />
+        </span>
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4" style={{ padding: "16px 0", borderTop: "1px solid var(--line)" }}>
+        <span className="flex flex-col gap-0.5">
+          <span id="write-label" className="t-body">
+            Agents may write to the record
+          </span>
+          <span className="t-small c3">Decisions, facts in their own name, and fixed marks. Every write is logged with its author, and the next scan is the judge of a fixed mark.</span>
+        </span>
+        <span className="inline-flex items-center justify-center" style={{ minWidth: 44, minHeight: 44 }}>
+          <button type="button" className="switch" role="switch" aria-checked={allowWrite} aria-labelledby="write-label" disabled={pending} onClick={toggleWrite} />
         </span>
       </div>
       <form

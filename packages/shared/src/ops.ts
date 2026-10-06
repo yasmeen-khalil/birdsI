@@ -26,7 +26,7 @@ export const VendorCategory = z.enum([
 export type VendorCategory = z.infer<typeof VendorCategory>;
 
 /** Where a fact came from. Each source has a confidence a person can reason about. */
-export const FactSource = z.enum(["static", "connector", "docs", "estimate", "asked"]);
+export const FactSource = z.enum(["static", "connector", "docs", "estimate", "asked", "agent"]);
 export type FactSource = z.infer<typeof FactSource>;
 
 export const FACT_SOURCE_LABEL: Record<FactSource, string> = {
@@ -35,7 +35,21 @@ export const FACT_SOURCE_LABEL: Record<FactSource, string> = {
   docs: "From the vendor's current docs",
   estimate: "Estimated by birdsI",
   asked: "You told birdsI",
+  agent: "Your coding agent told birdsI",
 };
+
+/** Which source wins when several state the same metric: the account, then the owner, then an agent, then the docs, the code, an estimate. */
+export const FACT_SOURCE_RANK: Record<FactSource, number> = { connector: 0, asked: 1, agent: 2, docs: 3, static: 4, estimate: 5 };
+
+/** One fact per metric, the best-sourced one. */
+export function bestFacts<T extends { metric: string; source: FactSource }>(facts: readonly T[]): T[] {
+  const best = new Map<string, T>();
+  for (const f of facts) {
+    const current = best.get(f.metric);
+    if (!current || FACT_SOURCE_RANK[f.source] < FACT_SOURCE_RANK[current.source]) best.set(f.metric, f);
+  }
+  return [...best.values()];
+}
 
 export const FactKind = z.enum(["plan", "limit", "usage", "cost", "purpose", "status", "billing"]);
 export type FactKind = z.infer<typeof FactKind>;
@@ -248,6 +262,8 @@ export const AgentPolicy = z.object({
   allowRead: z.boolean(),
   /** Agents may queue questions and action requests. */
   allowPropose: z.boolean(),
+  /** Agents may write to the record: decisions, facts in their own name, fixed marks. Every write is logged with its author. */
+  allowWrite: z.boolean(),
   /** Requests at or under this monthly cost are approved without asking. Null means always ask. */
   autoApproveUnderUsd: z.number().nullable(),
   /** Commands that may be auto-approved must start with one of these. */
@@ -346,6 +362,8 @@ export const AskOwnerRequest = z.object({
 export type AskOwnerRequest = z.infer<typeof AskOwnerRequest>;
 
 export const ActionsResponse = z.object({ actions: z.array(ActionRequest), policy: AgentPolicy });
+export const PolicyResponse = z.object({ policy: AgentPolicy });
+export type PolicyResponse = z.infer<typeof PolicyResponse>;
 export type ActionsResponse = z.infer<typeof ActionsResponse>;
 
 export const RequestActionRequest = z.object({
@@ -372,9 +390,99 @@ export type SetVisionRequest = z.infer<typeof SetVisionRequest>;
 
 export const UpdatePolicyRequest = z.object({
   allowPropose: z.boolean().optional(),
+  allowWrite: z.boolean().optional(),
   autoApproveUnderUsd: z.number().nonnegative().nullable().optional(),
 });
 export type UpdatePolicyRequest = z.infer<typeof UpdatePolicyRequest>;
+
+/**
+ * The record: what was decided, stated, fixed, answered, approved and run for
+ * one app, by whom and why. Append-only. Agents read it before acting and
+ * write to it within the repo's policy.
+ */
+export const RecordKind = z.enum([
+  "decision",
+  "fact",
+  "finding_fixed",
+  "finding_dismissed",
+  "finding_reopened",
+  "fix_opened",
+  "vision",
+  "policy",
+  "question_answered",
+  "question_dismissed",
+  "action_decided",
+  "action_run",
+]);
+export type RecordKind = z.infer<typeof RecordKind>;
+
+export const RECORD_KIND_LABEL: Record<RecordKind, string> = {
+  decision: "Decision",
+  fact: "Fact",
+  finding_fixed: "Marked fixed",
+  finding_dismissed: "Dismissed",
+  finding_reopened: "Reopened",
+  fix_opened: "Fix started",
+  vision: "Vision",
+  policy: "Policy",
+  question_answered: "Answered",
+  question_dismissed: "Question dismissed",
+  action_decided: "Approval",
+  action_run: "Ran",
+};
+
+export const RecordAuthorKind = z.enum(["owner", "agent", "birdsi"]);
+export type RecordAuthorKind = z.infer<typeof RecordAuthorKind>;
+
+export const RECORD_AUTHOR_LABEL: Record<RecordAuthorKind, string> = { owner: "you", agent: "your coding agent", birdsi: "birdsI" };
+
+export const RecordEntry = z.object({
+  id: z.string(),
+  repoId: z.string(),
+  kind: RecordKind,
+  authorKind: RecordAuthorKind,
+  authorLabel: z.string().nullable(),
+  /** What it is about: a finding key, a vendor slug, a metric, a command. */
+  subject: z.string().nullable(),
+  text: z.string(),
+  why: z.string().nullable(),
+  data: z.record(z.string(), z.unknown()).default({}),
+  createdAt: z.string(),
+});
+export type RecordEntry = z.infer<typeof RecordEntry>;
+
+export const RecordResponse = z.object({ entries: z.array(RecordEntry) });
+export type RecordResponse = z.infer<typeof RecordResponse>;
+export const RecordEntryEnvelope = z.object({ entry: RecordEntry });
+
+/** What an agent or the owner may write directly: a decision, or a fact about a vendor. */
+export const WriteRecordRequest = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("decision"),
+    text: z.string().min(1).max(2000),
+    why: z.string().max(2000).optional(),
+    subject: z.string().max(200).optional(),
+  }),
+  z.object({
+    kind: z.literal("fact"),
+    vendorSlug: z.string().min(1).max(80),
+    factKind: FactKind,
+    metric: z
+      .string()
+      .regex(/^[a-z0-9_]+$/)
+      .max(60),
+    label: z.string().min(1).max(120),
+    value: z.string().min(1).max(200),
+    numeric: z.number().optional(),
+    unit: z.string().max(40).optional(),
+    limitNumeric: z.number().optional(),
+    why: z.string().max(2000).optional(),
+  }),
+]);
+export type WriteRecordRequest = z.infer<typeof WriteRecordRequest>;
+
+export const MarkFixedRequest = z.object({ note: z.string().max(1000).optional() });
+export type MarkFixedRequest = z.infer<typeof MarkFixedRequest>;
 
 /** The whole knowledge base of one repo in one call, for agents and for the export. */
 export const InventoryResponse = z.object({
@@ -389,6 +497,8 @@ export const InventoryResponse = z.object({
   latestScan: z
     .object({ id: z.string(), kind: z.string(), finishedAt: z.string().nullable(), findings: z.number().int().nonnegative(), headline: z.string().nullable() })
     .nullable(),
+  /** The latest decisions on record, newest first, so an agent never asks what was already decided. */
+  decisions: z.array(RecordEntry).default([]),
 });
 export type InventoryResponse = z.infer<typeof InventoryResponse>;
 

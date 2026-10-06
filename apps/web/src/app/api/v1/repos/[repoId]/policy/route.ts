@@ -1,10 +1,10 @@
-import { UpdatePolicyRequest } from "@birdsi/shared";
-import { handler, json, parseBody, requireCaller } from "@/lib/api";
-import { changePolicy } from "@/lib/ops";
+import type { PolicyResponse } from "@birdsi/shared";
+import { handler, json, requireCaller } from "@/lib/api";
+import { loadPolicy } from "@/lib/ops";
 
-export const PATCH = handler(async (request, { params }) => {
+/** The repository's agent policy, for the terminal tool's hook and for agents. */
+export const GET = handler(async (request, { params }) => {
   const user = await requireCaller(request);
   const { repoId } = await params;
-  const body = await parseBody(request, UpdatePolicyRequest);
-  return json({ policy: await changePolicy(repoId!, user, body) });
+  return json({ policy: await loadPolicy(repoId!, user) } satisfies PolicyResponse);
 });

@@ -174,6 +174,10 @@ export const ScanStats = z.object({
   checksRun: z.number().int().nonnegative(),
   dependencies: z.number().int().nonnegative(),
   inputTokens: z.number().int().nonnegative(),
+  /** Of the input tokens, how many the provider served from its cache (or wrote to it). */
+  cachedTokens: z.number().int().nonnegative().default(0),
+  /** Provider answers that said "slow down" or "overloaded"; each cost a retry and a wait. */
+  throttledCalls: z.number().int().nonnegative().default(0),
   outputTokens: z.number().int().nonnegative(),
   /** Whole microdollars, so sums stay exact. */
   costMicrodollars: z.number().int().nonnegative(),

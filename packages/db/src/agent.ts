@@ -1,6 +1,7 @@
 import type { ActionRequest, AgentPolicy, FactKind, Question, Vision } from "@birdsi/shared";
 import { DEFAULT_AUTO_APPROVE_PREFIXES } from "@birdsi/shared";
 import { getDb, NotFoundError, unwrap } from "./client";
+import { schemaHas } from "./schema";
 
 /** Questions, action requests, policy and vision: the channel between agents, birdsI and the owner. */
 
@@ -217,15 +218,18 @@ export interface PolicyRow {
   allow_propose: boolean;
   auto_approve_under_usd: number | null;
   auto_approve_prefixes: string[];
+  /** Absent until the record migration (2026-10-06) has run; treated as true. */
+  allow_write?: boolean | null;
   updated_at: string;
 }
 
 export function toPolicy(row: PolicyRow | null, repoId: string): AgentPolicy {
-  if (!row) return { repoId, allowRead: true, allowPropose: true, autoApproveUnderUsd: null, autoApprovePrefixes: DEFAULT_AUTO_APPROVE_PREFIXES, updatedAt: new Date(0).toISOString() };
+  if (!row) return { repoId, allowRead: true, allowPropose: true, allowWrite: true, autoApproveUnderUsd: null, autoApprovePrefixes: DEFAULT_AUTO_APPROVE_PREFIXES, updatedAt: new Date(0).toISOString() };
   return {
     repoId: row.repo_id,
     allowRead: row.allow_read,
     allowPropose: row.allow_propose,
+    allowWrite: row.allow_write ?? true,
     autoApproveUnderUsd: row.auto_approve_under_usd,
     autoApprovePrefixes: row.auto_approve_prefixes?.length ? row.auto_approve_prefixes : DEFAULT_AUTO_APPROVE_PREFIXES,
     updatedAt: row.updated_at,
@@ -239,22 +243,22 @@ export async function policyForRepo(repoId: string): Promise<AgentPolicy> {
   return toPolicy((data as PolicyRow | null) ?? null, repoId);
 }
 
-export async function updatePolicy(repoId: string, patch: { allowPropose?: boolean; autoApproveUnderUsd?: number | null }): Promise<AgentPolicy> {
+export async function updatePolicy(repoId: string, patch: { allowPropose?: boolean; allowWrite?: boolean; autoApproveUnderUsd?: number | null }): Promise<AgentPolicy> {
   const db = getDb();
   const current = await policyForRepo(repoId);
+  const row: Record<string, unknown> = {
+    repo_id: repoId,
+    allow_read: current.allowRead,
+    allow_propose: patch.allowPropose ?? current.allowPropose,
+    auto_approve_under_usd: patch.autoApproveUnderUsd === undefined ? current.autoApproveUnderUsd : patch.autoApproveUnderUsd,
+    auto_approve_prefixes: current.autoApprovePrefixes,
+    updated_at: new Date().toISOString(),
+  };
+  // The column arrives with the record migration; until then the policy keeps its default.
+  if (await schemaHas("agent_policies.allow_write")) row["allow_write"] = patch.allowWrite ?? current.allowWrite;
   const result = await db
     .from("agent_policies")
-    .upsert(
-      {
-        repo_id: repoId,
-        allow_read: current.allowRead,
-        allow_propose: patch.allowPropose ?? current.allowPropose,
-        auto_approve_under_usd: patch.autoApproveUnderUsd === undefined ? current.autoApproveUnderUsd : patch.autoApproveUnderUsd,
-        auto_approve_prefixes: current.autoApprovePrefixes,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "repo_id" },
-    )
+    .upsert(row, { onConflict: "repo_id" })
     .select()
     .single();
   return toPolicy(unwrap(result, "updatePolicy") as PolicyRow, repoId);

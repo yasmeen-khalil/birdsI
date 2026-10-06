@@ -1,15 +1,16 @@
 import { Command, CommanderError, Option } from "commander";
 import { toCliError } from "./api";
-import { askCommand, dismissCommand, explainCommand, findingsCommand, reposCommand } from "./commands/findings";
+import { askCommand, dismissCommand, explainCommand, findingsCommand, fixedCommand, reposCommand } from "./commands/findings";
 import { fixCommand } from "./commands/fix";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth";
-import { approvalsCommand, changesCommand, exportCommand, inventoryCommand, questionsCommand, vendorsCommand, visionCommand } from "./commands/ops";
+import { approvalsCommand, changesCommand, decideCommand, exportCommand, inventoryCommand, questionsCommand, recordCommand, vendorsCommand, visionCommand } from "./commands/ops";
 import { scanCommand } from "./commands/scan";
 import { CliError, EXIT } from "./exit";
 import { installInterruptHandler } from "./interrupt";
 import { installHint } from "./mcp/install-hint";
 import { printError } from "./output";
 import { VERSION } from "./version";
+import { policyCheckCommand, policyCommand } from "./commands/policy";
 
 const asciiOption = (): Option => new Option("--ascii", "use [P] [D] [J] and plain glyphs instead of Unicode");
 const jsonOption = (): Option => new Option("--json", "print the API response as JSON, for scripts");
@@ -123,6 +124,49 @@ export function buildProgram(): Command {
     .option("-y, --yes", "dismiss without asking")
     .addOption(jsonOption())
     .action(run((ref: string, options: { yes?: boolean; json?: boolean }) => dismissCommand(ref, options)));
+
+  program
+    .command("fixed")
+    .description("say a finding is fixed in the code; the next scan confirms it or reopens it")
+    .argument("<finding>", "finding id, or its number in your newest scan")
+    .option("--note <text>", "what was done")
+    .addOption(jsonOption())
+    .action(run((ref: string, options: { note?: string; json?: boolean }) => fixedCommand(ref, options)));
+
+  program
+    .command("record")
+    .description("the record: decisions, facts, fixed marks, answers, approvals and runs, newest first")
+    .option("--kind <kind>", "one kind only: decision, fact, finding_fixed, action_decided, ...")
+    .option("--limit <n>", "how many entries (default 50, up to 200)")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((options: { kind?: string; limit?: string; repo?: string; json?: boolean; ascii?: boolean }) => recordCommand(options)));
+
+  program
+    .command("decide")
+    .description("write a decision to the record, so no agent asks about it again")
+    .argument("<text...>", "the decision, in your words")
+    .option("--why <text>", "the reason")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .action(run((text: string[], options: { why?: string; repo?: string; json?: boolean }) => decideCommand(text, options)));
+
+  const policy = program
+    .command("policy")
+    .description("the repository's agent policy; --hint prints the Claude Code hook that enforces it")
+    .option("--hint", "print the Claude Code settings snippet for the policy hook")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((options: { hint?: boolean; repo?: string; json?: boolean; ascii?: boolean }) => policyCommand(options)));
+  policy
+    .command("check")
+    .description("exit 2 when a command changes a vendor account and must go through birdsI (the hook's entry point; reads a Claude Code hook payload from stdin)")
+    .argument("[command...]", "the command, or nothing to read the hook payload from stdin")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .action(run((parts: string[], options: { repo?: string; json?: boolean }) => policyCheckCommand(parts, options)));
 
   program
     .command("repos")

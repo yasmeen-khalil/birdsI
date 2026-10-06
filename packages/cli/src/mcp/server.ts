@@ -284,6 +284,7 @@ export function createServer(): McpServer {
         lines.push(`- ${v.name} (${v.slug}, ${v.category}): ${q(v.purpose ?? v.what)}${plan ? ` Plan: ${plan.value}.` : " Plan: unknown."}${cost ? ` ${cost.label}: ${cost.value}.` : ""}${usage.length ? ` ${usage.join(", ")}.` : ""}${v.connected ? " Connected." : v.connectable ? " Connectable (owner can connect it in Settings)." : ""}`);
       }
       lines.push("", `Open questions for the owner: ${inv.openQuestions}. Pending approvals: ${inv.pendingActions}.`);
+      if (inv.decisions.length > 0) lines.push("", "Decisions on record (newest first; do not ask about these again):", ...inv.decisions.map((d) => `- ${d.createdAt.slice(0, 10)} ${q(d.text)}${d.why ? ` (why: ${q(d.why)})` : ""} [by ${d.authorKind}]`));
       lines.push("", "Facts carry a source: found in the code, from the connected account, from the vendor's current docs, estimated, or told by the owner. Call birdsi_vendor for one vendor's full facts with sources.", LEGEND);
       return text(lines.join("\n"), inv as unknown as Record<string, unknown>);
     }),
@@ -405,6 +406,71 @@ export function createServer(): McpServer {
       for (const f of c.resolved.slice(0, 40)) lines.push(`- [${f.severity}] ${q(f.title)}${f.path ? ` (${f.path})` : ""} key: ${f.key}`);
       lines.push("", LEGEND);
       return text(lines.join("\n"), c as unknown as Record<string, unknown>);
+    }),
+  );
+
+  server.registerTool(
+    "birdsi_record",
+    {
+      title: "Read the record",
+      description: "The record of this app: decisions, facts stated, findings marked fixed or dismissed, questions answered, commands approved and run. Newest first, with author and reason. Read it before deciding something that may already be decided. Filter with kind.",
+      inputSchema: { ...repoArg, kind: z.enum(["decision", "fact", "finding_fixed", "finding_dismissed", "finding_reopened", "fix_opened", "vision", "policy", "question_answered", "question_dismissed", "action_decided", "action_run"]).optional(), limit: z.number().int().min(1).max(200).optional() },
+    },
+    tool("the record", async (api, args: { repoId?: string | undefined; kind?: string | undefined; limit?: number | undefined }) => {
+      const r = (await api.record(await repoIdFrom(api, args.repoId), { ...(args.kind ? { kind: args.kind } : {}), ...(args.limit ? { limit: args.limit } : {}) })).data;
+      const lines = r.entries.length === 0 ? ["Nothing on record yet."] : r.entries.map((e) => `- ${e.createdAt.slice(0, 16).replace("T", " ")} [${e.kind}] by ${e.authorLabel ?? e.authorKind}: ${q(e.text)}${e.why ? ` Why: ${q(e.why)}` : ""}${e.subject ? ` (${e.subject})` : ""}`);
+      lines.push("", LEGEND);
+      return text(lines.join("\n"), r as unknown as Record<string, unknown>);
+    }),
+  );
+
+  server.registerTool(
+    "birdsi_record_decision",
+    {
+      title: "Write a decision to the record",
+      description: "Records a decision you and the owner reached, or one the owner gave you, with the reason, so it is never asked again. In your own name; the owner sees who wrote it. Needs the repo's policy to allow agent writes.",
+      inputSchema: { ...repoArg, text: z.string().min(1).max(2000), why: z.string().max(2000).optional(), subject: z.string().max(200).optional().describe("What it is about: a vendor slug, a finding key, a file.") },
+    },
+    tool("the decision", async (api, args: { repoId?: string | undefined; text: string; why?: string | undefined; subject?: string | undefined }) => {
+      const { entry } = (await api.writeRecord(await repoIdFrom(api, args.repoId), { kind: "decision", text: args.text, ...(args.why ? { why: args.why } : {}), ...(args.subject ? { subject: args.subject } : {}) })).data;
+      return text(`On record (id ${entry.id}).`);
+    }),
+  );
+
+  server.registerTool(
+    "birdsi_record_fact",
+    {
+      title: "State a fact about a vendor",
+      description: "Records a fact about a vendor in your own name: a plan, a limit, a usage number, a cost, a status. It is shown as told by the coding agent and is outranked by the connected account and by the owner. Use birdsi_ask_owner instead when only a person can know. Needs the repo's policy to allow agent writes.",
+      inputSchema: {
+        ...repoArg,
+        vendorSlug: z.string().min(1).max(80),
+        factKind: z.enum(["plan", "limit", "usage", "cost", "purpose", "status", "billing"]),
+        metric: z.string().regex(/^[a-z0-9_]+$/).max(60).describe("A stable snake_case name, for example plan, db_size_mb, monthly_cost_usd."),
+        label: z.string().min(1).max(120),
+        value: z.string().min(1).max(200),
+        numeric: z.number().optional(),
+        unit: z.string().max(40).optional(),
+        limitNumeric: z.number().optional().describe("The limit this usage counts against, when known."),
+        why: z.string().max(2000).optional().describe("Where you got it."),
+      },
+    },
+    tool("the fact", async (api, args: { repoId?: string | undefined; vendorSlug: string; factKind: "plan" | "limit" | "usage" | "cost" | "purpose" | "status" | "billing"; metric: string; label: string; value: string; numeric?: number | undefined; unit?: string | undefined; limitNumeric?: number | undefined; why?: string | undefined }) => {
+      const { entry } = (await api.writeRecord(await repoIdFrom(api, args.repoId), { kind: "fact", vendorSlug: args.vendorSlug, factKind: args.factKind, metric: args.metric, label: args.label, value: args.value, ...(args.numeric !== undefined ? { numeric: args.numeric } : {}), ...(args.unit ? { unit: args.unit } : {}), ...(args.limitNumeric !== undefined ? { limitNumeric: args.limitNumeric } : {}), ...(args.why ? { why: args.why } : {}) })).data;
+      return text(`On record (id ${entry.id}): ${entry.text}`);
+    }),
+  );
+
+  server.registerTool(
+    "birdsi_mark_fixed",
+    {
+      title: "Mark a finding fixed",
+      description: "Says a finding is fixed in the code, with a note on what was done. Recorded in your name; the next scan confirms it or reopens it. Needs the repo's policy to allow agent writes.",
+      inputSchema: { findingId: z.string(), note: z.string().max(1000).optional() },
+    },
+    tool("that finding", async (api, args: { findingId: string; note?: string | undefined }) => {
+      await api.markFixed(args.findingId, args.note);
+      return text("Marked fixed. The next scan confirms it, or reopens it.");
     }),
   );
 

@@ -51,6 +51,10 @@ Three doors, smallest first:
 
 Rules every door shares: facts carry their source; alerts are about now and trackers about what might happen; text read from the repository or the web is marked as data; an agent can ask the owner and propose, and only the owner approves, in the browser.
 
+Agents can also write, within the owner's policy: `birdsi_record_decision` (a decision reached, with the reason, so it is never asked again), `birdsi_record_fact` (a fact about a vendor in the agent's own name, outranked by the connected account and by the owner), `birdsi_mark_fixed` (the next scan is the judge). Every write lands in the record with its author, next to the owner's own answers, approvals and runs. The owner reads it on the Agent page or with `npx birdsi record`; agents read it with `birdsi_record` before deciding something that may already be decided.
+
+And a rule at the shell: `npx birdsi policy --hint` prints a Claude Code hook that runs before every shell command. A command that changes a vendor account (a plan upgrade, an env variable, a deploy, a secret, a pause) is stopped and the agent is told to propose it through birdsI; everything else passes untouched. Approval becomes the few commands that matter, not a prompt storm.
+
 ## Models
 
 One model door, two providers. With `ANTHROPIC_API_KEY`, birdsI runs on Claude:

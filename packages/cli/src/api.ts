@@ -3,6 +3,10 @@ import {
   ActionsResponse,
   ApiError,
   ChangesResponse,
+  PolicyResponse,
+  RecordEntryEnvelope,
+  RecordResponse,
+  type WriteRecordRequest,
   ChatMessage,
   CreateScanResponse,
   InventoryResponse,
@@ -241,6 +245,10 @@ export class ApiClient {
     return this.request("POST", `/questions/${enc(questionId)}`, { schema: OkResponse, body: { dismiss: true } });
   }
 
+  policy(repoId: string): Promise<Result<PolicyResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/policy`, { schema: PolicyResponse });
+  }
+
   actions(repoId: string, status?: ActionRequest["status"]): Promise<Result<ActionsResponse>> {
     return this.request("GET", `/repos/${enc(repoId)}/actions${status ? `?status=${status}` : ""}`, { schema: ActionsResponse });
   }
@@ -303,6 +311,22 @@ export class ApiClient {
 
   dismiss(findingId: string): Promise<Result<z.infer<typeof OkResponse>>> {
     return this.request("POST", `/findings/${enc(findingId)}/dismiss`, { schema: OkResponse, body: {} });
+  }
+
+  markFixed(findingId: string, note?: string): Promise<Result<z.infer<typeof OkResponse>>> {
+    return this.request("POST", `/findings/${enc(findingId)}/fixed`, { schema: OkResponse, body: note ? { note } : {} });
+  }
+
+  record(repoId: string, options: { kind?: string; limit?: number } = {}): Promise<Result<RecordResponse>> {
+    const params = new URLSearchParams();
+    if (options.kind) params.set("kind", options.kind);
+    if (options.limit) params.set("limit", String(options.limit));
+    const query = params.toString();
+    return this.request("GET", `/repos/${enc(repoId)}/record${query ? `?${query}` : ""}`, { schema: RecordResponse });
+  }
+
+  writeRecord(repoId: string, body: WriteRecordRequest): Promise<Result<z.infer<typeof RecordEntryEnvelope>>> {
+    return this.request("POST", `/repos/${enc(repoId)}/record`, { schema: RecordEntryEnvelope, body });
   }
 }
 

@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { ActionRequest, Alert, Question, Vendor, VendorFact, Watch } from "@birdsi/shared";
-import { FACT_SOURCE_LABEL, commandProgram, isAllowedCommand } from "@birdsi/shared";
+import { FACT_SOURCE_LABEL, RECORD_AUTHOR_LABEL, RECORD_KIND_LABEL, RecordKind, commandProgram, isAllowedCommand } from "@birdsi/shared";
 import { ApiClient, toCliError } from "../api";
 import { readConfig } from "../config";
 import { EXIT } from "../exit";
@@ -315,7 +315,7 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
   api.requireAuth();
   try {
     const repo = await resolveRepo(api, options.repo);
-    const [inventory, questions, actions] = await Promise.all([api.inventory(repo.id), api.questions(repo.id, "open"), api.actions(repo.id, "pending")]);
+    const [inventory, questions, actions, record] = await Promise.all([api.inventory(repo.id), api.questions(repo.id, "open"), api.actions(repo.id, "pending"), api.record(repo.id, { limit: 200 })]);
     const dir = join(resolve(options.path ?? process.cwd()), ".birdsi");
     await mkdir(dir, { recursive: true });
     const inv = inventory.data;
@@ -339,6 +339,14 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
     ].join("\n");
     const alertsMd = [`# Alerts`, "", ...(inv.alerts.length ? inv.alerts.map((a) => `- [${a.level}] ${a.title}: ${a.detail}${a.suggestedCommand ? ` Try: \`${a.suggestedCommand}\`` : ""}`) : ["None."]), ""].join("\n");
     const questionsMd = [`# Questions for the owner`, "", ...(questions.data.questions.length ? questions.data.questions.map((q) => `- ${q.question} (${q.why})${q.options.length ? ` Options: ${q.options.join(", ")}` : ""}`) : ["None open."]), "", `# Pending approvals`, "", ...(actions.data.actions.length ? actions.data.actions.map((a) => `- ${a.title}: \`${a.command}\` (${a.reason})`) : ["None."]), ""].join("\n");
+    const recordMd = [
+      `# The record`,
+      "",
+      `What was decided, stated, fixed, answered, approved and run for ${inv.repo.fullName}, by whom and why. Newest first. Read it before deciding something that may already be decided.`,
+      "",
+      ...(record.data.entries.length ? record.data.entries.map((e) => `- ${e.createdAt.slice(0, 16).replace("T", " ")} ${RECORD_KIND_LABEL[e.kind]} by ${e.authorLabel ?? RECORD_AUTHOR_LABEL[e.authorKind]}: ${e.text}${e.why ? ` (why: ${e.why})` : ""}${e.subject ? ` [${e.subject}]` : ""}`) : ["Nothing on record yet."]),
+      "",
+    ].join("\n");
     const readme = [
       `# birdsI knowledge base`,
       "",
@@ -348,6 +356,7 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
       `- vendors.md: every outside service, its plan, limits, usage and where the code uses it`,
       `- alerts.md: what is true now and needs attention, like a limit at 80% or an account that could not be read`,
       `- questions.md: what only the owner can answer, and commands waiting for approval`,
+      `- record.md: decisions, facts, fixed marks, answers, approvals and runs, with who and why`,
       "",
       `Pipeline stages: ${inv.stages.map((s) => `${s.label} (${s.freshness})`).join(", ")}.`,
       "",
@@ -358,6 +367,7 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
       writeFile(join(dir, "README.md"), readme),
       writeFile(join(dir, "vision.md"), `# Vision\n\n${inv.vision.text || "(not written yet)"}\n`),
       writeFile(join(dir, "vendors.md"), vendorsMd),
+      writeFile(join(dir, "record.md"), recordMd),
       writeFile(join(dir, "alerts.md"), alertsMd),
       writeFile(join(dir, "questions.md"), questionsMd),
     ]);
@@ -397,6 +407,11 @@ export async function inventoryCommand(options: PrintOptions): Promise<number> {
     println(wrap(inv.vision.text ? `Vision: ${inv.vision.text}` : "Vision: not written yet (birdsi vision \"...\")", style, ""));
     println(paint.dim(style, `Stages: ${inv.stages.map((s) => `${s.label} ${s.freshness}`).join(", ")}`));
     if (inv.latestScan) println(paint.dim(style, `Latest scan: ${inv.latestScan.kind}, ${plural(inv.latestScan.findings, "open finding")}`));
+    if (inv.decisions.length > 0) {
+      println();
+      println(paint.bold(style, "Decisions on record"));
+      for (const d of inv.decisions.slice(0, 8)) println(wrap(`${d.createdAt.slice(0, 10)}  ${d.text}${d.why ? paint.dim(style, ` (why: ${d.why})`) : ""}`, style, "  "));
+    }
     println();
     println(formatVendors(inv.vendors, inv.alerts, null, style, inv.watches));
     println();
@@ -427,5 +442,53 @@ export async function changesCommand(since: string | undefined, options: PrintOp
     return EXIT.ok;
   } catch (error) {
     throw toCliError(error, "the changes");
+  }
+}
+
+/** The record: decisions, facts, fixed marks, answers, approvals and runs, newest first. */
+export async function recordCommand(options: PrintOptions & { kind?: string; limit?: string }): Promise<number> {
+  const style = styleFor(process.stdout, options);
+  const { api } = await ApiClient.fromEnvironment();
+  api.requireAuth();
+  try {
+    const repo = await resolveRepo(api, options.repo);
+    const kind = options.kind ? RecordKind.parse(options.kind) : undefined;
+    const limit = options.limit ? Number.parseInt(options.limit, 10) || 50 : 50;
+    const result = await api.record(repo.id, { ...(kind ? { kind } : {}), limit });
+    if (options.json) {
+      printJson(result.raw);
+      return EXIT.ok;
+    }
+    const entries = result.data.entries;
+    if (entries.length === 0) {
+      println(paint.dim(style, kind ? `Nothing of kind ${kind} on record yet.` : "Nothing on record yet. Decisions, answers, approvals and fixed marks land here."));
+      return EXIT.ok;
+    }
+    for (const e of entries) {
+      const when = e.createdAt.slice(0, 16).replace("T", " ");
+      println(`${paint.dim(style, when)}  ${paint.bold(style, RECORD_KIND_LABEL[e.kind])}  ${paint.dim(style, `by ${e.authorLabel ?? RECORD_AUTHOR_LABEL[e.authorKind]}`)}`);
+      println(wrap(e.text, style, "    "));
+      if (e.why) println(paint.dim(style, wrap(`Why: ${e.why}`, style, "    ")));
+    }
+    return EXIT.ok;
+  } catch (error) {
+    throw toCliError(error, "the record");
+  }
+}
+
+/** The owner writes a decision to the record, so no agent asks about it again. */
+export async function decideCommand(text: string[], options: { why?: string; repo?: string; json?: boolean }): Promise<number> {
+  const { api } = await ApiClient.fromEnvironment();
+  api.requireAuth();
+  const joined = text.join(" ").trim();
+  if (!joined) throw usageError("Write the decision.", 'Example: birdsi decide "We stay on the Supabase free plan until 1,000 users" --why "cost"');
+  try {
+    const repo = await resolveRepo(api, options.repo);
+    const result = await api.writeRecord(repo.id, { kind: "decision", text: joined, ...(options.why ? { why: options.why } : {}) });
+    if (options.json) printJson(result.raw);
+    else println("On record.");
+    return EXIT.ok;
+  } catch (error) {
+    throw toCliError(error, "the decision");
   }
 }
