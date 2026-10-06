@@ -2,5 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && npm ci --no-audit --no-fund",
   "buildCommand": "cd ../.. && npm run build --workspace=apps/web",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [{ "path": "/api/cron/sync", "schedule": "0 6 * * *" }]
 }

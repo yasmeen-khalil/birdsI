@@ -139,12 +139,45 @@ const vercel: Connector = {
   },
 };
 
+/** Plan allowances from supabase.com/pricing, read 2026-10. Re-check when Supabase changes its plans. */
+const SUPABASE_ALLOWANCES: Record<string, { dbMb: number; storageGb: number; mau: number; egressGb: number }> = {
+  free: { dbMb: 500, storageGb: 1, mau: 50_000, egressGb: 5 },
+  pro: { dbMb: 8_192, storageGb: 100, mau: 100_000, egressGb: 250 },
+  team: { dbMb: 8_192, storageGb: 100, mau: 100_000, egressGb: 250 },
+};
+
+async function supabaseQuery(token: string, ref: string, query: string, signal?: AbortSignal): Promise<Record<string, unknown> | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  signal?.addEventListener("abort", () => controller.abort(), { once: true });
+  try {
+    const response = await fetch(`https://api.supabase.com/v1/projects/${encodeURIComponent(ref)}/database/query`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ query }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as unknown;
+    const rows = Array.isArray(body) ? body : body && typeof body === "object" && Array.isArray((body as { data?: unknown }).data) ? (body as { data: unknown[] }).data : [];
+    const first = rows[0];
+    return first && typeof first === "object" ? (first as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const supabase: Connector = {
   slug: "supabase",
   name: "Supabase",
-  tokenHint: "A personal access token from your Supabase account.",
+  tokenHint: "A personal access token from your Supabase account. It is used to read the plan and to run three read-only size and count queries on the project.",
   tokenUrl: "https://supabase.com/dashboard/account/tokens",
-  fields: [{ key: "orgSlug", label: "Organization slug", hint: "From the organization's URL: supabase.com/dashboard/org/<slug>. Leave empty to use the first organization.", required: false }],
+  fields: [
+    { key: "projectRef", label: "Project ref", hint: "The project's reference id, from its URL: supabase.com/dashboard/project/<ref>. Leave empty and birdsI reads up to three active projects.", required: false },
+    { key: "orgSlug", label: "Organization slug", hint: "From the organization's URL: supabase.com/dashboard/org/<slug>. Leave empty to use the first organization.", required: false },
+  ],
   async probe(token, settings, signal) {
     const auth = { authorization: `Bearer ${token}` };
     const facts: ConnectorFact[] = [];
@@ -159,16 +192,53 @@ const supabase: Connector = {
       const detail = await getJson<{ plan?: string }>(`https://api.supabase.com/v1/organizations/${encodeURIComponent(org.slug)}`, auth, signal);
       plan = detail.body?.plan ?? null;
     }
+    const planKey = (plan ?? "").toLowerCase();
+    const allowance = SUPABASE_ALLOWANCES[planKey] ?? null;
     if (plan) facts.push(fact("plan", "plan", "Plan", plan.charAt(0).toUpperCase() + plan.slice(1), null, null, null, { url: "https://supabase.com/pricing" }));
     facts.push(fact("status", "organization", "Organization", org.name));
-    const projects = await getJson<Array<{ id: string; name: string; status?: string; region?: string }>>("https://api.supabase.com/v1/projects", auth, signal);
-    if (projects.status < 400 && projects.body) {
-      const mine = projects.body;
-      facts.push(fact("usage", "projects", "Projects", String(mine.length), mine.length, "projects"));
-      const paused = mine.filter((p) => /pause|inactive/i.test(p.status ?? ""));
-      if (paused.length > 0) facts.push(fact("status", "paused_projects", "Paused projects", paused.map((p) => p.name).join(", "), paused.length, "projects", null, { note: "Free projects pause after a week without traffic." }));
+
+    const projects = await getJson<Array<{ id: string; name: string; status?: string; region?: string; organization_id?: string }>>("https://api.supabase.com/v1/projects", auth, signal);
+    const mine = (projects.status < 400 && projects.body ? projects.body : []).filter((p) => !p.organization_id || p.organization_id === org.id);
+    facts.push(fact("usage", "projects", "Projects", String(mine.length), mine.length, "projects"));
+    const paused = mine.filter((p) => /pause|inactive/i.test(p.status ?? ""));
+    if (paused.length > 0) facts.push(fact("status", "paused_projects", "Paused projects", paused.map((p) => p.name).join(", "), paused.length, "projects", null, { note: "Free projects pause after a week without traffic." }));
+
+    // Real usage: three read-only queries on the project itself, through the Management API.
+    const wantedRef = settings["projectRef"]?.trim();
+    const targets = (wantedRef ? mine.filter((p) => p.id === wantedRef) : mine.filter((p) => /active|healthy/i.test(p.status ?? "active"))).slice(0, 3);
+    const many = targets.length > 1;
+    const note = "Read from the project with a read-only query through Supabase's Management API.";
+    let readAny = false;
+    for (const project of targets) {
+      const suffix = many ? `:${project.id}` : "";
+      const label = many ? ` (${project.name})` : "";
+      const db = await supabaseQuery(token, project.id, "select pg_database_size(current_database())::bigint as bytes", signal);
+      const dbBytes = db ? Number(db["bytes"]) : NaN;
+      if (Number.isFinite(dbBytes)) {
+        const mb = Math.round((dbBytes / 1_048_576) * 10) / 10;
+        facts.push(fact("usage", `db_size_mb${suffix}`, `Database size${label}`, allowance ? `${mb} MB of ${allowance.dbMb} MB` : `${mb} MB`, mb, "MB", allowance?.dbMb ?? null, { note }));
+        readAny = true;
+      }
+      const storage = await supabaseQuery(token, project.id, "select coalesce(sum((metadata->>'size')::bigint), 0)::bigint as bytes from storage.objects", signal);
+      const storageBytes = storage ? Number(storage["bytes"]) : NaN;
+      if (Number.isFinite(storageBytes)) {
+        const gb = Math.round((storageBytes / 1_073_741_824) * 100) / 100;
+        facts.push(fact("usage", `storage_gb${suffix}`, `File storage${label}`, allowance ? `${gb} GB of ${allowance.storageGb} GB` : `${gb} GB`, gb, "GB", allowance?.storageGb ?? null, { note }));
+        readAny = true;
+      }
+      const mau = await supabaseQuery(token, project.id, "select count(*)::bigint as n from auth.users where last_sign_in_at > now() - interval '30 days'", signal);
+      const n = mau ? Number(mau["n"]) : NaN;
+      if (Number.isFinite(n)) {
+        facts.push(fact("usage", `mau${suffix}`, `Active users, 30 days${label}`, allowance ? `${n.toLocaleString("en-US")} of ${allowance.mau.toLocaleString("en-US")}` : n.toLocaleString("en-US"), n, "users", allowance?.mau ?? null, { note }));
+        readAny = true;
+      }
     }
-    facts.push(fact("status", "usage_access", "Usage data", "Supabase's API reports the plan but not usage. Database size, egress and active users are read from the dashboard.", null, null, null, { url: "https://supabase.com/dashboard/org/_/usage" }));
+    if (allowance) {
+      facts.push(fact("limit", "egress_gb", "Egress included", `${allowance.egressGb} GB a month`, allowance.egressGb, "GB", null, { url: "https://supabase.com/pricing", note: "Egress is not readable by query; the dashboard's usage page has it." }));
+    }
+    if (!readAny) {
+      facts.push(fact("status", "usage_access", "Usage data", targets.length === 0 ? "No active project to read. Set the project ref in the connection." : "The token could not run read-only queries on the project. Database size, storage and active users are on the dashboard's usage page.", null, null, null, { url: "https://supabase.com/dashboard/org/_/usage" }));
+    }
     return facts;
   },
 };
@@ -248,6 +318,32 @@ const stripe: Connector = {
   },
 };
 
+interface AnthropicBucket {
+  results?: Array<Record<string, unknown>>;
+}
+interface AnthropicPage {
+  data?: AnthropicBucket[];
+  has_more?: boolean;
+  next_page?: string | null;
+}
+
+async function anthropicReport(path: string, headers: Record<string, string>, signal?: AbortSignal): Promise<AnthropicBucket[]> {
+  const out: AnthropicBucket[] = [];
+  let page: string | null = null;
+  for (let i = 0; i < 12; i++) {
+    const url: string = `https://api.anthropic.com${path}${page ? `&page=${encodeURIComponent(page)}` : ""}`;
+    const res: { status: number; body: AnthropicPage | null; headers: Headers } = await getJson<AnthropicPage>(url, headers, signal);
+    if (res.status >= 400) {
+      if (i === 0) unauthorized(res.status, "Anthropic");
+      break;
+    }
+    out.push(...(res.body?.data ?? []));
+    if (!res.body?.has_more || !res.body.next_page) break;
+    page = res.body.next_page;
+  }
+  return out;
+}
+
 const anthropic: Connector = {
   slug: "anthropic",
   name: "Anthropic (Claude)",
@@ -257,22 +353,22 @@ const anthropic: Connector = {
   async probe(token, _settings, signal) {
     const { from } = monthRange();
     const headers = { "x-api-key": token, "anthropic-version": "2023-06-01" };
-    const cost = await getJson<{ data?: Array<{ results?: Array<{ amount?: string | number; currency?: string }> }> }>(`https://api.anthropic.com/v1/organizations/cost_report?starting_at=${encodeURIComponent(from)}&group_by[]=workspace_id`, headers, signal);
-    if (cost.status >= 400) unauthorized(cost.status, "Anthropic");
-    let total = 0;
-    for (const bucket of cost.body?.data ?? []) for (const r of bucket.results ?? []) total += Number(r.amount ?? 0);
-    const facts: ConnectorFact[] = [fact("cost", "spend_month", "Spend this month", `$${(total / 100).toFixed(2)}`, Math.round(total) / 100, "USD", null, { note: "From the Anthropic cost report. Amounts are reported in cents." })];
-    const usage = await getJson<{ data?: Array<{ results?: Array<{ uncached_input_tokens?: number; output_tokens?: number }> }> }>(`https://api.anthropic.com/v1/organizations/usage_report/messages?starting_at=${encodeURIComponent(from)}&bucket_width=1d`, headers, signal);
-    if (usage.status < 400) {
-      let input = 0;
-      let output = 0;
-      for (const bucket of usage.body?.data ?? []) for (const r of bucket.results ?? []) {
-        input += r.uncached_input_tokens ?? 0;
-        output += r.output_tokens ?? 0;
-      }
-      facts.push(fact("usage", "input_tokens_month", "Input tokens this month", input.toLocaleString("en-US"), input, "tokens"));
-      facts.push(fact("usage", "output_tokens_month", "Output tokens this month", output.toLocaleString("en-US"), output, "tokens"));
+    const cost = await anthropicReport(`/v1/organizations/cost_report?starting_at=${encodeURIComponent(from)}&limit=31`, headers, signal);
+    let totalCents = 0;
+    for (const bucket of cost) for (const r of bucket.results ?? []) totalCents += Number(r["amount"] ?? 0);
+    const facts: ConnectorFact[] = [fact("cost", "spend_month", "Spend this month", `$${(totalCents / 100).toFixed(2)}`, Math.round(totalCents) / 100, "USD", null, { note: "From the Anthropic cost report, every day of the month." })];
+    const usage = await anthropicReport(`/v1/organizations/usage_report/messages?starting_at=${encodeURIComponent(from)}&bucket_width=1d&limit=31`, headers, signal);
+    let input = 0;
+    let cached = 0;
+    let output = 0;
+    for (const bucket of usage) for (const r of bucket.results ?? []) {
+      input += Number(r["uncached_input_tokens"] ?? 0);
+      cached += Number(r["cache_read_input_tokens"] ?? 0) + Number(r["cache_creation_input_tokens"] ?? 0);
+      output += Number(r["output_tokens"] ?? 0);
     }
+    facts.push(fact("usage", "input_tokens_month", "Input tokens this month", input.toLocaleString("en-US"), input, "tokens"));
+    if (cached > 0) facts.push(fact("usage", "cached_tokens_month", "Cached input tokens this month", cached.toLocaleString("en-US"), cached, "tokens", null, { note: "Read from or written to the prompt cache; billed at the cache rates." }));
+    facts.push(fact("usage", "output_tokens_month", "Output tokens this month", output.toLocaleString("en-US"), output, "tokens"));
     return facts;
   },
 };

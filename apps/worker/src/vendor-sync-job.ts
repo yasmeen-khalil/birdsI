@@ -2,6 +2,7 @@ import {
   askQuestion,
   connectionsForUser,
   decryptSecret,
+  expireAskedFacts,
   factsForVendors,
   knowledgeFor,
   markConnectionProbed,
@@ -83,7 +84,8 @@ export async function runVendorSyncJob(config: EngineConfig, job: JobRow, heartb
       // 4. Docs facts: the limits of the plan the owner is on, from the tiers.
       await writeTierLimits(v, knowledge.get(v.slug));
 
-      // 5. Questions where birdsI still cannot know.
+      // 5. Typed usage older than a month is forgotten, then questions where birdsI still cannot know.
+      await expireAskedFacts(v.id, 30);
       await queueQuestions(repoId, v, knowledge.get(v.slug), Boolean(connector), Boolean(connection));
     }
     await setVendorsSyncedAt(repoId, new Date());

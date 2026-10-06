@@ -262,3 +262,27 @@ export async function saveKnowledge(k: VendorKnowledge): Promise<void> {
   const { error } = await db.from("vendor_knowledge").upsert({ slug: k.slug, name: k.name, what: k.what, pricing_url: k.pricingUrl, tiers: k.tiers, sources: k.sources, fetched_at: k.fetchedAt }, { onConflict: "slug" });
   if (error) throw new Error(`saveKnowledge: ${error.message}`);
 }
+
+/** Usage the owner typed goes stale; after the window it is removed so the question is asked again. */
+export async function expireAskedFacts(vendorId: string, days = 30): Promise<number> {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+  const { data, error } = await db.from("vendor_facts").delete().eq("vendor_id", vendorId).eq("source", "asked").eq("kind", "usage").lt("observed_at", cutoff).select("id");
+  if (error) throw new Error(`expireAskedFacts: ${error.message}`);
+  return ((data ?? []) as unknown[]).length;
+}
+
+/** Repositories whose vendors have not been synced within the window and that have been scanned at least once. */
+export async function reposDueForSync(hours: number, limit: number): Promise<Array<{ id: string; owner_user_id: string }>> {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - hours * 3_600_000).toISOString();
+  const { data, error } = await db.from("repos").select("id, owner_user_id, vendors_synced_at").is("archived_at", null).or(`vendors_synced_at.is.null,vendors_synced_at.lt.${cutoff}`).limit(limit);
+  if (error) throw new Error(`reposDueForSync: ${error.message}`);
+  const rows = (data ?? []) as Array<{ id: string; owner_user_id: string; vendors_synced_at: string | null }>;
+  const due: Array<{ id: string; owner_user_id: string }> = [];
+  for (const r of rows) {
+    const { count } = await db.from("vendors").select("id", { count: "exact", head: true }).eq("repo_id", r.id);
+    if ((count ?? 0) > 0) due.push({ id: r.id, owner_user_id: r.owner_user_id });
+  }
+  return due;
+}
