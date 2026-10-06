@@ -13,8 +13,8 @@ export const CONFIDENCE_MEANING: Record<Confidence, string> = {
 export const KIND_LABEL: Record<ScanKind, string> = { light: "Quick check", deep: "Full scan", audit: "Pre-launch audit" };
 export const KIND_LOWER: Record<ScanKind, string> = { light: "quick check", deep: "full scan", audit: "pre-launch audit" };
 /** Expected run time in seconds, used for "of about" lines. */
-export const KIND_SECONDS: Record<ScanKind, number> = { light: 60, deep: 360, audit: 1500 };
-export const KIND_DURATION: Record<ScanKind, string> = { light: "About 1 min", deep: "About 6 min", audit: "About 25 min" };
+export const KIND_SECONDS: Record<ScanKind, number> = { light: 120, deep: 900, audit: 1800 };
+export const KIND_DURATION: Record<ScanKind, string> = { light: "About 2 min", deep: "10 to 20 min", audit: "20 to 40 min" };
 
 export function plural(n: number, one: string, many?: string): string {
   return `${n} ${n === 1 ? one : (many ?? `${one}s`)}`;

@@ -72,8 +72,8 @@ export function ConnectForm({ repos }: { repos: ConnectRepo[] }) {
         <div className="grid grid-cols-1 gap-3 min-[901px]:grid-cols-2">
           {(
             [
-              ["light", "Quick check", "About 1 minute. Packages, exposed keys, known problems."],
-              ["deep", "Full scan", "About 6 minutes. Also reads every file and checks it against current docs."],
+              ["light", "Quick check", "About 2 minutes. The vendors, packages, exposed keys, known problems."],
+              ["deep", "Full scan", "10 to 20 minutes. Also reads every file and checks it against current docs."],
             ] as const
           ).map(([value, title, body]) => (
             <label key={value} className="grid grid-cols-[28px_minmax(0,1fr)]" style={{ padding: "14px 16px", border: `1px solid ${kind === value ? "var(--text-2)" : "var(--line-strong)"}`, borderRadius: "var(--r-md)", background: kind === value ? "var(--raised)" : "transparent", cursor: "pointer" }}>

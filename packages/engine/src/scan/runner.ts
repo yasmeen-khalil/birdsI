@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AuditReport, Dependency, FindingDraft, OpsSummary, ProjectHints, ScanEvent, ScanKind, ScanStats, ScanStep, ScanSummary, VendorDraft } from "@birdsi/shared";
 import { runAudit } from "../checks/audit";
 import { checksFor } from "../checks/registry";
-import type { Check, CheckContext } from "../checks/types";
+import type { Check, CheckContext, PreviousReview } from "../checks/types";
 import { toDependency } from "../checks/vulnerabilities";
 import type { EngineConfig } from "../config";
 import { collectDependencies } from "../inventory/manifests";
@@ -25,6 +26,10 @@ export interface ScanInput {
   projectHints?: ProjectHints | null;
   /** The operations picture from earlier syncs, for the audit's operations area. */
   ops?: OpsSummary | null;
+  /** The last finished scan's review index and findings, so unchanged files are not read again. */
+  previousReview?: PreviousReview | null;
+  /** Called as soon as the vendors are known, before the slow steps, so the dashboard can show them at once. */
+  onVendors?: (vendors: VendorDraft[]) => Promise<void> | void;
   signal?: AbortSignal;
   onEvent: (event: ScanEvent) => Promise<void>;
   onUsage?: (usage: Usage) => Promise<void> | void;
@@ -137,6 +142,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
     }
   }
   await emit({ type: "step_done", step: "vendors", findings: 0, durationMs: Date.now() - vendorsStart });
+  if (vendors.length > 0) await input.onVendors?.(vendors);
 
   const readCache = new Map<string, string>();
   const read = async (path: string): Promise<string> => {
@@ -147,6 +153,16 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
     if (readCache.size > 400) readCache.clear();
     readCache.set(path, windowed);
     return windowed;
+  };
+
+  const hashCache = new Map<string, string>();
+  const fileHash = async (path: string): Promise<string> => {
+    const cached = hashCache.get(path);
+    if (cached) return cached;
+    const raw = await readFile(join(snapshot.root, path));
+    const hash = createHash("sha1").update(raw).digest("hex");
+    hashCache.set(path, hash);
+    return hash;
   };
 
   const findings: FindingDraft[] = [];
@@ -162,6 +178,8 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
     digest,
     models,
     read,
+    fileHash,
+    previousReview: input.previousReview ?? null,
     emit,
     note,
     signal,

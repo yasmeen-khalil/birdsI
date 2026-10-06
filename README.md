@@ -38,7 +38,7 @@ A coding agent in your terminal can read your code. It cannot see the vendors th
 Three surfaces share one engine:
 
 - the **web app** (dashboard, findings, vendors, agent queue, chat about the codebase, pre-launch audit),
-- the **`birdsi` terminal tool** (`npx birdsi` runs the full pipeline and opens the dashboard; `birdsi vendors`, `questions`, `approvals`, `vision`, `export`), and
+- the **`birdsi` terminal tool** (`npx birdsi` maps the code and the vendors and opens the dashboard; `--full` reads every file; `birdsi vendors`, `questions`, `approvals`, `vision`, `export`), and
 - an **MCP server** (`npx birdsi mcp`) so Claude Code, Cursor and Codex can read the inventory, ask the owner, and propose actions mid-session. `birdsi export` also writes the knowledge base as Markdown under `.birdsi/` for agents that read files.
 
 ## Models
@@ -122,8 +122,8 @@ Model ids are overridable (`BIRDSI_MODEL_NANO`, `BIRDSI_MODEL_SUPER`, `BIRDSI_MO
 
 ```bash
 npx birdsi login          # sign in through the browser
-npx birdsi                # full pipeline on the current folder, opens the dashboard
-npx birdsi --quick        # a quick check instead
+npx birdsi                # quick check of the current folder (about 2 minutes), opens the dashboard
+npx birdsi --full         # the full scan: every file, current docs, the audit (10 to 20 minutes)
 npx birdsi vendors        # plans, usage, limits, spend, alerts
 npx birdsi questions      # answer what birdsI or your agent needs to know
 npx birdsi approvals      # decide on proposed actions; `approvals run` runs approved ones here

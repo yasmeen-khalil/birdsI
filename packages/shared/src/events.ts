@@ -86,6 +86,11 @@ export const ScanEvent = z.discriminatedUnion("type", [
     note: z.string(),
   }),
   z.object({
+    /** What the review step read, with content hashes, so the next scan can skip unchanged files. */
+    type: z.literal("review_index"),
+    files: z.array(z.object({ path: z.string(), hash: z.string() })),
+  }),
+  z.object({
     type: z.literal("note"),
     /** A line worth showing: a skipped folder, a budget cap reached. */
     text: z.string(),

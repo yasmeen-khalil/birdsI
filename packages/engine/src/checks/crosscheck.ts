@@ -34,7 +34,8 @@ export const crosscheckCheck: Check = {
         fast: false,
         purpose: "crosscheck",
         system: SYSTEM,
-        user: `Repository overview:\n${ctx.digest.text}\n\nFacts:\n${facts}\n\nFindings already established:\n${ctx.findingsSoFar
+        cachedContext: `Repository overview:\n${ctx.digest.text}`,
+        user: `Facts:\n${facts}\n\nFindings already established:\n${ctx.findingsSoFar
           .slice(0, 40)
           .map((f) => `- [${f.confidence}] ${f.title}${f.location ? ` (${f.location.path})` : ""}`)
           .join("\n")}`,

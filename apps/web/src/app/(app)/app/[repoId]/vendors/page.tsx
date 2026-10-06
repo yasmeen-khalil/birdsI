@@ -50,7 +50,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
           <h2 className="t-h2" style={{ fontSize: 23 }}>
             No vendors found yet
           </h2>
-          <p className="t-small c2">Run a full scan. birdsI maps the code, finds every service it calls, then reads each plan and limit. About 6 minutes.</p>
+          <p className="t-small c2">Run a full scan. birdsI maps the code, finds every service it calls, then reads each plan and limit. 10 to 20 minutes.</p>
           <div className="flex justify-end">
             <ScanAgainButton repoId={repo.id} kind="deep" full label={running ? "A scan is running" : "Full scan"} disabled={Boolean(running)} />
           </div>

@@ -283,7 +283,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
             </p>
             <dl className="t-body grid grid-cols-[120px_minmax(0,1fr)] gap-y-2.5" style={{ margin: "8px 0 0", maxWidth: 560 }}>
               <dt className="c3">Takes</dt>
-              <dd style={{ margin: 0 }}>About 25 minutes. You can close the page.</dd>
+              <dd style={{ margin: 0 }}>20 to 40 minutes. You can close the page.</dd>
               <dt className="c3">Covers</dt>
               <dd style={{ margin: 0 }}>{latest?.stats ? `${AUDIT_AREAS.length} areas, ${plural(latest.stats.filesSeen, "file")}, ${plural(latest.stats.dependencies, "dependency", "dependencies")}` : `${AUDIT_AREAS.length} areas, every file and every dependency`}</dd>
               <dt className="c3">When done</dt>

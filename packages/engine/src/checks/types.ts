@@ -6,6 +6,13 @@ import type { ModelClient } from "../models/client";
 import type { RepoDigest } from "../scan/digest";
 import type { Snapshot } from "../source/types";
 
+export interface PreviousReview {
+  /** path -> content hash as recorded by the last scan's review step. */
+  hashes: Map<string, string>;
+  /** path -> the review findings that scan produced for the file. */
+  findingsByPath: Map<string, FindingDraft[]>;
+}
+
 export interface CheckContext {
   config: EngineConfig;
   kind: ScanKind;
@@ -22,6 +29,10 @@ export interface CheckContext {
   models: ModelClient;
   /** Reads a file from the snapshot, windowed to the tier's byte cap. */
   read: (path: string) => Promise<string>;
+  /** Content hash of the whole file, for skipping unchanged files on later scans. */
+  fileHash: (path: string) => Promise<string>;
+  /** What the last finished scan read and found per file, when the repository has one. */
+  previousReview: PreviousReview | null;
   emit: (event: import("@birdsi/shared").ScanEvent) => Promise<void>;
   note: (text: string) => Promise<void>;
   signal: AbortSignal;

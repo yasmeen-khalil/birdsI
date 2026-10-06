@@ -39,15 +39,15 @@ export function buildProgram(): Command {
     .showHelpAfterError("(run birdsi --help for the full list)")
     .exitOverride()
     .argument("[path]", "folder to scan (default: the current one)")
-    .option("--quick", "a quick check (about a minute) instead of the full scan")
+    .option("--full", "the full scan: reads every file, checks docs, audits (10 to 20 minutes)")
     .option("--describe <text>", "what the app does, in a sentence or two")
     .option("--no-open", "do not open the dashboard in the browser")
     .option("--no-fix-prompt", "do not offer fixes after the scan")
     .addOption(jsonOption())
     .addOption(asciiOption())
     .action(
-      run((path: string | undefined, options: { quick?: boolean; describe?: string; open: boolean; fixPrompt: boolean; json?: boolean; ascii?: boolean }) =>
-        scanCommand(path, { ...(options.quick ? {} : { full: true }), describe: options.describe, open: options.open, fixPrompt: options.fixPrompt, json: options.json, ascii: options.ascii }),
+      run((path: string | undefined, options: { full?: boolean; describe?: string; open: boolean; fixPrompt: boolean; json?: boolean; ascii?: boolean }) =>
+        scanCommand(path, { ...(options.full ? { full: true } : {}), describe: options.describe, open: options.open, fixPrompt: options.fixPrompt, json: options.json, ascii: options.ascii }),
       ),
     );
 
@@ -72,7 +72,7 @@ export function buildProgram(): Command {
     .command("scan")
     .description("scan a folder: a quick check unless you add a flag (default folder: the current one)")
     .argument("[path]", "folder to scan")
-    .option("--full", "full scan: map the code, check docs, audit, refresh vendors (what birdsi with no command runs)")
+    .option("--full", "full scan: reads every file, checks docs, audits, refreshes vendors (10 to 20 minutes)")
     .option("--deep", "read all the code, without refreshing vendors")
     .option("--audit", "pre-launch audit: a launch verdict, area by area")
     .option("--open", "open the dashboard in the browser")

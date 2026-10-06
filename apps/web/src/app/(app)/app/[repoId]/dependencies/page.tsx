@@ -49,7 +49,7 @@ export default async function DependenciesPage({ params }: { params: Promise<{ r
         </div>
       ) : (
         <div className="panel flex flex-col gap-3" style={{ padding: "22px 24px", maxWidth: 560 }}>
-          <p className="t-small c2">A quick check lists every package and checks it for published vulnerabilities in about a minute.</p>
+          <p className="t-small c2">A quick check lists every package and checks it for published vulnerabilities in about two minutes.</p>
           <ScanButtons repoId={repo.id} runningKind={null} layout="compact" />
         </div>
       )}

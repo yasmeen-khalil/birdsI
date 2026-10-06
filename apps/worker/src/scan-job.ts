@@ -6,6 +6,9 @@ import {
   appendEvent,
   connectionsForUser,
   downloadSnapshot,
+  eventsAfter,
+  findingsForScan,
+  latestDoneScan,
   factHistory,
   factsForVendors,
   knowledgeFor,
@@ -23,8 +26,8 @@ import {
   updateScan,
   type JobRow,
 } from "@birdsi/db";
-import { computeAlerts, computeRunway, computeWatches, GitHubSource, runScan, snapshotFromDirectory, snapshotFromTarball, type EngineConfig, type Snapshot } from "@birdsi/engine";
-import type { OpsSummary, ProjectHints, ScanEvent } from "@birdsi/shared";
+import { computeAlerts, computeRunway, computeWatches, GitHubSource, runScan, snapshotFromDirectory, snapshotFromTarball, type EngineConfig, type PreviousReview, type Snapshot } from "@birdsi/engine";
+import type { FindingDraft, OpsSummary, ProjectHints, ScanEvent } from "@birdsi/shared";
 
 /**
  * Runs one scan job end to end: resolves the code, runs the engine, stores
@@ -60,6 +63,7 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
   let snapshot: Snapshot | null = null;
   const hints: ProjectHints | null = scan.snapshot_id ? (((await snapshotById(scan.snapshot_id))?.project_hints as ProjectHints | null) ?? null) : null;
   const ops = scan.repo_id && scan.owner_user_id ? await opsSummaryFor(scan.repo_id, scan.owner_user_id) : null;
+  const previousReview = scan.repo_id ? await previousReviewFor(scan.repo_id) : null;
   try {
     const result = await runScan(config, {
       kind: scan.kind,
@@ -71,6 +75,10 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
       appDescription: scan.app_description,
       projectHints: hints,
       ops,
+      previousReview,
+      onVendors: async (vendors) => {
+        if (scan.repo_id) await replaceVendors(scan.repo_id, scanId, vendors);
+      },
       signal: controller.signal,
       onEvent: emit,
       traceMetadata: { scanId, kind: scan.kind, source: scan.source },
@@ -117,6 +125,37 @@ async function lastEventSeq(scanId: string): Promise<number> {
   const { data, error } = await getDb().from("scan_events").select("seq").eq("scan_id", scanId).order("seq", { ascending: false }).limit(1).maybeSingle();
   if (error) throw new Error(`lastEventSeq: ${error.message}`);
   return (data as { seq: number } | null)?.seq ?? 0;
+}
+
+/** The last finished scan's review index (path to hash) and its review findings by path. */
+async function previousReviewFor(repoId: string): Promise<PreviousReview | null> {
+  const last = await latestDoneScan(repoId);
+  if (!last) return null;
+  const events = await eventsAfter(last.id, 0, 5000);
+  const index = events.map((e) => e.event).find((e) => e.type === "review_index");
+  if (!index || index.type !== "review_index") return null;
+  const hashes = new Map(index.files.map((f) => [f.path, f.hash]));
+  const findingsByPath = new Map<string, FindingDraft[]>();
+  for (const row of await findingsForScan(last.id)) {
+    if (row.check_id !== "review" || !row.location?.path || row.status === "fixed") continue;
+    const draft: FindingDraft = {
+      key: row.key,
+      checkId: row.check_id,
+      title: row.title,
+      explanation: row.explanation,
+      whyItMatters: row.why_it_matters,
+      severity: row.severity,
+      confidence: row.confidence,
+      category: row.category,
+      location: row.location,
+      evidence: row.evidence,
+      actionKind: row.action_kind,
+      steps: row.steps,
+      fixPlan: row.fix_plan,
+    };
+    findingsByPath.set(row.location.path, [...(findingsByPath.get(row.location.path) ?? []), draft]);
+  }
+  return { hashes, findingsByPath };
 }
 
 /** What earlier syncs learned about the app's services, for the audit's operations area. Null before the first sync. */

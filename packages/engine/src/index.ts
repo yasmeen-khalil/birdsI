@@ -9,7 +9,7 @@ export { collectDependencies, cleanVersion, type RawDependency } from "./invento
 export { languageOf, isCodeLanguage } from "./inventory/languages";
 export { prioritise, priorityOf } from "./inventory/priority";
 export { ALL_CHECKS, checksFor } from "./checks/registry";
-export type { Check, CheckContext } from "./checks/types";
+export type { Check, CheckContext, PreviousReview } from "./checks/types";
 export { redact } from "./checks/secrets";
 export { AREA_LABELS, areaOf, operationsArea } from "./checks/audit";
 export { runScan, STEP_LABELS, type ScanInput, type ScanResult } from "./scan/runner";

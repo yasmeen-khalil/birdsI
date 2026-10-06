@@ -134,7 +134,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
           <h2 id="no-scans" className="t-h2" style={{ fontSize: 23 }}>
             No scans of {name} yet
           </h2>
-          <p className="t-small c2">Start with a full scan. It maps the code, checks it against current docs, audits it, then finds the vendors (outside services) the app runs on. About 6 minutes.</p>
+          <p className="t-small c2">Start with a full scan. It maps the code, checks it against current docs, audits it, then finds the vendors (outside services) the app runs on. 10 to 20 minutes.</p>
           <ScanButtons repoId={repo.id} runningKind={null} layout="compact" />
         </section>
       )}
@@ -287,7 +287,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
         <Frame arm={32} bend={23} className="flex flex-col gap-3.5 px-[30px] py-7 min-[901px]:col-span-4 min-[901px]:col-start-9 max-[900px]:px-[22px] max-[900px]:py-6">
           <PlaneTakeoff {...icon20} className="i i20 c2" />
           <h2 className="t-h2 max-[900px]:text-[24px]!">Before you launch</h2>
-          <p className="t-body c2">The pre-launch audit is the deepest check birdsI runs. It goes area by area, from sign-in to services and limits, and says plainly if you are ready. About 25 minutes.</p>
+          <p className="t-body c2">The pre-launch audit is the deepest check birdsI runs. It goes area by area, from sign-in to services and limits, and says plainly if you are ready. 20 to 40 minutes.</p>
           {lastAudit?.audit ? (
             <p className="t-small c3">
               Last audit <LocalTime iso={lastAudit.finishedAt} />: {lastAudit.audit.verdict === "ready" ? "ready to launch" : lastAudit.audit.verdict === "not_ready" ? "not ready yet" : "no verdict"}.

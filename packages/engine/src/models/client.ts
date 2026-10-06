@@ -24,6 +24,8 @@ export interface CompleteOptions<T> {
   fast?: boolean;
   purpose: string;
   system: string;
+  /** Stable text shared by many calls in one scan (the repository digest, facts). Cached by the provider. */
+  cachedContext?: string;
   user: string;
   schema: z.ZodType<T>;
   /** JSON schema for the provider; derived from the zod schema by the caller. */
@@ -141,7 +143,7 @@ export class ModelClient {
     const model = this.modelId(opts.tier, opts.fast ?? false);
     const schemaText = JSON.stringify(opts.jsonSchema);
     const system = `${opts.system}\n\nRespond with a single JSON object that follows this JSON schema exactly, with no prose before or after:\n${schemaText}`;
-    this.assertBudget(ModelClient.estimateTokens(system + opts.user));
+    this.assertBudget(ModelClient.estimateTokens(system + (opts.cachedContext ?? "") + opts.user));
 
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -162,10 +164,13 @@ export class ModelClient {
       const client = this.requireAnthropic();
       const messages: Anthropic.MessageParam[] = [{ role: "user", content: opts.user }];
       if (repair) messages.push({ role: "user", content: repair });
+      // The system text and the shared context are the stable prefix; the provider caches them across the scan's calls.
+      const systemBlocks: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
+      if (opts.cachedContext) systemBlocks.push({ type: "text", text: opts.cachedContext, cache_control: { type: "ephemeral" } });
       const params = {
         model,
         max_tokens: opts.maxOutputTokens ?? 4096,
-        system,
+        system: systemBlocks,
         messages,
         output_config: { format: zodOutputFormat(opts.schema as never), ...(this.effortFor(model, opts.tier, opts.effort)) },
       };
@@ -189,7 +194,7 @@ export class ModelClient {
     }
     const client = this.requireOpenAI();
     const messages: OpenAI.ChatCompletionMessageParam[] = [
-      { role: "system", content: system },
+      { role: "system", content: opts.cachedContext ? `${system}\n\n${opts.cachedContext}` : system },
       { role: "user", content: opts.user },
     ];
     if (repair) messages.push({ role: "user", content: repair });

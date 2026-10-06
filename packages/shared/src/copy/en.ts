@@ -26,9 +26,9 @@ export const en = {
     audit: "Pre-launch audit",
   },
   scanKindDuration: {
-    light: "About 1 min",
-    deep: "About 6 min",
-    audit: "About 25 min",
+    light: "About 2 min",
+    deep: "10 to 20 min",
+    audit: "20 to 40 min",
   },
   scanStatus: {
     queued: "Queued",

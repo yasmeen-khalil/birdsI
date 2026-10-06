@@ -126,7 +126,7 @@ export function createServer(): McpServer {
         "Uploads a snapshot of a local folder (files .gitignore leaves out stay local) and scans it: exposed keys, published vulnerabilities, security problems, contradictions between files, and code that disagrees with current docs. Waits by default and returns the counts, a headline, and the top 10 findings with their ids. Use full for the whole pipeline, including vendors and limits.",
       inputSchema: {
         path: z.string().describe("Absolute path of the folder to scan."),
-        kind: ScanKind.optional().describe("light: Quick check, about 1 minute (default). deep: reads all the code, about 6 minutes. audit: Pre-launch audit with a verdict per area, about 25 minutes."),
+        kind: ScanKind.optional().describe("light: Quick check, about 2 minutes (default). deep: reads all the code, 10 to 20 minutes. audit: Pre-launch audit with a verdict per area, 20 to 40 minutes."),
         full: z.boolean().optional().describe("Full scan: the whole pipeline in order (map the code, check docs, audit, refresh vendors and limits). Implies deep."),
         describe: z.string().max(2000).optional().describe("What the app does, in a sentence or two. Helps birdsI judge what matters."),
         wait: z.boolean().optional().describe("Wait for the scan to finish, up to 30 minutes (default true). With false, returns the scan id at once; poll with birdsi_scan_status."),

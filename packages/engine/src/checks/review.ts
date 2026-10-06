@@ -27,13 +27,28 @@ export const reviewCheck: Check = {
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     const findings: FindingDraft[] = [];
     const knownPaths = new Set(ctx.inventory.files.map((f) => f.path));
-    const digest = ctx.digest.text;
-    const context = buildContextNotes(ctx);
+    const cachedContext = `Repository overview:\n${ctx.digest.text}\n\n${buildContextNotes(ctx)}`;
     const files = ctx.filesToRead;
+    const index: Array<{ path: string; hash: string }> = [];
+    let carried = 0;
     await ctx.emit({ type: "step_started", step: "review", label: reviewCheck.label, total: files.length });
     let done = 0;
     for (const file of files) {
       if (ctx.signal.aborted) break;
+      const hash = await ctx.fileHash(file.path);
+      index.push({ path: file.path, hash });
+      // Unchanged since the last scan: keep what that scan found instead of paying to read it again.
+      const previous = ctx.previousReview;
+      if (previous && previous.hashes.get(file.path) === hash) {
+        for (const draft of previous.findingsByPath.get(file.path) ?? []) {
+          findings.push(draft);
+          await ctx.emit({ type: "finding", finding: { ...draft, id: draft.key } });
+        }
+        carried += 1;
+        done += 1;
+        await ctx.emit({ type: "step_progress", step: "review", done, total: files.length });
+        continue;
+      }
       await ctx.emit({ type: "file_reading", step: "review", path: file.path, checks: ["security holes", "gaps", "inconsistencies"] });
       const content = await ctx.read(file.path);
       try {
@@ -42,7 +57,8 @@ export const reviewCheck: Check = {
           fast: ctx.budget.fast,
           purpose: "review",
           system: SYSTEM,
-          user: `Repository overview:\n${digest}\n\n${context}\n\nFile: ${file.path}\n\`\`\`\n${numberLines(content)}\n\`\`\``,
+          cachedContext,
+          user: `File: ${file.path}\n\`\`\`\n${numberLines(content)}\n\`\`\``,
           schema: ModelFindings,
           jsonSchema: MODEL_FINDINGS_JSON_SCHEMA,
           schemaName: "findings",
@@ -66,6 +82,8 @@ export const reviewCheck: Check = {
       done += 1;
       await ctx.emit({ type: "step_progress", step: "review", done, total: files.length });
     }
+    if (carried > 0) await ctx.note(`${carried} of ${files.length} files were unchanged since the last scan and were not read again.`);
+    await ctx.emit({ type: "review_index", files: index });
     return findings;
   },
 };
