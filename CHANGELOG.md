@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-13
+- The word Demo at the top right of every page while birdsI is a demo.
+
 ## v2 (2026-10-03, unreleased)
 
 The operations layer for coding agents.

@@ -19,6 +19,7 @@ export function DemoTopBar() {
         <span className="t-small c3 max-[900px]:hidden">public sample, read only</span>
       </span>
       <span className="inline-flex items-center gap-4" style={{ marginLeft: "auto" }}>
+        <span className="tag">Demo</span>
         <span className="t-small c3 max-[900px]:hidden">Scan your own code next</span>
         <Link className="btn btn-secondary btn-sm" href="/sign-in" style={{ minHeight: 36 }}>
           <Github {...icon} />

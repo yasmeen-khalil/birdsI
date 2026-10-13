@@ -16,6 +16,7 @@ export function TopBar({ login, repos, current, settingsActive = false }: { logi
         {repos.length > 0 && <RepoSwitcher repos={repos} current={current} />}
         {navRepo && <NavLinks repoId={navRepo.id} />}
         <span className="inline-flex items-center gap-3.5" style={{ marginLeft: "auto" }}>
+          <span className="tag">Demo</span>
           {current && <AskButton repoId={current.id} />}
           <Link className="avatar" href="/settings" aria-label="Settings" style={{ textDecoration: "none", ...(settingsActive ? { borderColor: "var(--text-2)", color: "var(--text)" } : {}) }}>
             {initials(login)}

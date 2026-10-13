@@ -17,6 +17,7 @@ export function SiteHeader({ signedIn, back = false }: { signedIn: boolean; back
         </Link>
       ) : (
         <nav className="flex items-center gap-9" style={{ fontSize: 14, fontWeight: 500 }} aria-label="Site">
+          <span className="tag">Demo</span>
           <Link href="/#how" className="max-[900px]:hidden" style={{ textDecoration: "none", color: "var(--text-2)" }}>
             How it works
           </Link>
