@@ -23,6 +23,8 @@ export const NEVER_UPLOADED: readonly string[] = [
   ".dev.vars.*",
   "*.pem",
   "*.key",
+  "*.crt",
+  "*.cer",
   "*.p8",
   "*.p12",
   "*.pfx",

@@ -278,7 +278,7 @@ export class ModelClient {
   async embed(inputs: string[], purpose: string): Promise<number[][]> {
     if (inputs.length === 0) return [];
     const model = this.config.models.embedding;
-    if (!model || !this.openai) throw new EmbeddingsUnavailableError("No embedding model is configured. Add NEBIUS_API_KEY to enable embeddings; chat uses keyword retrieval without them.");
+    if (!model || !this.openai) throw new EmbeddingsUnavailableError("No embedding model is set up. Add NEBIUS_API_KEY to turn on embeddings. Without them, chat searches by keywords.");
     await this.gate(model, purpose);
     const response = await this.openai.embeddings.create({ model, input: inputs, encoding_format: "float" });
     await this.record(model, purpose, { inputTokens: response.usage?.prompt_tokens ?? 0, outputTokens: 0 });

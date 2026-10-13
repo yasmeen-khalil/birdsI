@@ -18,7 +18,7 @@ export const ModelFinding = z.object({
   lineEnd: z.number().int().positive().nullable(),
   excerpt: z.string().max(600).nullable().describe("The exact lines that show the problem, copied verbatim"),
   certainty: z.number().min(0).max(1).describe("How sure you are that this is a real problem, not a style preference"),
-  actionKind: z.enum(["fix", "steps"]).describe("fix when a code change alone resolves it; steps when the developer must act outside the code"),
+  actionKind: z.enum(["fix", "steps"]).describe("fix when a code change alone resolves it, steps when the developer must act outside the code"),
   steps: z.array(z.object({ title: z.string().max(120), detail: z.string().max(400).nullable(), snippet: z.string().max(600).nullable() })).max(6),
   fixSummary: z.string().max(300).nullable().describe("For fix: what the change is, in one or two sentences"),
   fixPaths: z.array(z.string()).max(8).describe("For fix: files the change touches"),
@@ -71,7 +71,7 @@ export function toDraft(
   };
 }
 
-export const REVIEW_VOICE = `You write for a builder who ships real apps but does not read code fluently. Plain words, short sentences, no jargon without a gloss. Say what was found, why it matters, what happens next. Never alarmist. Prefer "fix" over "remediate" and "problem" over "vulnerability" unless it is a published vulnerability. Do not use emojis. Do not use em dashes; use commas, colons or periods.`;
+export const REVIEW_VOICE = `You write for a builder who ships real apps but does not read code fluently. Plain words, short sentences, no jargon without a gloss. Say what was found, why it matters, what happens next. Never alarmist. Prefer "fix" over "remediate" and "problem" over "vulnerability" unless it is a published vulnerability. Do not use emojis, em dashes, semicolons or exclamation marks. Use commas, colons or periods.`;
 
 /** Drops low-certainty and malformed model findings before they become records. */
 export function filterModelFindings(findings: ModelFinding[], minCertainty: number, knownPaths: Set<string>): ModelFinding[] {

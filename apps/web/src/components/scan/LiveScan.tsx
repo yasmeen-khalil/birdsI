@@ -33,7 +33,7 @@ export interface LiveScanProps {
   expectedSeconds: number;
   scanError?: string | null;
   leaveNote: string;
-  /** Pre-launch audit: the launch areas, judged once every file is read. */
+  /** Pre-launch audit: the launch areas, judged once the files are read. */
   areaTitles?: Record<string, string>;
 }
 
@@ -284,7 +284,7 @@ export function LiveScan(props: LiveScanProps) {
           <div className="flex flex-col">
             <div className="flex items-baseline justify-between gap-3" style={{ paddingBottom: 8 }}>
               <h2 className="t-h3">The {AUDIT_AREAS.length} launch areas</h2>
-              <span className="t-small c3">{view.areas.length > 0 ? `${view.areas.length} of ${AUDIT_AREAS.length} judged` : "Judged once every file is read"}</span>
+              <span className="t-small c3">{view.areas.length > 0 ? `${view.areas.length} of ${AUDIT_AREAS.length} judged` : "Judged once the files are read"}</span>
             </div>
             {Object.entries(props.areaTitles).map(([area, title], i, all) => {
               const result = view.areas.find((a) => a.area === area);

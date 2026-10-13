@@ -7,7 +7,7 @@ import { ButtonArc } from "./Arc";
 import { icon } from "./icon";
 
 /** Starts (or reuses) a scan of the sample repository and opens it. No sign-in needed. */
-export function DemoButton({ label = "Scan a sample repo", className = "btn btn-primary btn-lg", showIcon = true }: { label?: string; className?: string; showIcon?: boolean }) {
+export function DemoButton({ label = "Try the sample", className = "btn btn-primary btn-lg", showIcon = true }: { label?: string; className?: string; showIcon?: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);

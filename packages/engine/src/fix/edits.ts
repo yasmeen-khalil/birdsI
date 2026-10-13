@@ -53,7 +53,7 @@ export async function applyEdits(edits: FileEdit[], readFile: (path: string) => 
     if (edit.path.includes("..") || edit.path.startsWith("/")) throw new EditError(`Refusing to edit a path outside the repository: ${edit.path}`);
     const entry = await load(edit.path);
     if (edit.op === "create") {
-      if (entry.content !== null) throw new EditError(`${edit.path} already exists; use a replace edit`);
+      if (entry.content !== null) throw new EditError(`${edit.path} already exists. Use a replace edit.`);
       entry.content = edit.content;
     } else if (edit.op === "delete") {
       if (entry.content === null) throw new EditError(`${edit.path} does not exist`);
@@ -67,7 +67,7 @@ export async function applyEdits(edits: FileEdit[], readFile: (path: string) => 
         entry.content = entry.content.slice(0, relaxed.start) + edit.replace + entry.content.slice(relaxed.end);
         continue;
       }
-      if (occurrences > 1) throw new EditError(`The text to replace occurs ${occurrences} times in ${edit.path}; it must be unique`);
+      if (occurrences > 1) throw new EditError(`The text to replace occurs ${occurrences} times in ${edit.path}. It must be unique.`);
       entry.content = entry.content.replace(edit.search, () => edit.replace);
     }
   }

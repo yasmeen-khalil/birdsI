@@ -12,9 +12,12 @@ export function SiteHeader({ signedIn, back = false }: { signedIn: boolean; back
     <header className="flex items-center justify-between gap-6" style={{ minHeight: 64 }}>
       <Wordmark href="/" className="max-[900px]:text-[20px]!" />
       {back ? (
-        <Link className="btn btn-quiet btn-sm" href="/" style={{ minHeight: 44 }}>
-          Back to the home page
-        </Link>
+        <span className="inline-flex items-center gap-4">
+          <span className="tag">Demo</span>
+          <Link className="btn btn-quiet btn-sm" href="/" style={{ minHeight: 44 }}>
+            Back to the home page
+          </Link>
+        </span>
       ) : (
         <nav className="flex items-center gap-9" style={{ fontSize: 14, fontWeight: 500 }} aria-label="Site">
           <span className="tag">Demo</span>
@@ -50,7 +53,7 @@ export function SiteFooter() {
         <span className="wm" style={{ fontSize: 18 }}>
           birdsI
         </span>
-        <span className="t-small c3">Open source under MPL 2.0.</span>
+        <span className="t-small c3">Licensed under MPL 2.0.</span>
       </div>
       <p className="t-small c2 min-[901px]:col-span-5 min-[901px]:col-start-5">Scans run on Claude models from Anthropic. Current docs and vendor pricing come from Tavily. Your code is never used to train models.</p>
       <nav className="t-small flex flex-wrap gap-x-6 gap-y-2 min-[901px]:col-span-3 min-[901px]:col-start-10 min-[901px]:justify-end" style={{ fontSize: 13 }} aria-label="Footer">

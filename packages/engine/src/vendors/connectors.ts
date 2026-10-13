@@ -234,7 +234,7 @@ const supabase: Connector = {
       }
     }
     if (allowance) {
-      facts.push(fact("limit", "egress_gb", "Egress included", `${allowance.egressGb} GB a month`, allowance.egressGb, "GB", null, { url: "https://supabase.com/pricing", note: "Egress is not readable by query; the dashboard's usage page has it." }));
+      facts.push(fact("limit", "egress_gb", "Egress included", `${allowance.egressGb} GB a month`, allowance.egressGb, "GB", null, { url: "https://supabase.com/pricing", note: "Egress cannot be read by a query. The dashboard's usage page shows it." }));
     }
     if (!readAny) {
       facts.push(fact("status", "usage_access", "Usage data", targets.length === 0 ? "No active project to read. Set the project ref in the connection." : "The token could not run read-only queries on the project. Database size, storage and active users are on the dashboard's usage page.", null, null, null, { url: "https://supabase.com/dashboard/org/_/usage" }));
@@ -367,7 +367,7 @@ const anthropic: Connector = {
       output += Number(r["output_tokens"] ?? 0);
     }
     facts.push(fact("usage", "input_tokens_month", "Input tokens this month", input.toLocaleString("en-US"), input, "tokens"));
-    if (cached > 0) facts.push(fact("usage", "cached_tokens_month", "Cached input tokens this month", cached.toLocaleString("en-US"), cached, "tokens", null, { note: "Read from or written to the prompt cache; billed at the cache rates." }));
+    if (cached > 0) facts.push(fact("usage", "cached_tokens_month", "Cached input tokens this month", cached.toLocaleString("en-US"), cached, "tokens", null, { note: "Read from or written to the prompt cache, and billed at the cache rates." }));
     facts.push(fact("usage", "output_tokens_month", "Output tokens this month", output.toLocaleString("en-US"), output, "tokens"));
     return facts;
   },
@@ -396,7 +396,7 @@ const resend: Connector = {
     }
     const domains = Array.isArray(res.body?.data) ? res.body!.data!.length : null;
     if (domains !== null) facts.push(fact("usage", "domains", "Sending domains", String(domains), domains, "domains"));
-    if (facts.length === 0) facts.push(fact("status", "account", "Account", "Connected. Resend reports quota in response headers after sends; none were present on this call."));
+    if (facts.length === 0) facts.push(fact("status", "account", "Account", "Connected. Resend shows its quota only after the app sends email, so none is known yet."));
     return facts;
   },
 };

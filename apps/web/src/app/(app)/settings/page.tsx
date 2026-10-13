@@ -116,7 +116,7 @@ export default async function SettingsPage() {
         </Section>
 
         <Section id="connected-accounts" title="Connected accounts">
-          <p className="t-small c2">Connect a vendor account with a read-only token, a key that can look but not change. birdsI reads the plan, usage and spend, and alerts you near a limit.</p>
+          <p className="t-small c2">Connect a vendor account with a token. Use a read-only token, a key that can look but not change, where the service offers one. birdsI reads the plan, usage and spend, and alerts you near a limit.</p>
           {connections.length === 0 ? (
             <p className="t-small c3" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
               No accounts connected yet.

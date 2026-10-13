@@ -42,7 +42,7 @@ export default function SignInPage() {
           <p className="t-small c2 min-[901px]:mt-auto">
             Only want a look first?{" "}
             <Link href="/" style={{ fontWeight: 600, color: "var(--text)" }}>
-              Scan the sample repo
+              Try the sample
             </Link>{" "}
             without signing in.
           </p>
@@ -65,7 +65,7 @@ export default function SignInPage() {
             <li className="grid grid-cols-[32px_minmax(0,1fr)]" style={{ padding: "18px 0", borderBottom: "1px solid var(--line)" }}>
               <Mail {...icon} style={{ marginTop: 4 }} />
               <span className="t-body">
-                <b>Read your email address</b>, to tell you when a long scan finishes.
+                <b>Read your email address</b>, kept with your account. birdsI sends no email yet.
               </span>
             </li>
           </ul>

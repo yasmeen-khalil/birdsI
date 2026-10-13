@@ -13,10 +13,10 @@ import {
 import { z } from "zod";
 import { ApiClient, toCliError } from "../api";
 import { readConfig } from "../config";
-import { CONFIDENCE_WORD, KIND_WORD, PLAIN, countsLine, fixStatusLine, formatAudit, formatFindingDetail, locationText, orderFindings, sandboxResult, STEP_LABEL } from "../format";
+import { CONFIDENCE_WORD, KIND_WORD, PLAIN, countsLine, kindWord, fixStatusLine, formatAudit, formatFindingDetail, locationText, orderFindings, sandboxResult, STEP_LABEL } from "../format";
 import { applyPatchLocally, manualApplyCommand } from "../patch";
 import { VERSION } from "../version";
-import { followScan, sendSnapshot, startScan, waitForFix } from "../workflow";
+import { expectsPullRequest, followScan, sendSnapshot, startScan, waitForFix } from "../workflow";
 import { LEGEND, q } from "../quote";
 import { allowedScanRoot } from "./scope";
 
@@ -76,7 +76,7 @@ function summarize(result: ScanResponse, top = 10): string {
     lines.push("", ordered.length > top ? `Top ${top} findings:` : "Findings:");
     for (const f of ordered.slice(0, top)) lines.push(compactFinding(f));
     if (ordered.length > top) lines.push(`${ordered.length - top} more: call birdsi_findings with scanId ${scan.id}.`);
-    lines.push("", "Confidence: Proven means a fixed rule or tool found it. Doc-verified means checked against current official docs, which are cited. Judgment means the model's reading of the code; verify before acting on it.", LEGEND);
+    lines.push("", "Confidence: Proven means a fixed rule or tool found it. Doc-verified means checked against current official docs, which are cited. Judgment means the model's reading of the code. Verify it before acting on it.", LEGEND);
   } else if (scan.summary?.headline) {
     lines.push("", LEGEND);
   }
@@ -121,13 +121,13 @@ export function createServer(): McpServer {
     {
       title: "Scan a local folder",
       description:
-        "Uploads a snapshot of a local folder (files .gitignore leaves out stay local) and scans it: exposed keys, published vulnerabilities, security problems, contradictions between files, and code that disagrees with current docs. Waits by default and returns the counts, a headline, and the top 10 findings with their ids. Use full for the whole pipeline, including vendors and limits.",
+        "Uploads a snapshot of a local folder (files .gitignore leaves out stay local) and scans it: exposed keys, published vulnerabilities, security problems, contradictions between files, and code that disagrees with current docs. Waits up to 4 minutes by default and returns the counts, a headline, and the top 10 findings with their ids. Vendors and limits refresh after every scan.",
       inputSchema: {
         path: z.string().describe("Absolute path of the folder to scan: the folder this agent was started in, or a folder inside its git repository."),
-        kind: ScanKind.optional().describe("light: Quick check, about 2 minutes (default). deep: reads all the code, 10 to 20 minutes. audit: Pre-launch audit with a verdict per area, 20 to 40 minutes."),
-        full: z.boolean().optional().describe("Full scan: the whole pipeline in order (map the code, check docs, audit, refresh vendors and limits). Implies deep."),
+        kind: ScanKind.optional().describe("light: Quick check, about 2 minutes (default). deep: Full scan, reads up to 400 files and checks them against current docs, 10 to 20 minutes. audit: Pre-launch audit with a verdict per area, 20 to 40 minutes."),
+        full: z.boolean().optional().describe("Same as kind deep, a Full scan."),
         describe: z.string().max(2000).optional().describe("What the app does, in a sentence or two. Helps birdsI judge what matters."),
-        wait: z.boolean().optional().describe("Wait for the scan to finish, up to 30 minutes (default true). With false, returns the scan id at once; poll with birdsi_scan_status."),
+        wait: z.boolean().optional().describe("Wait up to 4 minutes for the scan to finish (default true). With false, returns the scan id at once. Follow it with birdsi_scan_status."),
       },
     },
     tool("that folder", async (api, args: { path: string; kind?: z.infer<typeof ScanKind> | undefined; full?: boolean | undefined; describe?: string | undefined; wait?: boolean | undefined }) => {
@@ -140,7 +140,7 @@ export function createServer(): McpServer {
       }
       const status = await followScan(api, scan.id, { onEvents: () => undefined, timeoutMs: 4 * 60_000 });
       if (status !== "done" && status !== "failed" && status !== "stopped") {
-        return text(`Scan ${scan.id} is still running after 4 minutes and continues on birdsI. Check it with birdsi_scan_status; vendors are already visible through birdsi_inventory.${scan.dashboardUrl ? ` Dashboard: ${scan.dashboardUrl}` : ""}`);
+        return text(`Scan ${scan.id} is still running after 4 minutes and continues on birdsI. Check it with birdsi_scan_status. Vendors are already visible through birdsi_inventory.${scan.dashboardUrl ? ` Dashboard: ${scan.dashboardUrl}` : ""}`);
       }
       return text(summarize((await api.scan(scan.id)).data));
     }),
@@ -166,7 +166,7 @@ export function createServer(): McpServer {
     "birdsi_findings",
     {
       title: "List findings",
-      description: "Every finding of a scan as one line each (severity, title, file:line, confidence, who acts, id), most serious first. Filter by severity, confidence, or actionKind (fix: birdsI can fix it; steps: the owner must act).",
+      description: "Every finding of a scan as one line each (severity, title, file:line, confidence, who acts, id), most serious first. Filter by severity, confidence, or actionKind (fix means birdsI can fix it, steps means the owner must act).",
       inputSchema: {
         scanId: z.string(),
         severity: Severity.optional(),
@@ -205,7 +205,7 @@ export function createServer(): McpServer {
     {
       title: "Fix a finding",
       description:
-        "For a finding with actionKind fix: birdsI writes the change and runs the project's build and tests on a separate copy. Returns the pull request link for repositories connected through the GitHub App, otherwise the patch. With apply and a local path, applies the patch there with git apply. Fails for steps findings.",
+        "For a finding with actionKind fix: birdsI writes the change and, when sandbox testing is set up, runs the project's build and tests on a separate copy. Returns the pull request link for repositories connected through the GitHub App, otherwise the patch. With apply and a local path, applies the patch there with git apply. Fails for steps findings.",
       inputSchema: {
         findingId: z.string(),
         apply: z.boolean().optional().describe("Apply the patch to the local folder at path."),
@@ -221,7 +221,7 @@ export function createServer(): McpServer {
         return { content: [{ type: "text", text: "To apply the fix, pass path: the local folder to change." }], isError: true };
       }
       const started = (await api.startFix(finding.id)).data.fix;
-      const fix = await waitForFix(api, started, { expectPr: finding.repoId !== null });
+      const fix = await waitForFix(api, started, { expectPr: await expectsPullRequest(api, finding.repoId) });
       const lines = [fixStatusLine(fix)];
       const result = sandboxResult(fix);
       if (result) lines.push(`Test result: ${result}`);
@@ -245,7 +245,7 @@ export function createServer(): McpServer {
     }),
   );
 
-  // The operations layer: what agents cannot see from the code alone.
+  // The operations record: what agents cannot see from the code alone.
 
   const repoArg = { repoId: z.string().optional().describe("Repository id from birdsi_repos. Defaults to the repository scanned last from this computer.") };
   async function repoIdFrom(api: ApiClient, given: string | undefined): Promise<string> {
@@ -268,9 +268,9 @@ export function createServer(): McpServer {
     tool("that repository", async (api, args: { repoId?: string | undefined }) => {
       const inv = (await api.inventory(await repoIdFrom(api, args.repoId))).data;
       const lines = [`${inv.repo.fullName} (id ${inv.repo.id})`, ""];
-      lines.push(`Vision: ${inv.vision.text ? inv.vision.text : "(not written yet; ask the owner with birdsi_ask_owner if you need it)"}`, "");
-      lines.push(`Stages: ${inv.stages.map((s) => `${s.label}: ${s.freshness}${s.lastRunAt ? ` (${s.lastRunAt})` : ""}`).join("; ")}`);
-      if (inv.latestScan) lines.push(`Latest scan: ${inv.latestScan.kind} ${inv.latestScan.id}, ${inv.latestScan.findings} open findings${inv.latestScan.headline ? `. ${q(inv.latestScan.headline)}` : ""}`);
+      lines.push(`Vision: ${inv.vision.text ? inv.vision.text : "(not written yet. Ask the owner with birdsi_ask_owner if you need it.)"}`, "");
+      lines.push(`Stages: ${inv.stages.map((s) => `${s.label}: ${s.freshness}${s.lastRunAt ? ` (${s.lastRunAt})` : ""}`).join(", ")}`);
+      if (inv.latestScan) lines.push(`Latest scan: ${kindWord(inv.latestScan.kind)} ${inv.latestScan.id}, ${inv.latestScan.findings} open findings${inv.latestScan.headline ? `. ${q(inv.latestScan.headline)}` : ""}`);
       lines.push("");
       lines.push(`Alerts (${inv.alerts.length}):`, ...(inv.alerts.length ? inv.alerts.map((a) => `- [${a.level}] ${q(a.title)}. ${q(a.detail)}${a.suggestedCommand ? ` Suggested: ${q(a.suggestedCommand)}` : ""}`) : ["- none"]), "");
       if (inv.watches.length > 0) lines.push(`Tracking (might happen, not true now):`, ...inv.watches.map((w) => `- ${q(w.vendorName)}: ${q(w.title)}. ${q(w.detail)}${w.needs ? ` To know for sure: ${q(w.needs)}` : ""}`), "");
@@ -282,8 +282,8 @@ export function createServer(): McpServer {
         lines.push(`- ${q(v.name)} (${v.slug}, ${v.category}): ${q(v.purpose ?? v.what)}${plan ? ` Plan: ${q(plan.value)}.` : " Plan: unknown."}${cost ? ` ${q(cost.label)}: ${q(cost.value)}.` : ""}${usage.length ? ` ${q(usage.join(", "))}.` : ""}${v.connected ? " Connected." : v.connectable ? " Connectable (owner can connect it in Settings)." : ""}`);
       }
       lines.push("", `Open questions for the owner: ${inv.openQuestions}. Pending approvals: ${inv.pendingActions}.`);
-      if (inv.decisions.length > 0) lines.push("", "Decisions on record (newest first; do not ask about these again):", ...inv.decisions.map((d) => `- ${d.createdAt.slice(0, 10)} ${q(d.text)}${d.why ? ` (why: ${q(d.why)})` : ""} [by ${d.authorKind}]`));
-      lines.push("", "Facts carry a source: found in the code, from the connected account, from the vendor's current docs, estimated, or told by the owner. Call birdsi_vendor for one vendor's full facts with sources.", LEGEND);
+      if (inv.decisions.length > 0) lines.push("", "Decisions on record, newest first. Do not ask about these again:", ...inv.decisions.map((d) => `- ${d.createdAt.slice(0, 10)} ${q(d.text)}${d.why ? ` (why: ${q(d.why)})` : ""} [by ${d.authorKind}]`));
+      lines.push("", "Facts carry a source: found in the code, from the connected account, from the vendor's current docs, told by the owner, or told by a coding agent. Call birdsi_vendor for one vendor's full facts with sources.", LEGEND);
       return text(lines.join("\n"), inv as unknown as Record<string, unknown>);
     }),
   );
@@ -299,7 +299,7 @@ export function createServer(): McpServer {
       const { vendors } = (await api.vendors(await repoIdFrom(api, args.repoId))).data;
       const v = vendors.find((x) => x.slug === args.slug);
       if (!v) return { content: [{ type: "text", text: `No vendor called ${args.slug}. Call birdsi_inventory for the list.` }], isError: true };
-      const lines = [`${q(v.name)} (${v.category})`, q(v.what), ...(v.purpose ? [`Used here for: ${q(v.purpose)}`] : []), `Found by: ${v.detectedBy.join(", ")}${v.packages.length ? `; packages ${v.packages.join(", ")}` : ""}${v.envVars.length ? `; env ${v.envVars.join(", ")}` : ""}`, ...(v.pricingUrl ? [`Pricing: ${v.pricingUrl}`] : []), ...(v.docsUrl ? [`Docs: ${v.docsUrl}`] : []), v.connected ? "Account connected." : v.connectable ? "Account not connected; the owner can connect it in Settings." : "No connector for this vendor yet.", ""];
+      const lines = [`${q(v.name)} (${v.category})`, q(v.what), ...(v.purpose ? [`Used here for: ${q(v.purpose)}`] : []), `Found by: ${v.detectedBy.join(", ")}${v.packages.length ? `, packages ${v.packages.join(", ")}` : ""}${v.envVars.length ? `, env ${v.envVars.join(", ")}` : ""}`, ...(v.pricingUrl ? [`Pricing: ${v.pricingUrl}`] : []), ...(v.docsUrl ? [`Docs: ${v.docsUrl}`] : []), v.connected ? "Account connected." : v.connectable ? "Account not connected. The owner can connect it in Settings." : "No connector for this vendor yet.", ""];
       lines.push("Facts:");
       for (const f of v.facts) lines.push(`- ${q(f.label)}: ${q(f.value)}${f.limitNumeric !== null && f.numeric !== null ? ` (${Math.round((f.numeric / f.limitNumeric) * 100)}% of the limit)` : ""} [${f.source}${f.evidence.url ? `, ${f.evidence.url}` : ""}${f.evidence.note ? `, ${q(f.evidence.note)}` : ""}]`);
       if (v.facts.length === 0) lines.push("- none yet");
@@ -340,7 +340,7 @@ export function createServer(): McpServer {
     "birdsi_ask_owner",
     {
       title: "Ask the owner a question",
-      description: "Adds a question to the owner's Questions queue, for what only a person can answer: a decision, a plan name, a number from a dashboard. Returns the question id at once. The owner answers in the dashboard or terminal; read the answer later with birdsi_questions. Ask only what you cannot find out yourself.",
+      description: "Adds a question to the owner's Questions queue, for what only a person can answer: a decision, a plan name, a number from a dashboard. Returns the question id at once. The owner answers in the dashboard or the terminal. Read the answer later with birdsi_questions. Ask only what you cannot find out yourself.",
       inputSchema: {
         ...repoArg,
         question: z.string().min(1).max(1000),
@@ -360,7 +360,7 @@ export function createServer(): McpServer {
     {
       title: "Propose a command for approval",
       description:
-        "Proposes a command to run on the owner's machine for something outside the code, for example a plan upgrade (stripe projects upgrade vercel) or a spend limit (stripe projects billing update --limit 50). Returns the request id and whether it waits for approval or was auto-approved by the repository's policy. Nothing runs until approved. Give the cost honestly. Follow it with birdsi_action_status.",
+        "Proposes a command to run on the owner's machine for something outside the code, for example a plan upgrade (stripe projects upgrade vercel) or a spend limit (stripe projects billing update --limit 50). Returns the request id and whether it waits for approval or was auto-approved by the repository's policy. Nothing runs until approved. Give the cost honestly. Follow it with birdsi_action_status. The command must start with stripe, npm, npx, pnpm, yarn, bun, vercel, supabase, railway, fly, flyctl, gh, git or node, with no shell operators and no output flag.",
       inputSchema: {
         ...repoArg,
         title: z.string().min(1).max(200),
@@ -426,7 +426,7 @@ export function createServer(): McpServer {
     "birdsi_record_decision",
     {
       title: "Write a decision to the record",
-      description: "Records a decision you and the owner reached, or one the owner gave you, with the reason, so it is never asked again. In your own name; the owner sees who wrote it. Needs the repo's policy to allow agent writes.",
+      description: "Records a decision you and the owner reached, or one the owner gave you, with the reason, so it is never asked again. In your own name, so the owner sees who wrote it. Needs the repo's policy to allow agent writes.",
       inputSchema: { ...repoArg, text: z.string().min(1).max(2000), why: z.string().max(2000).optional(), subject: z.string().max(200).optional().describe("What it is about: a vendor slug, a finding key, a file.") },
     },
     tool("the decision", async (api, args: { repoId?: string | undefined; text: string; why?: string | undefined; subject?: string | undefined }) => {
@@ -463,7 +463,7 @@ export function createServer(): McpServer {
     "birdsi_mark_fixed",
     {
       title: "Mark a finding fixed",
-      description: "Says a finding is fixed in the code, with a note on what was done. Recorded in your name; the next scan confirms it or reopens it. Needs the repo's policy to allow agent writes.",
+      description: "Says a finding is fixed in the code, with a note on what was done. Recorded in your name. The next scan confirms it or reopens it. Needs the repo's policy to allow agent writes.",
       inputSchema: { findingId: z.string(), note: z.string().max(1000).optional() },
     },
     tool("that finding", async (api, args: { findingId: string; note?: string | undefined }) => {
@@ -476,7 +476,7 @@ export function createServer(): McpServer {
     "birdsi_sync_vendors",
     {
       title: "Refresh vendors and limits",
-      description: "Refreshes the vendor stage alone: reads connected accounts and current pricing pages again, updates alerts, and queues questions for what is still unknown. Returns at once; call birdsi_inventory in a minute for the result. Needs a finished scan.",
+      description: "Refreshes the vendor stage alone: reads connected accounts and current pricing pages again, updates alerts, and queues questions for what is still unknown. Returns at once. Call birdsi_inventory in a minute for the result. Needs a finished scan.",
       inputSchema: repoArg,
     },
     tool("the sync", async (api, args: { repoId?: string | undefined }) => {
@@ -488,13 +488,13 @@ export function createServer(): McpServer {
   server.registerTool(
     "birdsi_repos",
     {
-      title: "Connected repositories",
+      title: "Your repositories",
       description: "Repositories on the owner's birdsI account, from GitHub or uploaded from a terminal, with the ids that birdsi_ask and repoId arguments need.",
       inputSchema: {},
     },
     tool("your repositories", async (api) => {
       const { repos } = (await api.repos()).data;
-      if (repos.length === 0) return text("No repositories are connected to birdsI yet.");
+      if (repos.length === 0) return text("No repositories on birdsI yet. Run birdsi in a project folder, or connect one through GitHub on the website.");
       return text(repos.map((r) => `- ${r.fullName} (${r.private ? "private" : "public"}), id: ${r.id}`).join("\n"));
     }),
   );
@@ -503,8 +503,8 @@ export function createServer(): McpServer {
     "birdsi_ask",
     {
       title: "Ask about a repository",
-      description: "Asks birdsI a question about a connected repository and returns a plain answer that cites the files and findings it used. Answers marked Judgment have no finding behind them.",
-      inputSchema: { repoId: z.string().describe("Repository id from birdsi_repos."), question: z.string().min(1).max(4000) },
+      description: "Asks birdsI a question about one of your repositories and returns a plain answer that cites the files and findings it used. Answers marked Judgment have no finding behind them.",
+      inputSchema: { repoId: z.string().describe("Repository id from birdsi_repos."), question: z.string().min(1).max(2000) },
     },
     tool("that repository", async (api, args: { repoId: string; question: string }) => {
       const { message } = (await api.ask(args.repoId, args.question)).data;

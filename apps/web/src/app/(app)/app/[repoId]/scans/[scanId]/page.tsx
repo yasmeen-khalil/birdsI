@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Scan" };
 
 const INTRO = {
   light: "Packages, exposed keys and known problems, checked against the published vulnerability database.",
-  deep: "Every file read and compared with the others, each package checked against its current docs, and every vendor found.",
+  deep: "Up to 400 files read and compared with each other, each package checked against its current docs, and every vendor found.",
   audit: "The deepest check birdsI runs, ending in a plain answer: ready to launch, or not yet and why.",
 } as const;
 

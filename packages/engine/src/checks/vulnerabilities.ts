@@ -43,7 +43,7 @@ export const vulnerabilitiesCheck: Check = {
       const body = { queries: batch.map((d) => ({ version: d.version, package: { name: d.name, ecosystem: d.ecosystem } })) };
       const response = await fetch(OSV_BATCH, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctx.signal });
       if (!response.ok) {
-        await ctx.note(`The vulnerability database did not answer (HTTP ${response.status}); vulnerabilities were not checked for ${batch.length} packages.`);
+        await ctx.note(`The vulnerability database did not answer (HTTP ${response.status}), so ${batch.length} packages were not checked for vulnerabilities.`);
         continue;
       }
       const data = (await response.json()) as OsvBatchResponse;

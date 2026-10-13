@@ -16,8 +16,8 @@ Rules:
 - Report only real problems you can point at with line numbers. Style, naming and formatting are not problems.
 - Do not report something that is clearly handled elsewhere (for example, auth enforced by a middleware you were told about).
 - certainty is your honest probability that a competent engineer would agree it is a bug or hole.
-- actionKind is "fix" only when a change inside the repository resolves it fully; anything needing a dashboard, a key rotation or a product decision is "steps".
-- At most four findings per file, the most important first. Keep explanation under 60 words and whyItMatters under 30; copy at most six lines into excerpt; at most three steps. A short, exact finding beats a long one.
+- actionKind is "fix" only when a change inside the repository resolves it fully. Anything needing a dashboard, a key rotation or a product decision is "steps".
+- At most four findings per file, the most important first. Keep explanation under 60 words and whyItMatters under 30. Copy at most six lines into excerpt. Give at most three steps. A short, exact finding beats a long one.
 - If the file is fine, return an empty findings list. That is a good outcome, not a failure.`;
 
 export const reviewCheck: Check = {
@@ -135,7 +135,7 @@ function buildContextNotes(ctx: CheckContext): string {
   if (envExample) notes.push(`Environment variables are documented in ${envExample.path}.`);
   const proven = ctx.findingsSoFar.filter((f) => f.confidence === "proven").slice(0, 15);
   if (proven.length > 0) {
-    notes.push(`Already established by deterministic checks (do not repeat these): ${proven.map((f) => `${f.title}${f.location ? ` (${f.location.path})` : ""}`).join("; ")}`);
+    notes.push(`Already established by deterministic checks (do not repeat these): ${proven.map((f) => `${f.title}${f.location ? ` (${f.location.path})` : ""}`).join(", ")}`);
   }
   return notes.length > 0 ? `Known facts:\n- ${notes.join("\n- ")}` : "";
 }

@@ -33,10 +33,11 @@ const AUDIT_JSON_SCHEMA = toJsonSchema(AuditOutput);
 
 const SYSTEM = `You are birdsI, giving a founder a pre-launch verdict on their application. ${REVIEW_VOICE}
 
-You have the repository overview, every finding from a deep scan (with confidence classes), and deterministic facts about tests and legal pages. For each of eight areas, decide: pass (nothing found that affects launch), attention (should be handled soon), blocker (do not launch until fixed). A blocker is a real exposure: leaked keys, unprotected user data, a critical vulnerability with a fix available, payments that can be bypassed. Be decisive and specific. Do not invent problems the findings do not show; if an area has no relevant findings and the facts look fine, it passes.`;
+You have the repository overview, every finding from a deep scan (with confidence classes), and deterministic facts about tests and legal pages. For each of eight areas, decide: pass (nothing found that affects launch), attention (should be handled soon), blocker (do not launch until fixed). A blocker is a real exposure: leaked keys, unprotected user data, a critical vulnerability with a fix available, payments that can be bypassed. Be decisive and specific. Do not invent problems the findings do not show. If an area has no relevant findings and the facts look fine, it passes.`;
 
 /**
- * The pre-launch audit: eight areas, a verdict each, and three lists. It
+ * The pre-launch audit: nine areas, a verdict each, and three lists. The
+ * model judges eight of them and services and limits are judged by rule. It
  * reads the findings the other checks produced plus a few deterministic
  * facts, and asks the strongest model to judge.
  */
@@ -107,12 +108,12 @@ export async function runAudit(ctx: CheckContext, findings: FindingDraft[]): Pro
  */
 export function operationsArea(ops: OpsSummary | null): AuditAreaResult {
   if (!ops || ops.vendors === 0) {
-    return { area: "operations", verdict: "pass", note: ops ? "No outside services were found in the code." : "The services the app runs on have not been synced yet; this area is judged after the first sync.", findingIds: [] };
+    return { area: "operations", verdict: "pass", note: ops ? "No outside services were found in the code." : "The services the app runs on have not been synced yet. This area is judged after the first sync.", findingIds: [] };
   }
   const critical = ops.alerts.filter((a) => a.level === "critical");
   const warnings = ops.alerts.filter((a) => a.level === "warning");
   const unknownPlans = ops.vendors - ops.plansKnown;
-  const watching = ops.watches.length > 0 ? ` Tracking: ${ops.watches.slice(0, 3).map((w) => w.title.toLowerCase()).join("; ")}.` : "";
+  const watching = ops.watches.length > 0 ? ` Tracking: ${ops.watches.slice(0, 3).map((w) => w.title.toLowerCase()).join(", ")}.` : "";
   if (critical.length > 0) {
     return { area: "operations", verdict: "blocker", note: `${critical.map((a) => a.title).join(". ")}. Launching now means users hit this.${watching}`, findingIds: [] };
   }

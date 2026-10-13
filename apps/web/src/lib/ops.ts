@@ -48,7 +48,7 @@ import { ApiError } from "./api";
 import { assertSpendCap, assertUserSpendCap } from "./limits";
 
 /**
- * The operations layer: vendors and their facts, alerts, the pipeline
+ * The operations record: vendors and their facts, alerts, the pipeline
  * stages, questions, action requests, the agent policy and the vision.
  * Shared by the web pages, /api/v1 and therefore the CLI and MCP server.
  */
@@ -244,7 +244,7 @@ export async function changePolicy(repoId: string, user: UserRow, patch: UpdateP
   if (patch.allowPropose !== undefined) parts.push(`agents may ${patch.allowPropose ? "" : "not "}ask and propose`);
   if (patch.allowWrite !== undefined) parts.push(`agents may ${patch.allowWrite ? "" : "not "}write to the record`);
   if (patch.autoApproveUnderUsd !== undefined) parts.push(patch.autoApproveUnderUsd === null ? "always ask before a command" : `approve commands at or under $${patch.autoApproveUnderUsd} a month`);
-  await note(repo.id, ownerAuthor(user), { kind: "policy", text: parts.length ? `Policy: ${parts.join("; ")}.` : "Policy updated.", data: { ...patch } });
+  await note(repo.id, ownerAuthor(user), { kind: "policy", text: parts.length ? `Policy: ${parts.join(", ")}.` : "Policy updated.", data: { ...patch } });
   return policy;
 }
 
@@ -317,14 +317,14 @@ export async function loadInventory(repoId: string, user: UserRow): Promise<Inve
   };
 }
 
-// Connections (web only: tokens are pasted in the browser, never sent through the CLI)
+// Connected accounts (web only: tokens are pasted in the browser, never sent through the CLI)
 
 export function connectorCatalog() {
   return connectorInfo();
 }
 
 export async function connectVendor(user: UserRow, input: { vendorSlug: string; token: string; settings: Record<string, string> }): Promise<void> {
-  if (!isSecretsKeyConfigured()) throw new ApiError(500, "not_configured", "Connections are not available: BIRDSI_SECRETS_KEY is not set on the server.");
+  if (!isSecretsKeyConfigured()) throw new ApiError(500, "not_configured", "Connected accounts are not switched on for this copy of birdsI yet.");
   const connector = CONNECTOR_BY_SLUG.get(input.vendorSlug);
   if (!connector) throw new ApiError(400, "bad_request", "birdsI has no connector for that service yet.");
   const token = input.token.trim();

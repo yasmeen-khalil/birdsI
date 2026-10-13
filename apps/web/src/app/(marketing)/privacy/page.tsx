@@ -3,8 +3,8 @@ import Link from "next/link";
 import { LegalList, LegalP, LegalPage, LegalSection } from "@/components/marketing/Legal";
 import { GITHUB_REPO_URL } from "@/components/marketing/SiteChrome";
 
-/** Replace with the legal name of the person or company that runs this instance of birdsI. */
-const OPERATOR_NAME = "{{OPERATOR_NAME}}";
+/** Who runs this instance of birdsI. A self-hosted copy names its own operator here. */
+const OPERATOR_NAME = "yasmeen-khalil";
 const EFFECTIVE_DATE = "28 September 2026";
 const SECURITY_POLICY_URL = `${GITHUB_REPO_URL}/security/policy`;
 
@@ -36,7 +36,7 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             <>
-              <b>Your account.</b> Your GitHub username and user id, the email address on your GitHub account, and whether you want email updates. Sign-in itself is handled by Clerk.
+              <b>Your account.</b> Your GitHub username and user id, the email address on your GitHub account, and whether you want email updates. birdsI sends no email yet. Sign-in itself is handled by Clerk.
             </>,
             <>
               <b>Repositories you connect.</b> Their names, default branches, and the GitHub App installation that grants access.
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
               <b>Tokens.</b> Terminal and MCP tokens are stored only as one-way hashes. Vendor account tokens you connect are stored encrypted, so birdsI can read plans and usage.
             </>,
             <>
-              <b>Sample scans.</b> Visitors who try the sample are not asked to sign in. birdsI keeps a one-way hash of the network address and browser name for an hour, to limit how often the sample runs.
+              <b>Sample scans.</b> Visitors who try the sample are not asked to sign in. birdsI keeps a one-way hash of the network address and browser name, to limit how often the sample runs.
             </>,
           ]}
         />
@@ -73,7 +73,7 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             "Repository snapshots uploaded by the terminal tool are kept for up to seven days, so a fix can be applied to the same code, then deleted. They are deleted at once when you delete your account. Environment files and private keys are never uploaded in the first place.",
-            "Findings, scan results, dependency lists, chats and fixes are kept until you delete your account. Disconnecting a repository stops birdsI from reading it; its earlier results stay until your account is deleted.",
+            "Findings, scan results, dependency lists, chats and fixes are kept until you delete your account. Disconnecting a repository stops birdsI from reading it and deletes its scans, findings and other results.",
             "Usage records are kept for cost accounting. When you delete your account they stay, without your name or email, tied only to your sign-in account number, so the daily limits still count them if you sign in again.",
             "Indexed code passages for chat are not bound by the seven days: they stay until the next scan replaces them, and are deleted with the repository or your account. Keys in a shape birdsI recognises are masked before the passages, call sites and excerpts are stored.",
             "Backups made by the database host roll off within their own retention window after deletion.",
@@ -93,6 +93,9 @@ export default function PrivacyPage() {
             </>,
             <>
               <b>Tavily</b> searches current documentation and vendor pricing pages. It receives search queries built from package and vendor names, not your source files. <b>Vendors you connect</b> receive read-only requests made with your token.
+            </>,
+            <>
+              <b>OSV</b> and <b>deps.dev</b> receive the names and versions of your packages, to check them for known problems. The <b>npm</b>, <b>PyPI</b> and <b>crates.io</b> registries receive package names, to look up their latest versions.
             </>,
             <>
               <b>LangSmith</b>, when enabled by the operator, records model calls, including the passages sent, to measure how accurate findings are.
@@ -120,7 +123,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="Deleting your data">
         <LegalP>
-          In <Link href="/settings">Settings</Link> you can disconnect a repository, revoke terminal and MCP tokens, turn off email updates, and delete your account. Deleting your account removes your findings, scans, chats, fixes and tokens and disconnects every repository. Usage records remain without your name or email, so the daily limits still count them if you sign in again. Pull requests birdsI opened stay on GitHub, because they belong to your repository.
+          In <Link href="/settings">Settings</Link> you can disconnect a repository, revoke terminal and MCP tokens, choose whether you want email updates (none are sent yet), and delete your account. Deleting your account removes your findings, scans, chats, fixes and tokens and disconnects every repository. Usage records remain without your name or email, so the daily limits still count them if you sign in again. Pull requests birdsI opened stay on GitHub, because they belong to your repository.
         </LegalP>
       </LegalSection>
 

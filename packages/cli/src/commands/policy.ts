@@ -26,7 +26,7 @@ export async function policyCommand(options: { repo?: string; json?: boolean; as
     println(paint.bold(style, `Agent policy for ${repo.fullName}`));
     println(`  Agents may ask questions and propose commands: ${p.allowPropose ? "yes" : "no"}`);
     println(`  Agents may write to the record: ${p.allowWrite ? "yes" : "no"}`);
-    println(`  Approved without asking: ${p.autoApproveUnderUsd === null ? "nothing; the owner is always asked" : `commands at or under $${p.autoApproveUnderUsd} a month that start with ${p.autoApprovePrefixes.join(", ")}`}`);
+    println(`  Approved without asking: ${p.autoApproveUnderUsd === null ? "nothing, the owner is always asked" : `commands at or under $${p.autoApproveUnderUsd} a month that start with ${p.autoApprovePrefixes.join(", ")}`}`);
     println();
     println(wrap("Account-changing commands from an agent's shell (plan upgrades, env changes, deploys, secrets, pauses) go through birdsI with the hook: birdsi policy --hint", style, "  "));
     return EXIT.ok;
@@ -102,7 +102,7 @@ export function hookHint(): string {
     "",
     "The hook needs birdsi login on this computer, or BIRDSI_TOKEN in the",
     "environment, to read the repository's policy. When birdsI cannot be",
-    "reached, account-changing commands stay blocked; the rest still pass.",
+    "reached, account-changing commands stay blocked and the rest still pass.",
     "",
   ].join("\n");
 }

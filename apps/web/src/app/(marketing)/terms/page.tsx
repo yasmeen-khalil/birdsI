@@ -3,8 +3,8 @@ import Link from "next/link";
 import { LegalList, LegalP, LegalPage, LegalSection } from "@/components/marketing/Legal";
 import { GITHUB_REPO_URL } from "@/components/marketing/SiteChrome";
 
-/** Replace with the legal name of the person or company that runs this instance of birdsI. */
-const OPERATOR_NAME = "{{OPERATOR_NAME}}";
+/** Who runs this instance of birdsI. A self-hosted copy names its own operator here. */
+const OPERATOR_NAME = "yasmeen-khalil";
 const EFFECTIVE_DATE = "28 September 2026";
 const SECURITY_POLICY_URL = `${GITHUB_REPO_URL}/security/policy`;
 
@@ -27,7 +27,7 @@ export default function TermsPage() {
 
       <LegalSection title="What birdsI does">
         <LegalP>
-          birdsI reads the code in repositories you connect, finds the outside services (vendors) it runs on, checks the code against current documentation and vulnerability databases, and reports what it finds. With accounts you connect, it reads plans, usage, limits and spend. For some findings it writes a fix, tests it on a separate copy, and opens a pull request. For others it gives you steps to follow.
+          birdsI reads the code in repositories you connect, finds the outside services (vendors) it runs on, checks the code against current documentation and vulnerability databases, and reports what it finds. With accounts you connect, it reads plans, usage, limits and spend. For some findings it writes a fix and opens a pull request, tested on a separate copy first when sandbox testing is set up. Otherwise the pull request says the change was not run. For others it gives you steps to follow.
         </LegalP>
         <LegalP>Every finding says how sure birdsI is: Proven, Doc-verified, or Judgment. Judgment findings are an AI model’s reading of your code and may be wrong.</LegalP>
       </LegalSection>
@@ -44,7 +44,7 @@ export default function TermsPage() {
 
       <LegalSection title="Fixes and pull requests">
         <LegalP>
-          A fix is a proposal. birdsI opens it as a pull request on a new branch and never merges it or pushes to your main branch. You decide whether to merge, and you are responsible for reviewing the change first. A passing test lowers the risk of a broken change but does not remove it. Commands a coding agent or birdsI proposes run only after you approve them, on your own computer, and you are responsible for what they do, including plan changes and charges.
+          A fix is a proposal. birdsI opens it as a pull request on a new branch and never merges it or pushes to your main branch. You decide whether to merge, and you are responsible for reviewing the change first. A passing test lowers the risk of a broken change but does not remove it. Nothing a coding agent or birdsI proposes runs until it is approved, by you or by the rule you set. Commands run on your own computer, and you are responsible for what they do, including plan changes and charges.
         </LegalP>
       </LegalSection>
 

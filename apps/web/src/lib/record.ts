@@ -1,5 +1,5 @@
 import { addRecordEntry, type RecordInput, type UserRow } from "@birdsi/db";
-import type { RecordAuthorKind } from "@birdsi/shared";
+import { RECORD_AUTHOR_LABEL, type RecordAuthorKind } from "@birdsi/shared";
 
 export interface RecordAuthor {
   kind: RecordAuthorKind;
@@ -13,7 +13,7 @@ export function ownerAuthor(user: UserRow): RecordAuthor {
 
 /** Who is writing: an agent through MCP, or the person (browser or terminal). */
 export function callerAuthor(request: Request, user: UserRow): RecordAuthor {
-  return request.headers.get("x-birdsi-client") === "mcp" ? { kind: "agent", label: "coding agent via MCP" } : ownerAuthor(user);
+  return request.headers.get("x-birdsi-client") === "mcp" ? { kind: "agent", label: RECORD_AUTHOR_LABEL.agent } : ownerAuthor(user);
 }
 
 /**

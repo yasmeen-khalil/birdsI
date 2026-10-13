@@ -118,6 +118,11 @@ export const KIND_WORD: Record<ScanKind, string> = {
   audit: "Pre-launch audit",
 };
 
+/** The product's word for a scan kind given as a plain string, or the string itself for a kind this version does not know. */
+export function kindWord(kind: string): string {
+  return (KIND_WORD as Record<string, string>)[kind] ?? kind;
+}
+
 /** Default step labels, used until the server names a step. */
 export const STEP_LABEL: Record<ScanStep, string> = {
   fetch: "Receive your files",
@@ -383,7 +388,7 @@ const AUDIT_AREA_WORD: Record<AuditReport["areas"][number]["area"], string> = {
   tests: "Tests and checks",
 };
 
-export const AUDIT_VERDICT_WORD = { pass: "Pass", attention: "Needs attention", blocker: "Blocker" } as const;
+export const AUDIT_VERDICT_WORD = { pass: "Cleared", attention: "Fix before launch", blocker: "Blocks launch" } as const;
 
 export function formatAuditArea(
   area: AuditReport["areas"][number]["area"],
@@ -392,7 +397,7 @@ export function formatAuditArea(
   style: Style,
 ): string {
   const g = glyphs(style);
-  const mark = verdict === "pass" ? paint.ok(style, g.done) : verdict === "blocker" ? paint.fail(style, g.failed) : paint.high(style, "!");
+  const mark = verdict === "pass" ? paint.ok(style, g.done) : verdict === "blocker" ? paint.fail(style, g.failed) : paint.high(style, style.unicode ? "△" : "*");
   return `  ${mark} ${AUDIT_AREA_WORD[area].padEnd(20)} ${AUDIT_VERDICT_WORD[verdict]}. ${note}`;
 }
 
@@ -466,12 +471,17 @@ export function fixStatusLine(fix: Fix): string {
     case "testing":
       return "Testing the fix on a separate copy of your code.";
     case "tested":
-      return "Tested on a separate copy, and it passed.";
+      return sandboxRan(fix) ? "Tested on a separate copy, and it passed." : "Ready. It was not run on a separate copy.";
     case "pr_open":
       return fix.prNumber ? `Pull request #${fix.prNumber} is open.` : "The pull request is open.";
     case "failed":
       return `The fix did not pass${fix.error ? `: ${fix.error}` : "."}`;
   }
+}
+
+/** True when the fix ran in the sandbox. The worker starts the log with the command it ran, and otherwise says why it did not run. */
+export function sandboxRan(fix: Pick<Fix, "testLog">): boolean {
+  return fix.testLog?.startsWith("$ ") ?? false;
 }
 
 /** Last meaningful line of the sandbox log, e.g. "build passes, 38 of 38 tests pass". */

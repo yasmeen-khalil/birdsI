@@ -37,7 +37,7 @@ export function DeviceApproval({ initialCode, initialState }: { initialCode: str
         {!r.ok && (
           <div>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setState("form")}>
-              Enter a different code
+              Use another code
             </button>
           </div>
         )}

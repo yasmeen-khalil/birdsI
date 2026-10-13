@@ -142,7 +142,7 @@ export function ScanControls({ repoId, runningKind, syncRunning = false }: { rep
           <button type="button" className="mi" disabled={syncPending || syncRunning} onClick={refreshVendors} style={syncPending || syncRunning ? { opacity: 0.45, cursor: "not-allowed" } : undefined}>
             {syncPending ? <ButtonArc /> : <RefreshCw {...icon} />}
             <span className="flex flex-col">
-              <span>{syncRunning ? "Vendors refreshing" : "Refresh vendors"}</span>
+              <span>{syncRunning ? "Refreshing vendors" : "Refresh vendors"}</span>
               <span className="t-small c3">Plans, usage, limits and spend only.</span>
             </span>
           </button>

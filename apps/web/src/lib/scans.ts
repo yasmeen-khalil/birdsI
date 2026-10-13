@@ -199,8 +199,8 @@ export async function askRepo(repoId: string, user: UserRow, question: string): 
     projectSummary = [
       inv.vision.text ? `Vision: ${inv.vision.text.slice(0, 600)}` : "Vision: not written yet.",
       `Vendors (${inv.vendors.length}): ${inv.vendors.map((v) => `${v.name}${v.facts.find((f) => f.kind === "plan") ? ` (${v.facts.find((f) => f.kind === "plan")!.value})` : ""}`).join(", ") || "none found yet"}`,
-      `Alerts: ${inv.alerts.map((a) => `[${a.level}] ${a.title}`).join("; ") || "none"}`,
-      `Tracking: ${inv.watches.map((w) => `${w.vendorName}: ${w.title}`).join("; ") || "nothing"}`,
+      `Alerts: ${inv.alerts.map((a) => `[${a.level}] ${a.title}`).join(", ") || "none"}`,
+      `Tracking: ${inv.watches.map((w) => `${w.vendorName}: ${w.title}`).join(", ") || "nothing"}`,
       `Stages: ${inv.stages.map((s) => `${s.label} ${s.freshness}`).join(", ")}`,
       `Open questions for the owner: ${inv.openQuestions}. Pending approvals: ${inv.pendingActions}.`,
       inv.latestScan ? `Latest scan: ${inv.latestScan.kind}, ${inv.latestScan.findings} open findings.` : "No scan has finished yet.",

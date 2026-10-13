@@ -324,7 +324,7 @@ export type StageState = z.infer<typeof StageState>;
 export const STAGE_LABEL: Record<StageId, string> = {
   inventory: "Map the code",
   docs: "Check current docs",
-  audit: "Audit the code",
+  audit: "Read the code",
   ops: "Sync vendors and limits",
 };
 

@@ -9,7 +9,7 @@ import { FindingRow } from "@/components/FindingRow";
 import { Frame } from "@/components/Frame";
 import { LocalTime } from "@/components/LocalTime";
 import { orNotFound } from "@/components/guard";
-import { compareFindings, CONFIDENCE_LABEL, plural, repoName, shortDuration, shortSha } from "@/components/format";
+import { compareFindings, CONFIDENCE_LABEL, KIND_SECONDS, plural, repoName, shortDuration, shortSha } from "@/components/format";
 import { icon } from "@/components/icon";
 import { LiveScan } from "@/components/scan/LiveScan";
 import { latestDone, recentScans, repoContext } from "@/components/server/data";
@@ -192,7 +192,7 @@ function Report({ scan, report, findings, base, name }: { scan: Scan; report: Au
         <PrintButton />
         <span className="flex flex-col gap-3 min-[901px]:flex-row">
           <Link className="btn btn-secondary" href={`${base}/audit?new=1`}>
-            Run the audit again
+            Audit again
           </Link>
           {firstBlocker && (
             <Link className="btn btn-primary" href={`${base}/findings/${firstBlocker.id}`}>
@@ -233,11 +233,11 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
           initialCursor={events[events.length - 1]?.seq ?? 0}
           stepLabels={STEP_LABELS}
           heading={`Auditing ${name}`}
-          intro={`Pre-launch audit of ${audit.branch ?? repo.default_branch}. Every file is read first, then each launch area is judged.`}
+          intro={`Pre-launch audit of ${audit.branch ?? repo.default_branch}. Up to 600 files are read first, then each launch area is judged.`}
           mapTitle={`${name} from above`}
           mode="app"
           repoId={repo.id}
-          expectedSeconds={1500}
+          expectedSeconds={KIND_SECONDS.audit}
           scanError={audit.error}
           leaveNote="Safe to close this page"
           areaTitles={areaTitles()}
@@ -262,7 +262,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
             {problem.status === "stopped" ? "The last audit was stopped" : "The last audit did not finish"}
           </h2>
           <p className="t-small c2">
-            {problem.status === "stopped" ? "It was stopped before every area was judged." : (problem.error ?? "It stopped with an error before it finished.")} Start it again below. It takes about 25 minutes.
+            {problem.status === "stopped" ? "It was stopped before every area was judged." : (problem.error ?? "It stopped with an error before it finished.")} Start it again below. It takes 20 to 40 minutes.
           </p>
           <p className="t-mono-s c3">Reference: scan {problem.id.slice(0, 6)}</p>
         </section>
@@ -279,13 +279,13 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
           <>
             <h1 className="t-display">Pre-launch audit</h1>
             <p className="t-body-l c2" style={{ maxWidth: 560 }}>
-              The deepest check birdsI runs. It reads every file with its most careful model, judges each area a real launch depends on, and ends with a plain answer: ready, or not yet and why.
+              The deepest check birdsI runs. It reads up to 600 files with its most careful model, judges each area a real launch depends on, and ends with a plain answer: ready, or not yet and why.
             </p>
             <dl className="t-body grid grid-cols-[120px_minmax(0,1fr)] gap-y-2.5" style={{ margin: "8px 0 0", maxWidth: 560 }}>
               <dt className="c3">Takes</dt>
               <dd style={{ margin: 0 }}>20 to 40 minutes. You can close the page.</dd>
               <dt className="c3">Covers</dt>
-              <dd style={{ margin: 0 }}>{latest?.stats ? `${AUDIT_AREAS.length} areas, ${plural(latest.stats.filesSeen, "file")}, ${plural(latest.stats.dependencies, "dependency", "dependencies")}` : `${AUDIT_AREAS.length} areas, every file and every dependency`}</dd>
+              <dd style={{ margin: 0 }}>{latest?.stats ? `${AUDIT_AREAS.length} areas, ${plural(latest.stats.filesSeen, "file")}, ${plural(latest.stats.dependencies, "dependency", "dependencies")}` : `${AUDIT_AREAS.length} areas, up to 600 files and every dependency`}</dd>
               <dt className="c3">When done</dt>
               <dd style={{ margin: 0 }}>The report appears on this page</dd>
             </dl>

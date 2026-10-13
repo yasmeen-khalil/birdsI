@@ -23,8 +23,7 @@ export function DemoTopBar() {
         <span className="t-small c3 max-[900px]:hidden">Scan your own code next</span>
         <Link className="btn btn-secondary btn-sm" href="/sign-in" style={{ minHeight: 36 }}>
           <Github {...icon} />
-          <span className="max-[900px]:hidden">Sign in with GitHub</span>
-          <span className="min-[901px]:hidden">Sign in</span>
+          Sign in
         </Link>
       </span>
     </header>

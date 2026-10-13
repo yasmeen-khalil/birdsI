@@ -12,7 +12,7 @@ import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import { icon } from "@/components/icon";
 import { currentUserRow } from "@/lib/auth";
 
-/** The sample repository seen from above: a fixed illustration, no data needed. */
+/** An example app seen from above: a fixed illustration, not the sample's real numbers. */
 const SAMPLE: Array<{ name: string; count: number; critical: number[]; medium: number[] }> = [
   { name: "app", count: 34, critical: [], medium: [21] },
   { name: "app/api", count: 12, critical: [3], medium: [] },
@@ -94,7 +94,7 @@ export default async function LandingPage() {
   ) : (
     <Link className="btn btn-secondary btn-lg" href="/sign-in">
       <Github {...icon} />
-      Sign in with GitHub
+      Sign in
     </Link>
   );
 
@@ -114,11 +114,11 @@ export default async function LandingPage() {
         >
           <div className="t-small c2 flex items-baseline justify-between gap-4">
             <span>
-              <span className="max-[900px]:hidden">birdsI, the operations layer for coding agents</span>
-              <span className="min-[901px]:hidden">Operations for coding agents</span>
+              <span className="max-[900px]:hidden">birdsI, the operations record for an app, built for coding agents</span>
+              <span className="min-[901px]:hidden">The operations record for an app</span>
             </span>
             <span className="t-mono-s c2">
-              <span className="max-[900px]:hidden">Sample scan: 142 files, 38 dependencies, about 2 min</span>
+              <span className="max-[900px]:hidden">Sample scan: a quick check, about 2 min</span>
               <span className="min-[901px]:hidden">Sample: about 2 min</span>
             </span>
           </div>
@@ -127,7 +127,7 @@ export default async function LandingPage() {
           </h1>
           <div className="grid grid-cols-1 gap-8 min-[901px]:mt-auto min-[901px]:grid-cols-[minmax(0,1fr)_minmax(0,500px)] min-[901px]:items-end min-[901px]:gap-x-20 min-[901px]:pt-16">
             <div className="flex flex-col gap-6" style={{ maxWidth: 500 }}>
-              <p className="t-body-l c2 max-[900px]:text-[16px]!">Run npx birdsi in a project. It maps the code, finds every outside service the app runs on with its plan, limits and spend, audits it against current docs, and asks you only what it cannot know.</p>
+              <p className="t-body-l c2 max-[900px]:text-[16px]!">Run npx birdsi in a project. It maps the code, finds every outside service the app runs on with its plan, limits and spend, checks it against current docs, and asks you only what it cannot know.</p>
               <div className="flex flex-wrap gap-3 max-[900px]:flex-col max-[900px]:[&>*]:w-full max-[900px]:[&_.btn]:w-full">
                 {primaryCta}
                 <DemoButton />
@@ -159,16 +159,16 @@ export default async function LandingPage() {
           </div>
         </Frame>
 
-        <section className="grid grid-cols-1 gap-y-6 pt-[72px] min-[901px]:grid-cols-12 min-[901px]:gap-x-6 min-[901px]:gap-y-10 min-[901px]:pt-32" aria-label="A sample shop app seen from above">
+        <section className="grid grid-cols-1 gap-y-6 pt-[72px] min-[901px]:grid-cols-12 min-[901px]:gap-x-6 min-[901px]:gap-y-10 min-[901px]:pt-32" aria-label="An example app seen from above">
           <SectionRule index="01" />
           <figure className="m-0 grid grid-cols-1 gap-5 min-[901px]:col-span-12 min-[901px]:grid-cols-12 min-[901px]:gap-x-6">
             <figcaption className="t-small c3 order-2 flex flex-col gap-2 min-[901px]:order-1 min-[901px]:col-span-3">
-              <span className="max-[900px]:hidden">corner-bakery seen from above. Each square is one file.</span>
-              <span className="max-[900px]:hidden">Ringed squares have findings: 6 in 142 files.</span>
-              <span className="min-[901px]:hidden">A sample shop app from above. Each square is a file. Ringed ones have findings.</span>
+              <span className="max-[900px]:hidden">Example. An app seen from above. Each square is one file.</span>
+              <span className="max-[900px]:hidden">Ringed squares have findings.</span>
+              <span className="min-[901px]:hidden">Example. An app from above. Each square is a file. Ringed ones have findings.</span>
             </figcaption>
             <div className="order-1 min-w-0 min-[901px]:order-2 min-[901px]:col-span-9">
-              <BirdsEyeMap folders={sampleFolders} hits={sampleHits} label="A sample shop app seen from above, one square per file" style={{ gap: "24px 34px" }} />
+              <BirdsEyeMap folders={sampleFolders} hits={sampleHits} label="An example app seen from above, one square per file" style={{ gap: "24px 34px" }} />
             </div>
           </figure>
         </section>
@@ -202,8 +202,8 @@ export default async function LandingPage() {
 
           <div className="panel mt-4 overflow-hidden min-[901px]:col-span-12 min-[901px]:mt-0">
             <div className="flex items-center justify-between gap-3" style={{ padding: "14px 20px", background: "var(--surface)" }}>
-              <span className="t-label c2">From the sample scan of corner-bakery</span>
-              <span className="t-mono-s c3">6 findings, 3 shown</span>
+              <span className="t-label c2">Findings as birdsI shows them</span>
+              <span className="tag">Example</span>
             </div>
             {SAMPLE_FINDINGS.map((f) => (
               <div key={f.title} className="frow max-[900px]:px-4!">
@@ -228,7 +228,7 @@ export default async function LandingPage() {
           <SectionRule index="03" />
           <h2 className="t-display max-[900px]:text-[32px]! min-[901px]:col-span-5">Nothing changes until you say so.</h2>
           <p className="t-body-l c2 max-[900px]:text-[15px]! min-[901px]:col-span-5 min-[901px]:col-start-7 min-[901px]:self-end">
-            When the fix is in your code, birdsI writes it, tests it, and opens a pull request you merge. When it lives outside the code, like database settings or a vendor plan, you get the steps. Your coding agent works the same way: it proposes, you approve.
+            When the fix is in your code, birdsI writes it and opens a pull request you merge, tested first when sandbox testing is set up. When it lives outside the code, like database settings or a vendor plan, you get the steps. Your coding agent works the same way: it proposes, you approve.
           </p>
           <div className="mt-4 flex min-w-0 flex-col gap-4 min-[901px]:col-span-6 min-[901px]:mt-0">
             <ActionKind kind="fix" strong />
@@ -248,7 +248,7 @@ export default async function LandingPage() {
                 ))}
               </div>
             </div>
-            <p className="t-small c3">Tested before it was opened: build passes, 21 of 21 tests pass.</p>
+            <p className="t-small c3">Example. When sandbox testing is set up, the change is built and tested before the pull request opens. Otherwise the pull request says it was not run.</p>
           </div>
           <div className="mt-6 flex flex-col gap-4 min-[901px]:col-span-6 min-[901px]:mt-0">
             <ActionKind kind="steps" strong />
@@ -279,7 +279,7 @@ export default async function LandingPage() {
           <h2 className="t-display max-[900px]:text-[32px]! min-[901px]:col-span-6">Use it where you already work.</h2>
           {[
             ["In the browser", "A dashboard for each app: findings, vendors, alerts, questions, approvals and your vision. Ask about your code in plain words.", null],
-            ["In the terminal", "One command in your project folder runs a full scan and opens the dashboard.", "npx birdsi"],
+            ["In the terminal", "One command in your project folder runs a quick check and opens the dashboard. Add --full for the full scan.", "npx birdsi"],
             ["Inside your coding agent", "Through MCP, the standard way agents use tools, Claude Code, Cursor or Codex read your vendors and limits, ask you questions and propose actions.", "npx birdsi mcp"],
           ].map(([title, body, cmd], i) => (
             <div key={title} className={`flex flex-col gap-3 pt-4 min-[901px]:col-span-4 min-[901px]:pt-5 ${i === 0 ? "min-[901px]:col-start-1" : ""}`} style={{ borderTop: "1px solid var(--text)" }}>

@@ -5,6 +5,18 @@ import {
 } from "@birdsi/shared";
 import { LocalTime } from "../LocalTime";
 
+const FINDING_KINDS = new Set<RecordEntry["kind"]>(["finding_fixed", "finding_dismissed", "finding_reopened", "fix_opened"]);
+
+/**
+ * The subject as a person reads it. A finding's subject is an internal key
+ * (the title already names it), and a fact's is "vendor:metric".
+ */
+function subjectLabel(e: RecordEntry): string | null {
+  if (!e.subject || FINDING_KINDS.has(e.kind)) return null;
+  if (e.kind === "fact") return e.subject.replace(":", ", ").replace(/_/g, " ");
+  return e.subject;
+}
+
 /**
  * The record, newest first: the kind on the left, the entry in the middle, the
  * time on the right (on a phone the kind and the time share the first line).
@@ -23,6 +35,7 @@ export function RecordPanel({
       <ol className="m-0 flex list-none flex-col p-0">
         {entries.map((e, i) => {
           const decision = e.kind === "decision";
+          const subject = subjectLabel(e);
           return (
             <li
               key={e.id}
@@ -53,9 +66,9 @@ export function RecordPanel({
                   <span>
                     By {e.authorLabel ?? RECORD_AUTHOR_LABEL[e.authorKind]}
                   </span>
-                  {e.subject && (
+                  {subject && (
                     <span className="tag max-w-full">
-                      <span className="truncate">{e.subject}</span>
+                      <span className="truncate">{subject}</span>
                     </span>
                   )}
                 </span>

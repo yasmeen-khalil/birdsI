@@ -95,7 +95,7 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="approvals-title">
-        <SectionHead id="approvals-title" title="Approvals" intro="Commands your coding agent or birdsI proposes, like upgrading a plan. Nothing runs until you approve it." count={pending.length} />
+        <SectionHead id="approvals-title" title="Approvals" intro="Commands your coding agent or birdsI proposes, like upgrading a plan. Nothing runs until it is approved, by you or by the rule you set." count={pending.length} />
         {pending.length === 0 ? (
           <Empty>Nothing to approve. When an agent proposes a command, it waits here until you decide.</Empty>
         ) : (
@@ -171,6 +171,9 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
             </code>
             <CopyButton text={MCP_SERVER} />
           </div>
+          <p className="t-small c3">
+            Until the package is on npm, run it from a clone: <span className="t-mono">npm install</span>, then <span className="t-mono">npx tsx packages/cli/src/birdsi.ts mcp</span>.
+          </p>
           <p className="t-small c3">MCP is the standard way coding agents connect to tools. Your agent can then read the vendors, limits, alerts and vision, ask you questions, propose commands, and write decisions, facts and fixed marks to the record.</p>
         </Frame>
       </section>

@@ -182,5 +182,5 @@ export function checkCommand(command: string, policy: Pick<AgentPolicy, "allowPr
   if (policy && !policy.allowPropose) {
     return { verdict: "propose", vendor, reason: `This changes the ${vendor} account, and agents may not propose commands in this repository. Tell the owner what you would run and why, and let them run it.` };
   }
-  return { verdict: "propose", vendor, reason: `This changes the ${vendor} account. Propose it with birdsi_request_action (the exact command, the reason, the monthly cost) and wait for the owner's yes; it then runs on the owner's machine with birdsi approvals run. Do not run it here.` };
+  return { verdict: "propose", vendor, reason: `This changes the ${vendor} account. Propose it with birdsi_request_action (the exact command, the reason, the monthly cost) and wait for the owner's yes. It then runs on the owner's machine with birdsi approvals run. Do not run it here.` };
 }

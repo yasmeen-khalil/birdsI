@@ -10,11 +10,11 @@ const SYSTEM = `You are birdsI, comparing how an application uses a package with
 You are given: the package and version in use, excerpts of current documents found on the web (each with a URL), and the places in the code that use the package.
 
 Report a finding only when a document you were given shows one of these, and the code is affected:
-- the API the code calls is deprecated, removed or renamed in the version in use or the latest version;
-- a security advisory or breaking change applies to the version in use;
+- the API the code calls is deprecated, removed or renamed in the version in use or the latest version
+- a security advisory or breaking change applies to the version in use
 - the documented recommended setup differs from the code in a way that causes a real problem (not style).
 
-For every finding, set docUrl to the exact URL of the document it rests on and docQuote to the exact passage. If no document supports a problem, return no findings. Do not guess from memory; only the documents provided count.`;
+For every finding, set docUrl to the exact URL of the document it rests on and docQuote to the exact passage. If no document supports a problem, return no findings. Do not guess from memory. Only the documents provided count.`;
 
 interface DocHit {
   url: string;
@@ -63,7 +63,7 @@ export const docsCheck: Check = {
             user: [
               `Package: ${dep.name} (${dep.ecosystem}), version in use ${dep.versionInUse}${dep.latestVersion ? `, latest ${dep.latestVersion}` : ""}. Declared in ${dep.manifestPath}.`,
               `Documents:\n${hits.map((h, i) => `[${i + 1}] ${h.title}\nURL: ${h.url}${h.publishedAt ? `\nPublished: ${h.publishedAt}` : ""}\n${h.content.slice(0, 1800)}`).join("\n\n")}`,
-              `Where the code uses it:\n${usage || "(no direct imports found; the package may be used indirectly)"}`,
+              `Where the code uses it:\n${usage || "(no direct imports found, so the package may be used indirectly)"}`,
             ].join("\n\n"),
             schema: ModelFindings,
             jsonSchema: MODEL_FINDINGS_JSON_SCHEMA,

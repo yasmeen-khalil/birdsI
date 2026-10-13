@@ -27,7 +27,7 @@ export async function labelPurposes(models: ModelClient, drafts: VendorDraft[], 
   if (drafts.length === 0) return out;
   const items = drafts.slice(0, 40).map((d) => {
     const sites = d.callSites.slice(0, 6).map((c) => `  ${c.path}:${c.line}  ${c.excerpt}`).join("\n");
-    return `- ${d.slug} (${d.name}): detected by ${d.detectedBy.join(", ")}${d.packages.length ? `; packages ${d.packages.join(", ")}` : ""}${d.envVars.length ? `; env ${d.envVars.slice(0, 6).join(", ")}` : ""}\n${sites || "  (no call sites)"}`;
+    return `- ${d.slug} (${d.name}): detected by ${d.detectedBy.join(", ")}${d.packages.length ? `, packages ${d.packages.join(", ")}` : ""}${d.envVars.length ? `, env ${d.envVars.slice(0, 6).join(", ")}` : ""}\n${sites || "  (no call sites)"}`;
   });
   const result = await models.complete({
     tier: "nano",
@@ -51,7 +51,7 @@ const Learned = z.object({
     .array(
       z.object({
         name: z.string().max(60),
-        priceUsd: z.number().nullable().describe("Monthly price in US dollars; null when usage-based or custom"),
+        priceUsd: z.number().nullable().describe("Monthly price in US dollars, or null when usage-based or custom"),
         priceNote: z.string().max(160).nullable().describe("How it is billed when not a flat monthly price"),
         limits: z
           .array(

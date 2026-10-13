@@ -125,6 +125,11 @@ export function formatWhen(iso: string | null | undefined, style: "sentence" | "
   return `${date} at ${time}`;
 }
 
+/** True when the fix was run in the sandbox. The worker's log then starts with the command it ran. */
+export function fixWasRun(fix: { testLog: string | null } | null | undefined): boolean {
+  return Boolean(fix?.testLog?.startsWith("$ "));
+}
+
 /** Only http and https links are rendered; anything else from a model or a web search is dropped. */
 export function safeUrl(url: string | null | undefined): string | null {
   if (!url) return null;

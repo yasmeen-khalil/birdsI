@@ -73,7 +73,7 @@ export function ConnectForm({ repos }: { repos: ConnectRepo[] }) {
           {(
             [
               ["light", "Quick check", "About 2 minutes. The vendors, packages, exposed keys, known problems."],
-              ["deep", "Full scan", "10 to 20 minutes. Also reads every file and checks it against current docs."],
+              ["deep", "Full scan", "10 to 20 minutes. Also reads up to 400 files and checks them against current docs."],
             ] as const
           ).map(([value, title, body]) => (
             <label key={value} className="grid grid-cols-[28px_minmax(0,1fr)]" style={{ padding: "14px 16px", border: `1px solid ${kind === value ? "var(--text-2)" : "var(--line-strong)"}`, borderRadius: "var(--r-md)", background: kind === value ? "var(--raised)" : "transparent", cursor: "pointer" }}>

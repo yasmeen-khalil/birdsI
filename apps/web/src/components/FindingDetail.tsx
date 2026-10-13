@@ -9,7 +9,7 @@ import { FixFlowPanel } from "./FixFlowPanel";
 import { Frame } from "./Frame";
 import { LocalTime } from "./LocalTime";
 import { SeverityMeter } from "./Severity";
-import { CONFIDENCE_MEANING, KIND_DURATION, KIND_LOWER, locationText, plural, safeUrl } from "./format";
+import { CONFIDENCE_MEANING, KIND_DURATION, KIND_LOWER, fixWasRun, locationText, plural, safeUrl } from "./format";
 import { icon, icon14 } from "./icon";
 
 export interface FindingPosition {
@@ -162,7 +162,7 @@ export function FindingDetail({
                 {finding.fixPlan && finding.fixPlan.paths.length > 0 && (
                   <span className="t-small c3">
                     {plural(finding.fixPlan.paths.length, "file")}
-                    {patchReady ? ", tested in a sandbox" : ", tested in a sandbox first"}
+                    {patchReady && fixWasRun(fix) ? ", tested in a sandbox" : ""}
                   </span>
                 )}
               </div>
@@ -180,10 +180,10 @@ export function FindingDetail({
                       ))}
                     </div>
                   )}
-                  <p className="t-small c3">The exact change is written and tested when you open the pull request. You see the diff before you merge.</p>
+                  <p className="t-small c3">The exact change is written when you open the pull request, and tested first when sandbox testing is set up. You see the diff before you merge.</p>
                 </>
               ) : (
-                <p className="t-body c2">The change is written and tested when you open the pull request.</p>
+                <p className="t-body c2">The change is written when you open the pull request, and tested first when sandbox testing is set up.</p>
               )}
             </section>
           )}
@@ -258,14 +258,14 @@ export function FindingDetail({
               <h2 className="t-h3">{finding.actionKind === "fix" ? "birdsI can fix this" : "You need to do this"}</h2>
               <p className="t-body c2">
                 {finding.actionKind === "fix"
-                  ? "On your own repository, birdsI writes this change, tests it on a separate copy, and opens a pull request you approve. The sample is read-only, so nothing here changes."
+                  ? "On your own repository, birdsI writes this change and opens a pull request you approve, tested on a separate copy first when sandbox testing is set up. The sample is read-only, so nothing here changes."
                   : "On your own repository, you get these steps with tick boxes and a Check again button that confirms the fix. The sample is read-only."}
               </p>
               <div className={ACTION_BAR}>
                 <span />
                 <Link className="btn btn-primary" href="/sign-in">
                   <Github {...icon} />
-                  Sign in with GitHub
+                  Sign in
                 </Link>
               </div>
             </section>
@@ -276,7 +276,7 @@ export function FindingDetail({
               <ul className="t-small flex flex-col gap-2.5" style={{ listStyle: "none", margin: 0, padding: 0 }}>
                 <li className="flex gap-2.5">
                   <Check {...icon} className="i c2" />
-                  <span className="c2">Tested on a separate copy of your code before the pull request opens</span>
+                  <span className="c2">Tested on a separate copy of your code first when sandbox testing is set up. Otherwise the pull request says so.</span>
                 </li>
                 <li className="flex gap-2.5">
                   <Check {...icon} className="i c2" />

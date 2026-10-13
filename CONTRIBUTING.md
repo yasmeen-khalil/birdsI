@@ -4,7 +4,7 @@ Thanks for looking. birdsI is open source under the MPL 2.0.
 
 ## Before you start
 
-Outside contributions are welcome once the contributor license agreement is in place; until then, please open an issue describing the change first so the work is not wasted.
+Outside contributions are welcome once the contributor license agreement is in place. Until then, please open an issue describing the change first so the work is not wasted.
 
 ## Working on the code
 
@@ -23,7 +23,7 @@ npm run check      # typecheck, lint, tests, build
 
 ## Adding a check
 
-Checks are independent modules in `packages/engine/src/checks/`. Implement the `Check` interface (`id`, `step`, `label`, `tiers`, `available`, `run`) and add it to `registry.ts`. A check returns `FindingDraft`s; the runner assigns ids, ranks and persists them. Set the confidence class honestly:
+Checks are independent modules in `packages/engine/src/checks/`. Implement the `Check` interface (`id`, `step`, `label`, `tiers`, `available`, `run`) and add it to `registry.ts`. A check returns `FindingDraft`s, and the runner assigns ids, ranks and persists them. Set the confidence class honestly:
 
 - `proven` only when a tool or rule established it,
 - `doc_verified` only when a cited document supports it,
@@ -31,7 +31,10 @@ Checks are independent modules in `packages/engine/src/checks/`. Implement the `
 
 ## Style
 
-- Plain language in every user-facing string. No emojis. No em dashes in UI copy (the copy guard test enforces this).
+- The house rule for anything a person reads (the web app, the terminal tool, MCP tool text, model prompts that shape what people read, and these documents): plain language, no emojis, no em dashes, no semicolons and no exclamation marks. Use commas, colons or periods.
+- Buttons are short: a verb and at most a noun or two ("Sign in", "Open pull request", "Audit again").
+- Use the product's own nouns. birdsI is the operations record for an app, built for coding agents. The scans are the Quick check, the Full scan and the Pre-launch audit. The outside services are vendors. Say repository for code connected through GitHub or uploaded from the terminal.
+- The copy guard test (`packages/shared/src/copy/copy.test.ts`) enforces the punctuation on the copy dictionary and on every string literal and JSX text in `apps/` and `packages/`. Code-shaped text (a separator character, shell syntax, Tailwind's `!` modifier) passes.
 - TypeScript strict, no `any` unless a third-party type forces it.
 - Comments explain why, not what.
 - Commit messages are short and technical.

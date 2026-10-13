@@ -8,7 +8,7 @@ import { startFixAction } from "@/lib/actions";
 import { Arc, ButtonArc } from "./Arc";
 import { DiffView } from "./CodeExcerpt";
 import { Toast } from "./Toast";
-import { clock, safeUrl } from "./format";
+import { clock, fixWasRun, safeUrl } from "./format";
 import { icon, icon14, icon20 } from "./icon";
 
 const TESTED_GRACE_MS = 90_000;
@@ -61,7 +61,7 @@ function StepLine({ state, label, last = false }: { state: "done" | "running" | 
 }
 
 /**
- * "Open a pull request" and its side panel: confirm, testing in the sandbox,
+ * "Open pull request" and its side panel: confirm, testing in the sandbox when set up,
  * the pull request is open, or it failed with the reason.
  */
 export function FixFlowPanel({
@@ -113,7 +113,7 @@ export function FixFlowPanel({
             setToast({ tone: "ok", text: `Pull request #${body.fix.prNumber ?? ""} is open`, ...(safeUrl(body.fix.prUrl) ? { href: safeUrl(body.fix.prUrl)! } : {}) });
             router.refresh();
           } else if (body.fix.status === "failed" && before !== "failed") {
-            setToast({ tone: "error", text: "The fix did not pass its tests. No pull request was opened." });
+            setToast({ tone: "error", text: body.fix.testLog ? "The fix did not pass its tests. No pull request was opened." : "The fix did not finish. No pull request was opened." });
           }
           if (!isWorking(body.fix, Date.now())) return;
         }
@@ -179,14 +179,14 @@ export function FixFlowPanel({
     trigger = (
       <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
         <Check {...icon} />
-        See the tested change
+        {fixWasRun(fix) ? "See the tested change" : "See the change"}
       </button>
     );
   } else {
     trigger = (
       <button type="button" className="btn btn-primary" onClick={() => setOpen(true)} aria-haspopup="dialog">
         <GitPullRequest {...icon} />
-        Open a pull request
+        Open pull request
       </button>
     );
   }
@@ -206,7 +206,7 @@ export function FixFlowPanel({
               </button>
               <button type="button" className="btn btn-primary btn-sm" onClick={begin} disabled={pending}>
                 {pending && <ButtonArc />}
-                Test and open
+                Open pull request
               </button>
             </>
           }
@@ -233,7 +233,7 @@ export function FixFlowPanel({
               ))}
             </div>
           )}
-          <p className="t-small c3">birdsI writes the change, then runs your project’s own build and tests on a separate copy (a sandbox). The pull request opens only if they pass. birdsI never merges it.</p>
+          <p className="t-small c3">birdsI writes the change. When sandbox testing is set up, it runs your project’s own build and tests on a separate copy (a sandbox) and opens the pull request only if they pass. Otherwise the pull request says the change was not run. birdsI never merges it.</p>
           {error && (
             <p className="t-small" role="alert" style={{ color: "var(--critical)" }}>
               {error}
@@ -265,7 +265,7 @@ export function FixFlowPanel({
           </div>
           <ol className="t-small flex flex-col" style={{ listStyle: "none", margin: 0, padding: 0 }} aria-live="polite">
             <StepLine state={stage > 0 ? "done" : "running"} label={files.length > 0 ? `Write the change to ${files.length === 1 ? "1 file" : `${files.length} files`}` : "Write the change"} />
-            <StepLine state={stage > 1 ? "done" : stage === 1 ? "running" : "waiting"} label="Test it on a separate copy: install, build, run tests" />
+            <StepLine state={stage > 1 ? "done" : stage === 1 ? "running" : "waiting"} label="Test it on a separate copy, when sandbox testing is set up" />
             <StepLine state={stage === 2 ? "running" : "waiting"} label="Open the pull request" last />
           </ol>
           {fix.testLog && (
@@ -307,7 +307,7 @@ export function FixFlowPanel({
           }
         >
           <h2 className="t-h2">Pull request #{fix.prNumber} is open</h2>
-          <p className="t-small c2">It passed its tests and is waiting for you on GitHub. birdsI never merges.</p>
+          <p className="t-small c2">{fixWasRun(fix) ? "It passed its tests and is waiting for you on GitHub." : "It was not run in a sandbox first, and the pull request says so. It is waiting for you on GitHub."} birdsI never merges.</p>
           {prUrl && (
             <a className="path" href={prUrl} target="_blank" rel="noreferrer" style={{ color: "var(--text)", whiteSpace: "normal", wordBreak: "break-all" }}>
               {prUrl.replace(/^https?:\/\//, "")}
@@ -326,12 +326,12 @@ export function FixFlowPanel({
     } else if (fix.status === "tested") {
       sheet = (
         <Sheet
-          label="The change is tested"
+          label={fixWasRun(fix) ? "The change is tested" : "The change is ready"}
           onClose={close}
           header={
             <span className="t-small inline-flex items-center gap-2" style={{ color: "var(--ok)", fontWeight: 600 }}>
               <Check {...icon} />
-              Tested
+              {fixWasRun(fix) ? "Tested" : "Ready"}
             </span>
           }
           footer={
@@ -404,7 +404,7 @@ export function FixFlowPanel({
         {trigger}
         {fix?.status === "failed" && !open && (
           <button type="button" className="btn btn-muted t-small" onClick={() => setOpen(true)} style={{ fontSize: 13 }}>
-            The last attempt did not pass. See why
+            Why it failed
           </button>
         )}
       </span>

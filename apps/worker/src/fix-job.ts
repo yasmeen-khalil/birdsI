@@ -55,7 +55,7 @@ export async function runFixJob(config: EngineConfig, job: JobRow, heartbeat: ()
     } else {
       testLog = SandboxRunner.isConfigured(config)
         ? "No test or typecheck command was found in the project, so the change was not run in a sandbox."
-        : "Sandbox testing is not configured on this server, so the change was not run before the pull request.";
+        : "Sandbox testing is not set up on this server, so the change was not run.";
     }
     await updateFix(fixId, { status: "tested", test_log: testLog });
 

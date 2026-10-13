@@ -31,7 +31,7 @@ export const CreateScanRequest = z.object({
   branch: z.string().optional(),
   /** Optional description of what the app does; sharpens the audit. */
   appDescription: z.string().max(2000).optional(),
-  /** Full scan: run the whole pipeline, then sync vendors and limits. */
+  /** Sent by the bare command's --full. The kind decides what runs, so a full scan is a deep scan. */
   full: z.boolean().optional(),
 });
 export type CreateScanRequest = z.infer<typeof CreateScanRequest>;

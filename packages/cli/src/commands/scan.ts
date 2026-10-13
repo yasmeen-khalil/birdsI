@@ -20,7 +20,7 @@ import { scannerNote } from "@birdsi/shared";
 export interface ScanOptions {
   deep?: boolean;
   audit?: boolean;
-  /** Full scan: the whole pipeline in order, then the vendor sync. */
+  /** The bare command's --full: the same scan as --deep. */
   full?: boolean;
   /** Open the dashboard in the browser once the scan starts. */
   open?: boolean;
@@ -69,12 +69,11 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
   if (git?.commitSha) where.push(`at ${git.commitSha.slice(0, 7)}`);
   say();
   say(`${paint.bold(style, `birdsI ${VERSION}`)}  ${where.join(" ")}`);
-  say(`${options.full ? "Full scan: map the code, check docs, audit, refresh vendors" : KIND_WORD[kind]}. Signed in as ${login}.`);
+  say(`${KIND_WORD[kind]}. Signed in as ${login}.`);
 
   let scanId: string;
   let repoId: string | null = null;
   let dashboardUrl: string | null = null;
-  let repoConnected = false;
   try {
     const sent = await sendSnapshot(api, root, {
       ...(options.branch ? { branch: options.branch } : {}),
@@ -84,7 +83,7 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
       },
     });
     if (sent.walk.tooLarge.length > 0) {
-      say(paint.dim(style, `Left out ${plural(sent.walk.tooLarge.length, "file")} over 2 MB, for example ${sent.walk.tooLarge[0]}.`));
+      say(paint.dim(style, `Left out ${plural(sent.walk.tooLarge.length, "file")} over the size limit, for example ${sent.walk.tooLarge[0]}.`));
     }
     say();
     const scan = await startScan(api, {
@@ -97,7 +96,6 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
     scanId = scan.id;
     repoId = scan.repoId;
     dashboardUrl = scan.dashboardUrl ?? null;
-    repoConnected = scan.repoId !== null;
     if (dashboardUrl) {
       say(paint.dim(style, `Dashboard: ${dashboardUrl}`));
       if (options.open && process.stdout.isTTY) openBrowser(dashboardUrl);
@@ -192,7 +190,7 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
 
   const wantsPrompt = options.fixPrompt !== false && isInteractive();
   if (wantsPrompt) {
-    const stopped = await walkFixes(api, orderFindings(findings), { style, dir: root, repoConnected });
+    const stopped = await walkFixes(api, orderFindings(findings), { style, dir: root });
     if (stopped) return EXIT.stopped;
   } else if (findings.some((f) => f.actionKind === "fix" && f.status === "open")) {
     say();
@@ -209,7 +207,7 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
         say(needs);
       }
     } catch {
-      // The ops layer may still be syncing; the dashboard shows it when ready.
+      // Vendors may still be syncing. The dashboard shows them when ready.
     }
   }
   return exitCode;
@@ -217,12 +215,14 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
 
 /**
  * One question per fixable finding, in severity order. Enter alone means
- * no. Returns true when the user pressed Ctrl+C to leave.
+ * no. Returns true when the user pressed Ctrl+C to leave. A terminal scan
+ * uploads a snapshot, so a fix comes back as a change to apply here, never
+ * as a pull request.
  */
 async function walkFixes(
   api: ApiClient,
   ordered: Finding[],
-  options: { style: Style; dir: string; repoConnected: boolean },
+  options: { style: Style; dir: string },
 ): Promise<boolean> {
   const { style } = options;
   const fixable = ordered.filter((f) => f.actionKind === "fix" && f.status === "open");
@@ -233,10 +233,7 @@ async function walkFixes(
       println(wrap(`- ${finding.fixPlan.summary}`, style, "  "));
       if (finding.fixPlan.paths.length > 0) println(wrap(`- Changes ${finding.fixPlan.paths.join(", ")}`, style, "  "));
     }
-    const question =
-      finding.repoId !== null || options.repoConnected
-        ? "Open a pull request for this fix? [y/N]"
-        : "Make this fix in your local files? [y/N]";
+    const question = "Make this fix in your local files? [y/N]";
     println();
     const yes = await askYesNo(paint.accent(style, question));
     if (yes === null) return true;
@@ -245,7 +242,7 @@ async function walkFixes(
       continue;
     }
     try {
-      const outcome = await runFix(api, finding, { style, apply: true, dir: options.dir });
+      const outcome = await runFix(api, finding, { style, apply: true, dir: options.dir, expectPr: false });
       if (outcome.kind === "interrupted") return true;
     } catch (error) {
       const cli = toCliError(error, "that fix");

@@ -234,7 +234,7 @@ export async function deleteAccountAction(typed: string): Promise<ActionResult> 
 export async function approveDeviceAction(userCode: string): Promise<ActionResult<{ status: "approved" | "expired" | "not_found" | "already_used" }>> {
   return run(async () => {
     const user = await requireUser();
-    const status = await approveDeviceLogin(userCode, user.id, "CLI sign-in");
+    const status = await approveDeviceLogin(userCode, user.id, "Terminal sign-in");
     return { status };
   });
 }

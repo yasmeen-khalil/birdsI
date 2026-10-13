@@ -34,13 +34,13 @@ export function buildProgram(): Command {
   const program = new Command();
   program
     .name("birdsi")
-    .description("birdsI: the operations layer for coding agents. Run it in a project to map the code, the vendors (outside services) it runs on, their limits and spend, and what needs you.")
+    .description("birdsI, the operations record for an app. Run it in a project to map the code, the vendors (outside services) it runs on, their limits and spend, and what needs you.")
     .version(VERSION, "-v, --version", "print the version")
     .helpOption("-h, --help", "show help")
     .showHelpAfterError("(run birdsi --help for the full list)")
     .exitOverride()
     .argument("[path]", "folder to scan (default: the current one)")
-    .option("--full", "the full scan: reads every file, checks docs, audits (10 to 20 minutes)")
+    .option("--full", "Full scan: reads the code and checks it against current docs (10 to 20 minutes)")
     .option("--describe <text>", "what the app does, in a sentence or two")
     .option("--no-open", "do not open the dashboard in the browser")
     .option("--no-fix-prompt", "do not offer fixes after the scan")
@@ -71,11 +71,11 @@ export function buildProgram(): Command {
 
   program
     .command("scan")
-    .description("scan a folder: a quick check unless you add a flag (default folder: the current one)")
+    .description("scan a folder: a Quick check unless you add a flag (default folder: the current one)")
     .argument("[path]", "folder to scan")
-    .option("--full", "full scan: reads every file, checks docs, audits, refreshes vendors (10 to 20 minutes)")
-    .option("--deep", "read all the code, without refreshing vendors")
-    .option("--audit", "pre-launch audit: a launch verdict, area by area")
+    .option("--full", "Full scan: reads the code and checks it against current docs (10 to 20 minutes)")
+    .option("--deep", "Full scan, the same as --full")
+    .option("--audit", "pre-launch audit: a launch verdict, area by area (20 to 40 minutes)")
     .option("--open", "open the dashboard in the browser")
     .option("--describe <text>", "what the app does, in a sentence or two")
     .option("--branch <name>", "branch name to record, if not the current one")
@@ -84,7 +84,7 @@ export function buildProgram(): Command {
     .addOption(asciiOption())
     .addHelpText(
       "after",
-      "\nExit codes: 0 nothing at or above High, 1 findings at or above High, 2 the scan could not finish,\n3 stopped with Ctrl+C, 4 not signed in, 5 usage error.",
+      "\nExit codes: 0 nothing open at or above High, 1 open Critical or High, 2 the scan could not finish,\n3 stopped with Ctrl+C, 4 not signed in, 5 usage error.",
     )
     .action(run((path: string | undefined, options: Parameters<typeof scanCommand>[1]) => scanCommand(path, options)));
 
@@ -127,7 +127,7 @@ export function buildProgram(): Command {
 
   program
     .command("fixed")
-    .description("say a finding is fixed in the code; the next scan confirms it or reopens it")
+    .description("say a finding is fixed in the code. The next scan confirms it or reopens it.")
     .argument("<finding>", "finding id, or its number in your newest scan")
     .option("--note <text>", "what was done")
     .addOption(jsonOption())
@@ -154,7 +154,7 @@ export function buildProgram(): Command {
 
   const policy = program
     .command("policy")
-    .description("the repository's agent policy; --hint prints the Claude Code hook that enforces it")
+    .description("show the repository's agent policy. With --hint, print the Claude Code hook that enforces it.")
     .option("--hint", "print the Claude Code settings snippet for the policy hook")
     .addOption(repoOption())
     .addOption(jsonOption())
@@ -162,7 +162,7 @@ export function buildProgram(): Command {
     .action(run((options: { hint?: boolean; repo?: string; json?: boolean; ascii?: boolean }) => policyCommand(options)));
   policy
     .command("check")
-    .description("exit 2 when a command changes a vendor account and must go through birdsI (the hook's entry point; reads a Claude Code hook payload from stdin)")
+    .description("exit 2 when a command changes a vendor account and must go through birdsI. The hook calls this, and it reads the hook payload from stdin.")
     .argument("[command...]", "the command, or nothing to read the hook payload from stdin")
     .addOption(repoOption())
     .addOption(jsonOption())
@@ -170,13 +170,13 @@ export function buildProgram(): Command {
 
   program
     .command("repos")
-    .description("list repositories connected through the GitHub App")
+    .description("list your repositories, from GitHub and from terminal uploads, with their ids")
     .addOption(jsonOption())
     .action(run((options: { json?: boolean }) => reposCommand(options)));
 
   program
     .command("ask")
-    .description("ask a question about a connected repository")
+    .description("ask a question about one of your repositories")
     .argument("<repo>", "repository id or owner/name")
     .argument("<question...>", "your question")
     .addOption(jsonOption())

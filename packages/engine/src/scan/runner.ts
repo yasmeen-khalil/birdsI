@@ -245,7 +245,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
 
   stats.durationMs = Date.now() - started;
   stats.throttledCalls = models.throttledCalls;
-  if (stats.throttledCalls > 0) await note(`${stats.throttledCalls} model calls were slowed by the provider's rate limit and retried; the scan took longer than the code alone would.`);
+  if (stats.throttledCalls > 0) await note(`${stats.throttledCalls} model calls were slowed by the provider's rate limit and retried. The scan took longer because of it.`);
   if (stats.cachedTokens > 0) await note(`${stats.cachedTokens.toLocaleString("en-US")} of ${stats.inputTokens.toLocaleString("en-US")} input tokens were served from the provider's cache.`);
   await emit({ type: "scan_done", findings: ranked.length, durationMs: stats.durationMs });
   return { findings: ranked, dependencies, summary, audit, stats, inventory, vendors, snapshot };

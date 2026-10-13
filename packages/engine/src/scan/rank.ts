@@ -65,6 +65,6 @@ function headline(total: number, bySeverity: Record<Severity, number>): string {
   if (bySeverity.high > 0) parts.push(`${bySeverity.high} high`);
   const rest = bySeverity.medium + bySeverity.low;
   if (rest > 0) parts.push(`${rest} lower`);
-  const lead = bySeverity.critical > 0 ? "Fix the critical findings first." : bySeverity.high > 0 ? "Start with the high findings." : "Nothing urgent; work through these when convenient.";
+  const lead = bySeverity.critical > 0 ? "Fix the critical findings first." : bySeverity.high > 0 ? "Start with the high findings." : "Nothing urgent. Work through these when it suits you.";
   return `${total} finding${total === 1 ? "" : "s"}: ${parts.join(", ")}. ${lead}`;
 }

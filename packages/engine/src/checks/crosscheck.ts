@@ -8,8 +8,8 @@ const SYSTEM = `You are birdsI, looking across a whole codebase for contradictio
 You are given facts extracted from the repository: environment variables the code reads versus the ones documented, routes and handlers, database tables and the code that uses them, what the README promises, and the findings already established.
 
 Report:
-- Contradictions: the README or comments promise something the code does not do; two modules disagree about a rule (for example, one enforces a limit and another ignores it); a schema and the code that reads it disagree.
-- Gaps: an environment variable the code needs but nothing documents; a route that exists but is never protected while its siblings are; a table with no access rules while others have them; a payment or email path with no failure handling.
+- Contradictions: the README or comments promise something the code does not do, two modules disagree about a rule (for example, one enforces a limit and another ignores it), or a schema and the code that reads it disagree.
+- Gaps: an environment variable the code needs but nothing documents, a route that exists but is never protected while its siblings are, a table with no access rules while others have them, or a payment or email path with no failure handling.
 - Inconsistencies: the same concept handled two different ways.
 
 Only report what the facts show. Cite the paths involved. If the facts show nothing, return no findings.`;
@@ -97,7 +97,7 @@ async function extractFacts(ctx: CheckContext): Promise<string> {
 
   const undocumented = [...envRead.keys()].filter((k) => !envDocumented.has(k) && !/^(NODE_ENV|VERCEL|CI|PORT|HOME|PATH|NEXT_PUBLIC_VERCEL)/.test(k));
   const unused = [...envDocumented].filter((k) => !envRead.has(k));
-  sections.push(`Environment variables read by code but not documented in .env.example (${undocumented.length}): ${undocumented.slice(0, 40).map((k) => `${k} (${[...envRead.get(k)!].slice(0, 2).join(", ")})`).join("; ") || "none"}`);
+  sections.push(`Environment variables read by code but not documented in .env.example (${undocumented.length}): ${undocumented.slice(0, 40).map((k) => `${k} (${[...envRead.get(k)!].slice(0, 2).join(", ")})`).join(", ") || "none"}`);
   sections.push(`Environment variables documented but never read (${unused.length}): ${unused.slice(0, 40).join(", ") || "none"}`);
   sections.push(`Route and handler files (${routes.length}):\n${routes.slice(0, 80).join("\n") || "none found"}`);
   sections.push(`Database tables or models referenced in code: ${[...tables].slice(0, 60).join(", ") || "none found"}`);

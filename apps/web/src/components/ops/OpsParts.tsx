@@ -6,7 +6,7 @@ import { CopyButton } from "../CopyButton";
 import { LocalTime } from "../LocalTime";
 import { icon14 } from "../icon";
 
-/** Display pieces for the operations layer: the pipeline, alerts and money. Server-safe. */
+/** Display pieces for the operations record: the pipeline, alerts and money. Server-safe. */
 
 export const FRESHNESS_LABEL: Record<StageState["freshness"], string> = { fresh: "Up to date", stale: "Out of date", never: "Not run yet", running: "Running" };
 
@@ -51,7 +51,7 @@ export function PipelineStrip({ stages }: { stages: StageState[] }) {
         <h2 id="pipeline-title" className="t-label c2">
           Pipeline
         </h2>
-        <p className="t-small c3">Stages run in this order. A full scan runs all four. Refreshing one stage first refreshes any out of date stage before it.</p>
+        <p className="t-small c3">Stages run in this order. A full scan runs all four. Refresh vendors runs the last stage alone.</p>
       </div>
       <ol className="pipe m-0 grid list-none grid-cols-1 p-0 min-[901px]:grid-cols-4">
         {stages.map((s, i) => {

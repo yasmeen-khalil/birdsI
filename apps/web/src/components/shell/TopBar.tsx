@@ -26,7 +26,10 @@ export function TopBar({ login, repos, current, settingsActive = false }: { logi
       <div className="flex w-full items-center gap-3 min-[901px]:hidden" style={{ marginRight: -8 }}>
         <Wordmark href={navRepo ? `/app/${navRepo.id}` : "/app"} markOnly />
         {repos.length > 0 && <RepoSwitcher repos={repos} current={current} compact />}
-        <span className="inline-flex gap-0.5" style={{ marginLeft: "auto" }}>
+        <span className="inline-flex items-center gap-0.5" style={{ marginLeft: "auto" }}>
+          <span className="tag" style={{ marginRight: 6 }}>
+            Demo
+          </span>
           {current && <AskButton repoId={current.id} iconOnly />}
           <MobileMenu repoId={navRepo?.id ?? null} />
         </span>

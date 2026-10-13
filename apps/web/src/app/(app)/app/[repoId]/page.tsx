@@ -134,7 +134,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
           <h2 id="no-scans" className="t-h2" style={{ fontSize: 23 }}>
             No scans of {name} yet
           </h2>
-          <p className="t-small c2">Start with a full scan. It maps the code, checks it against current docs, audits it, then finds the vendors (outside services) the app runs on. 10 to 20 minutes.</p>
+          <p className="t-small c2">Start with a full scan. It maps the code, reads up to 400 files and checks them against current docs, then finds the vendors (outside services) the app runs on. 10 to 20 minutes.</p>
           <ScanButtons repoId={repo.id} runningKind={null} layout="compact" />
         </section>
       )}
@@ -181,7 +181,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
             {inventory && (
               <figure className="m-0 flex flex-col gap-[18px] min-[901px]:mt-9">
                 <BirdsEyeMap folders={inventory.folders} hits={hitsFromFindings(open)} findingsHref={`${base}/findings`} label={`${name} seen from above, one square per file. Ringed files have findings.`} />
-                <figcaption className="t-small c3">Each square is one file. Ringed files have findings; select one to see them.</figcaption>
+                <figcaption className="t-small c3">Ringed files have findings. Select one to see them.</figcaption>
               </figure>
             )}
           </div>
@@ -217,7 +217,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
               </div>
             </div>
             <Link className="btn btn-secondary self-start max-[900px]:self-stretch" href={`${base}/findings`}>
-              See all {plural(open.length, "finding")}
+              See all {open.length}
             </Link>
           </aside>
         </section>

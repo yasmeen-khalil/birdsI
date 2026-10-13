@@ -28,7 +28,7 @@ Rules for edits:
 - Keep the change minimal and idiomatic for this codebase. Do not reformat unrelated code. Do not add comments explaining the fix.
 - Never write a secret value into the code. Read it from the environment and add the variable name to .env.example if that file exists.
 - If the fix needs a new dependency, add it to the manifest with a sensible version and say so in followUp.
-- verifyCommand is the project's own test or typecheck command if one exists in package.json scripts or an equivalent; otherwise null.`;
+- verifyCommand is the project's own test or typecheck command if one exists in package.json scripts or an equivalent, otherwise null.`;
 
 export interface GeneratedFix {
   summary: string;

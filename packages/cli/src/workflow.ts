@@ -143,6 +143,21 @@ export async function followScan(
 }
 
 /**
+ * True when the finding's repository came through the GitHub App, so a fix
+ * ends in a pull request. Repositories uploaded from the terminal never get
+ * one. When the list cannot be read, it assumes a pull request may come.
+ */
+export async function expectsPullRequest(api: ApiClient, repoId: string | null): Promise<boolean> {
+  if (!repoId) return false;
+  try {
+    const repo = (await api.repos()).data.repos.find((r) => r.id === repoId);
+    return repo ? repo.source === "github" : true;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Polls a fix every 3 seconds until it is tested, has a pull request, or
  * failed. When a pull request is expected (the repo is connected through
  * the GitHub App), a tested fix gets a short grace period to become pr_open.

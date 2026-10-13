@@ -49,7 +49,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
           </li>
           <li className="inline-flex items-center gap-2" style={{ color: "var(--text)", fontWeight: 600 }} aria-current="step">
             <span className="dot" style={{ background: "var(--accent)" }} />
-            2. Add a project
+            2. Add a repository
           </li>
           <li className="inline-flex items-center gap-2" style={{ color: "var(--text-3)" }}>
             3. First scan
@@ -58,14 +58,15 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
         <span className="t-small c2 min-[901px]:hidden" style={{ marginLeft: "auto" }}>
           Step 2 of 3
         </span>
+        <span className="tag">Demo</span>
         <Link className="avatar" href="/settings" aria-label="Settings" style={{ textDecoration: "none" }}>
           {initials(user.github_login ?? user.email)}
         </Link>
       </header>
       <main className="grid flex-grow grid-cols-1 gap-y-10 px-16 pt-[72px] pb-12 max-[900px]:px-5 max-[900px]:pt-8 min-[901px]:grid-cols-12 min-[901px]:gap-x-6">
         <section className="flex flex-col gap-5 min-[901px]:col-span-5">
-          <h1 className="t-h1">Add a project</h1>
-          <p className="t-body-l c2">Run birdsI in the project folder on your computer. It uploads the code (everything your .gitignore leaves out stays with you), runs the full pipeline, and opens the project here.</p>
+          <h1 className="t-h1">Add a repository</h1>
+          <p className="t-body-l c2">Run birdsI in the project folder on your computer. It uploads the code (everything your .gitignore leaves out stays with you), runs a quick check, and opens the repository here.</p>
           <div className="panel flex flex-col gap-3.5" style={{ padding: "22px 24px" }}>
             <h2 className="t-h3">From your terminal</h2>
             <div className="code">
@@ -78,7 +79,10 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
                 <div>npx birdsi</div>
               </div>
             </div>
-            <p className="t-small c2">Sign in once with a code shown in your terminal. After that, npx birdsi in any project folder is all it takes. Add --quick for a faster first look.</p>
+            <p className="t-small c2">Sign in once with a code shown in your terminal. After that, npx birdsi in any project folder is all it takes. Add --full for the full scan.</p>
+            <p className="t-small c3">
+              Until the package is on npm, run it from a clone: <span className="t-mono">npm install</span>, then <span className="t-mono">npx tsx packages/cli/src/birdsi.ts</span>.
+            </p>
           </div>
 
           {status === "connected" && (
@@ -163,14 +167,14 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
             <ConnectForm repos={repos.map((r, i) => ({ id: r.id, fullName: r.full_name, private: r.private, createdAt: r.created_at, scanned: scanned[i] ?? false }))} />
           ) : (
             <div className="flex flex-col gap-3" style={{ paddingTop: 8 }}>
-              <h2 className="t-h3">Your projects</h2>
+              <h2 className="t-h3">Your repositories</h2>
               <p className="t-body c2" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
                 None yet. Run npx birdsi in a project folder and it appears here within a minute.
               </p>
               <p className="t-small c3">
                 Want a look first?{" "}
                 <Link href="/" style={{ color: "var(--text-2)" }}>
-                  Scan the sample repository
+                  Try the sample
                 </Link>
                 .
               </p>

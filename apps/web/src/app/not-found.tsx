@@ -7,6 +7,9 @@ export default function NotFound() {
     <div className="night flex min-h-screen flex-col">
       <header className="topbar">
         <Wordmark href="/" />
+        <span className="tag" style={{ marginLeft: "auto" }}>
+          Demo
+        </span>
       </header>
       <main className="flex flex-grow items-start px-16 pt-16 max-[900px]:px-5 max-[900px]:pt-8">
         <Frame arm={24} bend={17} className="flex flex-col gap-4 px-8 py-10" style={{ maxWidth: 560 }}>

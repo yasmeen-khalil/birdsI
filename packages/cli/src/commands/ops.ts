@@ -6,14 +6,14 @@ import { FACT_SOURCE_LABEL, RECORD_AUTHOR_LABEL, RECORD_KIND_LABEL, RecordKind, 
 import { ApiClient, toCliError } from "../api";
 import { readConfig } from "../config";
 import { EXIT } from "../exit";
-import { glyphs, paint, plural, styleFor, wrap, type Style } from "../format";
+import { glyphs, kindWord, paint, plural, styleFor, wrap, type Style } from "../format";
 import { isInteractive, printJson, println, usageError } from "../output";
 import { askText, askYesNo } from "../prompt";
 import { openBrowser } from "./auth";
 import { LEGEND, q } from "../quote";
 
 /**
- * The operations layer from the terminal: vendors and limits, the questions
+ * The operations record from the terminal: vendors and limits, the questions
  * birdsI needs answered, the approvals queue, the vision, and an export that
  * writes the whole knowledge base as plain files any agent can read.
  */
@@ -102,7 +102,7 @@ export async function vendorsCommand(options: PrintOptions & { sync?: boolean })
     const stale = result.data.stages.filter((s) => s.freshness === "stale" || s.freshness === "never");
     if (stale.length > 0) {
       println();
-      println(paint.dim(style, `Stages out of date: ${stale.map((s) => s.label.toLowerCase()).join(", ")}. Run birdsi to refresh everything in order.`));
+      println(paint.dim(style, `Stages out of date: ${stale.map((s) => s.label.toLowerCase()).join(", ")}. Run birdsi --full to refresh them all.`));
     }
     return EXIT.ok;
   } catch (error) {
@@ -297,7 +297,7 @@ export async function visionCommand(text: string[] | undefined, options: PrintOp
       return EXIT.ok;
     }
     if (!vision.text) {
-      println("No vision written yet. The vision is what you are building and why; birdsI and your agent read it.");
+      println("No vision written yet. The vision is what you are building and why. Your agent and birdsI chat read it.");
       println(paint.dim(style, 'Write it with: birdsi vision "What this app is for and where it is going", or --file VISION.md'));
       return EXIT.ok;
     }
@@ -331,7 +331,7 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
         `${v.what ? q(v.what) : "(no description yet)"}${v.purpose ? ` Used here for: ${q(v.purpose)}` : ""}`,
         "",
         `- Category: ${v.category}`,
-        `- Found by: ${v.detectedBy.join(", ")}${v.packages.length ? `; packages ${v.packages.join(", ")}` : ""}${v.envVars.length ? `; env ${v.envVars.join(", ")}` : ""}`,
+        `- Found by: ${v.detectedBy.join(", ")}${v.packages.length ? `, packages ${v.packages.join(", ")}` : ""}${v.envVars.length ? `, env ${v.envVars.join(", ")}` : ""}`,
         ...(v.pricingUrl ? [`- Pricing: ${v.pricingUrl}`] : []),
         ...v.facts.map((f) => `- ${q(f.label)}: ${q(f.value)} (${FACT_SOURCE_LABEL[f.source].toLowerCase()}${f.evidence.url ? `, ${f.evidence.url}` : ""})`),
         ...(v.callSites.length ? ["", "Used in:", ...v.callSites.slice(0, 12).map((c) => `- ${q(c.path)}:${c.line}`)] : []),
@@ -378,19 +378,19 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
       writeFile(join(dir, "alerts.md"), withLegend(alertsMd)),
       writeFile(join(dir, "questions.md"), withLegend(questionsMd)),
     ]);
-    if (options.json) printJson({ dir, files: ["README.md", "vision.md", "vendors.md", "alerts.md", "questions.md"] });
-    else println(`${paint.ok(style, "Wrote")} ${dir} (vision, vendors, alerts, questions). Agents can read these files directly.`);
+    if (options.json) printJson({ dir, files: ["README.md", "vision.md", "vendors.md", "alerts.md", "questions.md", "record.md"] });
+    else println(`${paint.ok(style, "Wrote")} ${dir} (vision, vendors, alerts, questions, record). Agents can read these files directly.`);
     return EXIT.ok;
   } catch (error) {
     throw toCliError(error, "the export");
   }
 }
 
-/** The one-line status printed after the default command: alerts, questions, approvals. */
+/** The lines printed after a scan: limit alerts, questions, approvals and the dashboard link. */
 export function formatNeedsYou(openQuestions: number, pendingActions: number, alerts: readonly Alert[], dashboardUrl: string | null, style: Style): string {
   const lines: string[] = [];
   const serious = alerts.filter((a) => a.level !== "info");
-  if (serious.length > 0) lines.push(`${paint.high(style, plural(serious.length, "limit alert"))}: ${serious.map((a) => a.title).join("; ")}`);
+  if (serious.length > 0) lines.push(`${paint.high(style, plural(serious.length, "limit alert"))}: ${serious.map((a) => a.title).join(", ")}`);
   if (openQuestions > 0) lines.push(`${plural(openQuestions, "question")} for you: birdsi questions --answer`);
   if (pendingActions > 0) lines.push(`${plural(pendingActions, "command")} waiting for approval: birdsi approvals`);
   if (dashboardUrl) lines.push(paint.dim(style, `Dashboard: ${dashboardUrl}`));
@@ -413,7 +413,7 @@ export async function inventoryCommand(options: PrintOptions): Promise<number> {
     println(paint.bold(style, inv.repo.fullName));
     println(wrap(inv.vision.text ? `Vision: ${inv.vision.text}` : "Vision: not written yet (birdsi vision \"...\")", style, ""));
     println(paint.dim(style, `Stages: ${inv.stages.map((s) => `${s.label} ${s.freshness}`).join(", ")}`));
-    if (inv.latestScan) println(paint.dim(style, `Latest scan: ${inv.latestScan.kind}, ${plural(inv.latestScan.findings, "open finding")}`));
+    if (inv.latestScan) println(paint.dim(style, `Latest scan: ${kindWord(inv.latestScan.kind)}, ${plural(inv.latestScan.findings, "open finding")}`));
     if (inv.decisions.length > 0) {
       println();
       println(paint.bold(style, "Decisions on record"));
@@ -459,7 +459,9 @@ export async function recordCommand(options: PrintOptions & { kind?: string; lim
   api.requireAuth();
   try {
     const repo = await resolveRepo(api, options.repo);
-    const kind = options.kind ? RecordKind.parse(options.kind) : undefined;
+    const parsed = options.kind === undefined ? undefined : RecordKind.safeParse(options.kind);
+    if (parsed && !parsed.success) throw usageError(`There is no record kind called ${options.kind}.`, `Kinds: ${RecordKind.options.join(", ")}`);
+    const kind = parsed?.data;
     const limit = options.limit ? Number.parseInt(options.limit, 10) || 50 : 50;
     const result = await api.record(repo.id, { ...(kind ? { kind } : {}), limit });
     if (options.json) {
@@ -468,7 +470,7 @@ export async function recordCommand(options: PrintOptions & { kind?: string; lim
     }
     const entries = result.data.entries;
     if (entries.length === 0) {
-      println(paint.dim(style, kind ? `Nothing of kind ${kind} on record yet.` : "Nothing on record yet. Decisions, answers, approvals and fixed marks land here."));
+      println(paint.dim(style, kind ? `Nothing of the kind ${RECORD_KIND_LABEL[kind]} on record yet.` : "Nothing on record yet. Decisions, answers, approvals and fixed marks land here."));
       return EXIT.ok;
     }
     for (const e of entries) {

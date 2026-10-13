@@ -1,11 +1,11 @@
 import type { Finding, Fix } from "@birdsi/shared";
 import { ApiClient, toCliError } from "../api";
 import { CliError, EXIT } from "../exit";
-import { fixStatusLine, glyphs, paint, sandboxResult, styleFor, wrap, type Style } from "../format";
+import { fixStatusLine, glyphs, paint, sandboxRan, sandboxResult, styleFor, wrap, type Style } from "../format";
 import { withInterrupt } from "../interrupt";
 import { printJson, println, StatusLine } from "../output";
 import { applyPatchLocally, manualApplyCommand } from "../patch";
-import { resolveFindingRef, waitForFix } from "../workflow";
+import { expectsPullRequest, resolveFindingRef, waitForFix } from "../workflow";
 
 export type FixOutcome =
   | { kind: "pr"; fix: Fix }
@@ -16,14 +16,16 @@ export type FixOutcome =
   | { kind: "interrupted"; fix: Fix };
 
 /**
- * Starts a fix, waits for the sandbox, and reports the result. With a
- * pull request, prints its link; with only a patch, applies it in `dir`
- * (when apply is true) or leaves it for the caller to print.
+ * Starts a fix, waits for the sandbox when one is set up, and reports the
+ * result. With a pull request, prints its link. With only a patch, applies
+ * it in `dir` (when apply is true) or leaves it for the caller to print.
+ * `expectPr` says whether to wait for a pull request, and is looked up from
+ * the repository when left out.
  */
 export async function runFix(
   api: ApiClient,
   finding: Pick<Finding, "id" | "repoId" | "fixPlan">,
-  options: { style: Style; apply: boolean; dir: string; quiet?: boolean },
+  options: { style: Style; apply: boolean; dir: string; quiet?: boolean; expectPr?: boolean },
 ): Promise<FixOutcome> {
   const { style } = options;
   const g = glyphs(style);
@@ -42,6 +44,7 @@ export async function runFix(
     throw toCliError(error, "that finding");
   }
 
+  const expectPr = options.expectPr ?? (await expectsPullRequest(api, finding.repoId));
   const controller = new AbortController();
   let interrupted = false;
   let fix: Fix;
@@ -51,7 +54,7 @@ export async function runFix(
         interrupted = true;
         controller.abort();
       },
-      () => waitForFix(api, started, { onUpdate: show, signal: controller.signal, expectPr: finding.repoId !== null }),
+      () => waitForFix(api, started, { onUpdate: show, signal: controller.signal, expectPr }),
     );
   } catch (error) {
     status.clear();
@@ -66,12 +69,13 @@ export async function runFix(
 
   const result = sandboxResult(fix);
   if (fix.status === "failed") {
-    say(`  ${paint.fail(style, g.failed)} The fix did not pass its tests on a separate copy${fix.error ? `: ${fix.error}` : "."}`);
+    say(`  ${paint.fail(style, g.failed)} The fix did not go through${fix.error ? `: ${fix.error}` : "."}`);
     if (result && result !== fix.error) say(paint.dim(style, `    ${result}`));
     say(paint.dim(style, "    Nothing in your files changed."));
     return { kind: "failed", fix };
   }
-  say(`  ${paint.ok(style, g.done)} Tested on a separate copy${result ? `: ${result}` : "."}`);
+  if (sandboxRan(fix)) say(`  ${paint.ok(style, g.done)} Tested on a separate copy${result ? `: ${result}` : "."}`);
+  else say(`  ${paint.dim(style, g.pending)} ${result ?? "The change was not run on a separate copy."}`);
 
   const followUp = (): void => {
     const items = finding.fixPlan?.followUp ?? [];

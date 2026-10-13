@@ -215,7 +215,7 @@ export class ApiClient {
     return this.request("POST", `/snapshots/${enc(snapshotId)}/complete`, { schema: OkResponse, body: { bytes, ...(hints ? { hints } : {}) } });
   }
 
-  // Vendors, questions, actions, vision: the operations layer
+  // Vendors, questions, actions, vision: the operations record
 
   vendors(repoId: string): Promise<Result<VendorsResponse>> {
     return this.request("GET", `/repos/${enc(repoId)}/vendors`, { schema: VendorsResponse });

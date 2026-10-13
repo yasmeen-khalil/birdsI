@@ -64,9 +64,9 @@ export const en = {
     not_run: "The pre-launch audit has not run yet.",
   },
   areaVerdict: {
-    pass: "Pass",
-    attention: "Needs attention",
-    blocker: "Blocker",
+    pass: "Cleared",
+    attention: "Fix before launch",
+    blocker: "Blocks launch",
   },
   step: {
     fetch: "Fetch the code",
