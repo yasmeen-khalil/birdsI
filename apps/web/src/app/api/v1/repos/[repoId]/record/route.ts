@@ -10,7 +10,9 @@ export const GET = handler(async (request, { params }) => {
   const url = new URL(request.url);
   const rawKind = url.searchParams.get("kind");
   const kind = rawKind ? RecordKind.parse(rawKind) : undefined;
-  const limit = Number.parseInt(url.searchParams.get("limit") ?? "50", 10) || 50;
+  // Anything outside 1 to 200, or not a number, falls back to the nearest allowed value.
+  const asked = Number.parseInt(url.searchParams.get("limit") ?? "50", 10);
+  const limit = Number.isFinite(asked) ? Math.min(200, Math.max(1, asked)) : 50;
   return json({ entries: await loadRecord(repoId!, user, { ...(kind ? { kind } : {}), limit }) } satisfies RecordResponse);
 });
 

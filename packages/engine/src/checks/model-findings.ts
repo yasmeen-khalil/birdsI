@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { findingKey, type Confidence, type FindingDraft } from "@birdsi/shared";
 import { toJsonSchema } from "../models/schema";
+import { maskSecrets } from "./secrets";
 
 /**
  * The shape the model fills in when it reports a problem. Kept smaller than
@@ -59,12 +60,13 @@ export function toDraft(
     category: f.category,
     location,
     evidence: {
-      ...(f.excerpt ? { excerpt: f.excerpt } : {}),
+      // Copied verbatim from the code by the model, so key shapes are masked before it is stored.
+      ...(f.excerpt ? { excerpt: maskSecrets(f.excerpt) } : {}),
       ...(doc ? { doc } : {}),
       advisories: [],
     },
     actionKind: f.actionKind,
-    steps: f.steps.map((s) => ({ title: s.title, ...(s.detail ? { detail: s.detail } : {}), ...(s.snippet ? { snippet: s.snippet } : {}) })),
+    steps: f.steps.map((s) => ({ title: s.title, ...(s.detail ? { detail: s.detail } : {}), ...(s.snippet ? { snippet: maskSecrets(s.snippet) } : {}) })),
     fixPlan: f.actionKind === "fix" ? { summary: f.fixSummary ?? f.title, paths: f.fixPaths.length > 0 ? f.fixPaths : f.path ? [f.path] : [], followUp: [] } : null,
   };
 }
@@ -81,6 +83,8 @@ export function filterModelFindings(findings: ModelFinding[], minCertainty: numb
       f.lineStart = null;
       f.lineEnd = null;
     }
+    // Fix paths are later read from disk, so only files that exist in the snapshot are kept.
+    f.fixPaths = f.fixPaths.filter((p) => knownPaths.has(p));
     return f.title.trim().length > 0;
   });
 }

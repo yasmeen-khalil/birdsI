@@ -81,6 +81,9 @@ export function toVendor(row: VendorRow, facts: VendorFactRow[], connected: bool
  */
 export async function replaceVendors(repoId: string, scanId: string, drafts: VendorDraft[]): Promise<VendorRow[]> {
   const db = getDb();
+  // Slugs go into a hand-built filter below, so anything outside [a-z0-9-] is refused here.
+  const unsafe = drafts.find((d) => !/^[a-z0-9-]{1,40}$/.test(d.slug));
+  if (unsafe) throw new Error(`replaceVendors: refusing vendor slug ${JSON.stringify(unsafe.slug.slice(0, 60))}`);
   const slugs = drafts.map((d) => d.slug);
   if (slugs.length > 0) {
     const { error: delError } = await db.from("vendors").delete().eq("repo_id", repoId).not("slug", "in", `(${slugs.map((s) => `"${s}"`).join(",")})`);

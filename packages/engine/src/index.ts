@@ -1,5 +1,5 @@
 export { loadEngineConfig, detectProvider, DEFAULT_MODELS, ANTHROPIC_MODELS, NEBIUS_MODELS, DEFAULT_BUDGETS, type EngineConfig, type ScanBudget, type ModelIds, type Provider } from "./config";
-export { ModelClient, BudgetExceededError, EmbeddingsUnavailableError, extractJson, type Usage, type UsageSink, type ModelTier } from "./models/client";
+export { ModelClient, BudgetExceededError, EmbeddingsUnavailableError, extractJson, type Usage, type UsageSink, type BeforeCall, type ModelTier } from "./models/client";
 export { toJsonSchema } from "./models/schema";
 export type { Snapshot } from "./source/types";
 export { snapshotFromTarball, snapshotFromDirectory, MAX_SNAPSHOT_BYTES, MAX_SNAPSHOT_FILES } from "./source/tarball";
@@ -10,7 +10,7 @@ export { languageOf, isCodeLanguage } from "./inventory/languages";
 export { prioritise, priorityOf } from "./inventory/priority";
 export { ALL_CHECKS, checksFor } from "./checks/registry";
 export type { Check, CheckContext, PreviousReview } from "./checks/types";
-export { redact } from "./checks/secrets";
+export { redact, maskSecrets } from "./checks/secrets";
 export { AREA_LABELS, areaOf, operationsArea } from "./checks/audit";
 export { runScan, STEP_LABELS, type ScanInput, type ScanResult } from "./scan/runner";
 export { rankFindings, summarise } from "./scan/rank";

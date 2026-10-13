@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError, type z } from "zod";
 import { ForbiddenError, NotFoundError, userIdForToken, type UserRow, userById } from "@birdsi/db";
 import { currentUserRow } from "./auth";
+import { appUrl } from "./env";
 
 /**
  * Helpers for /api/v1. Every handler resolves the caller from a bearer
@@ -45,6 +46,24 @@ export async function requireCaller(request: Request): Promise<UserRow> {
   const user = await currentUserRow();
   if (!user) throw new ApiError(401, "unauthorized", "Sign in to continue.");
   return user;
+}
+
+/**
+ * For browser-only writes: the request must come from a birdsI page. The
+ * session cookie alone is not enough, since a form on another site can post
+ * plain text to this origin.
+ */
+export function assertSameOrigin(request: Request): void {
+  const origin = request.headers.get("origin");
+  const allowed = new Set<string>([new URL(request.url).origin]);
+  try {
+    allowed.add(new URL(appUrl()).origin);
+  } catch {
+    // A malformed app URL only narrows what is allowed.
+  }
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (host) allowed.add(`${request.headers.get("x-forwarded-proto") ?? "https"}://${host}`);
+  if (!origin || !allowed.has(origin)) throw new ApiError(403, "origin", "This request did not come from a birdsI page. Open the Agent page in birdsI and decide there.");
 }
 
 /** The caller when present; null for anonymous access to public resources like demo scans. */

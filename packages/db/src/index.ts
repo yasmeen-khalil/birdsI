@@ -14,3 +14,4 @@ export * from "./connections";
 export * from "./agent";
 export * from "./record";
 export * from "./schema";
+export * from "./paging";

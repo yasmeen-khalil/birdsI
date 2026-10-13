@@ -3,11 +3,13 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { approveDeviceLogin, deleteRepo, deleteUser, denyDeviceLogin, purgeSnapshotsForUser, revokeToken, updateUserPreferences } from "@birdsi/db";
-import { ScanKind } from "@birdsi/shared";
+import { AnswerQuestionRequest, RequestActionRequest, ScanKind, SetVisionRequest } from "@birdsi/shared";
+import type { z } from "zod";
 import { ApiError } from "./api";
 import { requireUser } from "./auth";
 import { answerQuestion, changePolicy, connectVendor, decideActionRequest, disconnectVendor, dismissQuestion, requestAction, resyncAllRepos, saveVision, startVendorSync } from "./ops";
 import { askRepo, dismissFinding, reopenFinding, startFix, startScan, stopScan } from "./scans";
+import { startedThisDemo } from "./demo-owner";
 
 /**
  * Server actions used by the web pages. Each one resolves the signed-in
@@ -25,6 +27,13 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
     console.error(error);
     return { ok: false, message: "birdsI hit an error. Try again in a moment." };
   }
+}
+
+/** The same limits the API applies, for input that arrives through a server action. */
+function checked<T>(schema: z.ZodType<T>, value: unknown, message: string): T {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new ApiError(400, "bad_request", message);
+  return parsed.data;
 }
 
 export async function startScanAction(input: { repoId: string; kind: string; appDescription?: string; full?: boolean }): Promise<ActionResult<{ scanId: string }>> {
@@ -49,7 +58,8 @@ export async function syncVendorsAction(repoId: string): Promise<ActionResult<{ 
 export async function answerQuestionAction(questionId: string, repoId: string, answer: string): Promise<ActionResult> {
   return run(async () => {
     const user = await requireUser();
-    await answerQuestion(questionId, user, answer);
+    const { answer: checkedAnswer } = checked(AnswerQuestionRequest, { answer }, "Keep the answer between 1 and 2,000 characters.");
+    await answerQuestion(questionId, user, checkedAnswer);
     revalidatePath(`/app/${repoId}`);
     revalidatePath(`/app/${repoId}/agent`);
     revalidatePath(`/app/${repoId}/vendors`);
@@ -78,7 +88,12 @@ export async function decideActionAction(actionId: string, repoId: string, decis
 export async function requestActionAction(repoId: string, input: { title: string; reason: string; command: string; vendorSlug?: string; estimatedMonthlyUsd?: number }): Promise<ActionResult<{ actionId: string }>> {
   return run(async () => {
     const user = await requireUser();
-    const action = await requestAction(repoId, user, { title: input.title, reason: input.reason, command: input.command, ...(input.vendorSlug ? { vendorSlug: input.vendorSlug } : {}), ...(input.estimatedMonthlyUsd !== undefined ? { estimatedMonthlyUsd: input.estimatedMonthlyUsd } : {}) }, "owner");
+    const body = checked(
+      RequestActionRequest,
+      { title: input.title, reason: input.reason, command: input.command, ...(input.vendorSlug ? { vendorSlug: input.vendorSlug } : {}), ...(input.estimatedMonthlyUsd !== undefined ? { estimatedMonthlyUsd: input.estimatedMonthlyUsd } : {}) },
+      "Keep the title under 200 characters, the reason under 2,000 and the command under 1,000.",
+    );
+    const action = await requestAction(repoId, user, { title: body.title, reason: body.reason, command: body.command, ...(body.vendorSlug ? { vendorSlug: body.vendorSlug } : {}), ...(body.estimatedMonthlyUsd !== undefined ? { estimatedMonthlyUsd: body.estimatedMonthlyUsd } : {}) }, "owner");
     revalidatePath(`/app/${repoId}/agent`);
     return { actionId: action.id };
   });
@@ -96,7 +111,8 @@ export async function updatePolicyAction(repoId: string, patch: { allowPropose?:
 export async function saveVisionAction(repoId: string, text: string): Promise<ActionResult> {
   return run(async () => {
     const user = await requireUser();
-    await saveVision(repoId, user, text);
+    const body = checked(SetVisionRequest, { text }, "Keep the vision under 20,000 characters.");
+    await saveVision(repoId, user, body.text);
     revalidatePath(`/app/${repoId}`);
     return undefined;
   });
@@ -132,6 +148,7 @@ export async function stopScanAction(scanId: string): Promise<ActionResult> {
 
 export async function stopDemoScanAction(scanId: string): Promise<ActionResult> {
   return run(async () => {
+    if (!(await startedThisDemo(scanId))) throw new ApiError(403, "demo", "Only the visitor who started this sample scan can stop it.");
     await stopScan(scanId, null);
     return undefined;
   });

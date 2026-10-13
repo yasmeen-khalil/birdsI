@@ -32,7 +32,8 @@ export async function assertUserScanQuota(userId: string, kind: ScanKind): Promi
   const perDay = envInt("BIRDSI_USER_SCANS_PER_DAY", 20);
   const db = getDb();
   const since = new Date(Date.now() - 86_400_000).toISOString();
-  const { data, error } = await db.from("scans").select("kind").eq("owner_user_id", userId).gte("created_at", since);
+  // Scans still waiting or running count too, however long ago they were queued.
+  const { data, error } = await db.from("scans").select("kind").eq("owner_user_id", userId).or(`created_at.gte."${since}",status.in.(queued,running)`);
   if (error) throw new Error(`quota: ${error.message}`);
   const used = ((data ?? []) as Array<{ kind: ScanKind }>).reduce((n, row) => n + (WEIGHT[row.kind] ?? 1), 0);
   if (used + WEIGHT[kind] > perDay) {
@@ -45,5 +46,25 @@ export async function runningScanForRepo(repoId: string): Promise<string | null>
   const db = getDb();
   const { data, error } = await db.from("scans").select("id").eq("repo_id", repoId).in("status", ["queued", "running"]).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (error) throw new Error(`runningScanForRepo: ${error.message}`);
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+/**
+ * The scan that holds the repository's one running slot: the oldest queued
+ * or running one. Checked after a new scan is inserted, so two requests that
+ * both passed runningScanForRepo agree on a single winner.
+ */
+export async function firstActiveScanForRepo(repoId: string): Promise<string | null> {
+  const db = getDb();
+  const { data, error } = await db
+    .from("scans")
+    .select("id")
+    .eq("repo_id", repoId)
+    .in("status", ["queued", "running"])
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`firstActiveScanForRepo: ${error.message}`);
   return (data as { id: string } | null)?.id ?? null;
 }

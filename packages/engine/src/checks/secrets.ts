@@ -116,10 +116,29 @@ export const secretsCheck: Check = {
   },
 };
 
+/**
+ * Masks every value in the text that matches a known key shape, whatever the
+ * file or context, before the text is stored or shown: vendor call sites,
+ * model excerpts, chat passages. A private key block is removed whole.
+ * Masks are applied to the whole text before any cut, so a key is never left
+ * half visible at the edge of an excerpt.
+ */
+export function maskSecrets(text: string): string {
+  // The line breaks stay, so line numbers in the masked text still match the file.
+  let out = text.replace(/-----BEGIN ([A-Z ]*)PRIVATE KEY-----[\s\S]*?(-----END \1PRIVATE KEY-----|$)/g, (block) => `[private key removed]${"\n".repeat(block.split("\n").length - 1)}`);
+  for (const rule of RULES) {
+    if (rule.id === "private-key-block") continue;
+    const global = new RegExp(rule.pattern.source, rule.pattern.flags.includes("g") ? rule.pattern.flags : `${rule.pattern.flags}g`);
+    out = out.replace(global, (secret) => mask(secret));
+  }
+  return out;
+}
+
+function mask(secret: string): string {
+  return `${secret.slice(0, 6)}${"*".repeat(Math.max(4, Math.min(12, secret.length - 9)))}${secret.slice(-3)}`;
+}
+
 /** Keeps the first and last few characters so the user can recognise the key without it being copyable. */
 export function redact(line: string, secret: string): string {
-  const head = secret.slice(0, 6);
-  const tail = secret.slice(-3);
-  const masked = `${head}${"*".repeat(Math.max(4, Math.min(12, secret.length - 9)))}${tail}`;
-  return line.replace(secret, masked).trim().slice(0, 200);
+  return line.replace(secret, mask(secret)).trim().slice(0, 200);
 }

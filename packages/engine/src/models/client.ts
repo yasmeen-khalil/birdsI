@@ -20,6 +20,12 @@ export interface Usage {
 
 export type UsageSink = (usage: Usage) => void | Promise<void>;
 
+/**
+ * Runs before every provider call. A caller uses it to refuse the call (by
+ * throwing) once a spending limit outside the client is reached.
+ */
+export type BeforeCall = (call: { purpose: string; model: string }) => void | Promise<void>;
+
 export interface CompleteOptions<T> {
   tier: ModelTier;
   /** Interactive work uses the fast flavor; background work the base flavor. */
@@ -88,6 +94,7 @@ export class ModelClient {
     private readonly config: EngineConfig,
     private readonly options: {
       onUsage?: UsageSink;
+      beforeCall?: BeforeCall;
       maxInputTokens?: number;
       traceMetadata?: Record<string, string>;
     } = {},
@@ -139,6 +146,10 @@ export class ModelClient {
     }
   }
 
+  private async gate(model: string, purpose: string): Promise<void> {
+    await this.options.beforeCall?.({ purpose, model });
+  }
+
   private async record(model: string, purpose: string, usage: RawUsage): Promise<void> {
     const cacheRead = usage.cacheReadTokens ?? 0;
     const cacheCreation = usage.cacheCreationTokens ?? 0;
@@ -171,6 +182,7 @@ export class ModelClient {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {
       const repair = attempt > 0 && lastError instanceof Error ? `The previous answer did not match the schema: ${lastError.message.slice(0, 500)}. Answer again with valid JSON only, and keep every text field short so the whole answer fits.` : null;
+      await this.gate(model, opts.purpose);
       const { text, usage } = await this.traced(`${opts.purpose}:${model}`, () => this.completeRaw(model, opts, system, repair))();
       await this.record(model, opts.purpose, usage);
       try {
@@ -197,23 +209,13 @@ export class ModelClient {
         messages,
         output_config: { format: zodOutputFormat(opts.schema as never), ...(this.effortFor(model, opts.tier, opts.effort)) },
       };
-      try {
-        const response = await client.messages.parse(params, { signal: opts.signal ?? undefined });
-        assertNotRefused(response, opts.purpose);
-        const usage = usageOf(response);
-        if (response.parsed_output !== null && response.parsed_output !== undefined) {
-          return { text: JSON.stringify(response.parsed_output), usage };
-        }
-        return { text: textOf(response), usage };
-      } catch (error) {
-        // The SDK could not parse the reply (usually cut off at max_tokens). Read the raw text
-        // instead; the caller's repair attempt asks for a shorter answer.
-        if (!(error instanceof Error) || !/parse structured output/i.test(error.message)) throw error;
-        const response = await client.messages.create(params, { signal: opts.signal ?? undefined });
-        assertNotRefused(response, opts.purpose);
-        const text = textOf(response);
-        return { text: response.stop_reason === "max_tokens" ? `${text}\n` : text, usage: usageOf(response) };
-      }
+      // One call, parsed by the caller: the SDK's own parse throws on a reply cut off at
+      // max_tokens and loses that call's usage, so the raw text is read instead and the
+      // caller's repair attempt asks for a shorter answer.
+      const response = await client.messages.create(params, { signal: opts.signal ?? undefined });
+      assertNotRefused(response, opts.purpose);
+      const text = textOf(response);
+      return { text: response.stop_reason === "max_tokens" ? `${text}\n` : text, usage: usageOf(response) };
     }
     const client = this.requireOpenAI();
     const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -239,6 +241,7 @@ export class ModelClient {
     const model = this.modelId(opts.tier, opts.fast ?? false);
     const joined = opts.system + opts.messages.map((m) => m.content).join("\n");
     this.assertBudget(ModelClient.estimateTokens(joined));
+    await this.gate(model, opts.purpose);
     const { text, usage } = await this.traced(`${opts.purpose}:${model}`, async () => {
       if (this.config.provider === "anthropic") {
         const client = this.requireAnthropic();
@@ -276,6 +279,7 @@ export class ModelClient {
     if (inputs.length === 0) return [];
     const model = this.config.models.embedding;
     if (!model || !this.openai) throw new EmbeddingsUnavailableError("No embedding model is configured. Add NEBIUS_API_KEY to enable embeddings; chat uses keyword retrieval without them.");
+    await this.gate(model, purpose);
     const response = await this.openai.embeddings.create({ model, input: inputs, encoding_format: "float" });
     await this.record(model, purpose, { inputTokens: response.usage?.prompt_tokens ?? 0, outputTokens: 0 });
     return response.data

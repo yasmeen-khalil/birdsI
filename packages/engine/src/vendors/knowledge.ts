@@ -2,7 +2,7 @@ import { tavily } from "@tavily/core";
 import { z } from "zod";
 import type { PlanTier, VendorDraft, VendorKnowledge } from "@birdsi/shared";
 import type { EngineConfig } from "../config";
-import { ModelClient, type UsageSink } from "../models/client";
+import { ModelClient, type BeforeCall, type UsageSink } from "../models/client";
 import { toJsonSchema } from "../models/schema";
 import { REVIEW_VOICE } from "../checks/model-findings";
 import type { RepoDigest } from "../scan/digest";
@@ -73,6 +73,7 @@ const LEARNED_SCHEMA = toJsonSchema(Learned);
 
 export interface LearnOptions {
   onUsage?: UsageSink;
+  beforeCall?: BeforeCall;
   signal?: AbortSignal;
 }
 
@@ -101,7 +102,7 @@ export async function learnVendor(config: EngineConfig, slug: string, name: stri
     }
   }
   if (docs.size === 0) return null;
-  const models = new ModelClient(config, options.onUsage ? { onUsage: options.onUsage } : {});
+  const models = new ModelClient(config, { ...(options.onUsage ? { onUsage: options.onUsage } : {}), ...(options.beforeCall ? { beforeCall: options.beforeCall } : {}) });
   const list = [...docs.values()];
   const learned = await models.complete({
     tier: "nano",

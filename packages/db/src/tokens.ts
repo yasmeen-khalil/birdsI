@@ -122,6 +122,38 @@ export async function approveDeviceLogin(userCode: string, userId: string, token
   return "approved";
 }
 
+/**
+ * An approved code the terminal never collected: the plain token is erased
+ * and the token revoked, so it can never be handed out or used.
+ */
+async function expireDeviceLogin(row: Pick<DeviceLoginRow, "id" | "status" | "token_id">): Promise<void> {
+  const db = getDb();
+  if (row.token_id && row.status === "approved") {
+    const { error } = await db.from("api_tokens").update({ revoked_at: new Date().toISOString() }).eq("id", row.token_id).is("revoked_at", null);
+    if (error) throw new Error(`expireDeviceLogin revoke: ${error.message}`);
+  }
+  const { error } = await db.from("device_logins").update({ status: "expired", token_plain: null }).eq("id", row.id).in("status", ["pending", "approved"]);
+  if (error) throw new Error(`expireDeviceLogin: ${error.message}`);
+}
+
+/**
+ * Expires every sign-in code past its time (revoking tokens nobody
+ * collected) and removes codes more than a day past expiry. Returns how many
+ * codes were expired.
+ */
+export async function sweepDeviceLogins(): Promise<number> {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const { data, error } = await db.from("device_logins").select("id, status, token_id").in("status", ["pending", "approved"]).lt("expires_at", now).limit(500);
+  if (error) throw new Error(`sweepDeviceLogins: ${error.message}`);
+  const rows = (data ?? []) as Array<Pick<DeviceLoginRow, "id" | "status" | "token_id">>;
+  for (const row of rows) await expireDeviceLogin(row);
+  const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+  const { error: delError } = await db.from("device_logins").delete().lt("expires_at", dayAgo).in("status", ["expired", "denied", "claimed"]);
+  if (delError) throw new Error(`sweepDeviceLogins delete: ${delError.message}`);
+  return rows.length;
+}
+
 export async function denyDeviceLogin(userCode: string): Promise<void> {
   const db = getDb();
   const { error } = await db.from("device_logins").update({ status: "denied" }).eq("user_code", userCode.toUpperCase().trim()).eq("status", "pending");
@@ -137,7 +169,10 @@ export async function pollDeviceLogin(deviceCode: string): Promise<{ status: "pe
   if (!row) return { status: "expired" };
   if (row.status === "denied") return { status: "denied" };
   if (row.status === "claimed" || row.status === "expired") return { status: "expired" };
-  if (new Date(row.expires_at) < new Date()) return { status: "expired" };
+  if (new Date(row.expires_at) < new Date()) {
+    await expireDeviceLogin(row);
+    return { status: "expired" };
+  }
   if (row.status === "pending") return { status: "pending" };
   if (!row.token_plain || !row.approved_by) return { status: "expired" };
   const claim = await db.from("device_logins").update({ status: "claimed", token_plain: null }).eq("id", row.id).eq("status", "approved").select("id");

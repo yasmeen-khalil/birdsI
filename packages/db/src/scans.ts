@@ -51,6 +51,13 @@ export async function createScan(input: { repoId: string | null; snapshotId: str
   return unwrap(result, "createScan") as ScanRow;
 }
 
+/** Removes a scan that was created but never queued (it lost a race to another scan of the same repository). */
+export async function discardScan(scanId: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from("scans").delete().eq("id", scanId).eq("status", "queued");
+  if (error) throw new Error(`discardScan: ${error.message}`);
+}
+
 export async function scanById(scanId: string): Promise<ScanRow | null> {
   const db = getDb();
   const { data, error } = await db.from("scans").select().eq("id", scanId).maybeSingle();
@@ -112,6 +119,14 @@ export async function eventsAfter(scanId: string, after: number, limit = 500): P
   const { data, error } = await db.from("scan_events").select("seq, at, event").eq("scan_id", scanId).gt("seq", after).order("seq").limit(limit);
   if (error) throw new Error(`eventsAfter: ${error.message}`);
   return ((data ?? []) as Array<{ seq: number; at: string; event: ScanEvent }>).map((r) => ({ seq: r.seq, at: r.at, event: r.event }));
+}
+
+/** The newest event of one type in a scan's log, read directly instead of paging the whole log. */
+export async function lastEventOfType(scanId: string, type: ScanEvent["type"]): Promise<ScanEvent | null> {
+  const db = getDb();
+  const { data, error } = await db.from("scan_events").select("event").eq("scan_id", scanId).eq("event->>type", type).order("seq", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error(`lastEventOfType: ${error.message}`);
+  return (data as { event: ScanEvent } | null)?.event ?? null;
 }
 
 export interface FindingRow {

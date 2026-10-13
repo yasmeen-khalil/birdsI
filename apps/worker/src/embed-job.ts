@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { recordUsage, replaceChunks, scanById, type JobRow } from "@birdsi/db";
-import { chunkFile, embedChunks, isCodeLanguage, prioritise, walkInventory, type EngineConfig, type Snapshot } from "@birdsi/engine";
+import { chunkFile, embedChunks, isCodeLanguage, maskSecrets, prioritise, walkInventory, type EngineConfig, type Snapshot } from "@birdsi/engine";
 import { resolveSnapshot } from "./scan-job";
+import { spendHook } from "./spend";
 
 const MAX_CHUNK_FILES = 300;
 
@@ -21,11 +22,12 @@ export async function runEmbedJob(config: EngineConfig, job: JobRow, heartbeat: 
     const chunks = [];
     for (const file of files) {
       const content = await readFile(join(snapshot.root, file.path), "utf8");
-      chunks.push(...(await chunkFile(file.path, content)));
+      // Stored passages outlive the snapshot, so key shapes are masked before they are embedded or saved.
+      chunks.push(...(await chunkFile(file.path, maskSecrets(content))));
     }
     let embedded = chunks;
     try {
-      embedded = await embedChunks(config, chunks, (u) => recordUsage({ ownerUserId: scan.owner_user_id, scanId, fixId: null, purpose: u.purpose, model: u.model, inputTokens: u.inputTokens, outputTokens: u.outputTokens, costMicrodollars: u.costMicrodollars }));
+      embedded = await embedChunks(config, chunks, (u) => recordUsage({ ownerUserId: scan.owner_user_id, scanId, fixId: null, purpose: u.purpose, model: u.model, inputTokens: u.inputTokens, outputTokens: u.outputTokens, costMicrodollars: u.costMicrodollars }), spendHook(scan.owner_user_id).beforeCall);
     } catch {
       // Embeddings unavailable: chat falls back to keyword retrieval over the stored text.
     }

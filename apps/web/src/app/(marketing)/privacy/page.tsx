@@ -24,7 +24,7 @@ export default function PrivacyPage() {
       <LegalSection title="The short version">
         <LegalList
           items={[
-            "Code uploaded by the terminal tool is kept for up to seven days so a fix can be applied, then deleted; your environment files and private keys are never uploaded at all.",
+            "Code uploaded by the terminal tool is kept for up to seven days so a fix can be applied, then deleted. Passages of it indexed for chat stay until the next scan replaces them. Your environment files and private keys are never uploaded at all.",
             "Findings, vendor details, answers to questions, approvals and chats are kept until you delete your account.",
             "Your code is sent to an AI model provider to be read, and search queries about your packages and vendors go to Tavily. Your code is never used to train models unless you opt in, and birdsI offers no such opt-in today.",
             "You can disconnect a repository or delete everything from Settings at any time.",
@@ -74,8 +74,8 @@ export default function PrivacyPage() {
           items={[
             "Repository snapshots uploaded by the terminal tool are kept for up to seven days, so a fix can be applied to the same code, then deleted. They are deleted at once when you delete your account. Environment files and private keys are never uploaded in the first place.",
             "Findings, scan results, dependency lists, chats and fixes are kept until you delete your account. Disconnecting a repository stops birdsI from reading it; its earlier results stay until your account is deleted.",
-            "Usage records are kept for cost accounting. When you delete your account they stay without anything that identifies you.",
-            "Indexed code passages for chat are replaced on every scan and deleted with the repository or your account.",
+            "Usage records are kept for cost accounting. When you delete your account they stay, without your name or email, tied only to your sign-in account number, so the daily limits still count them if you sign in again.",
+            "Indexed code passages for chat are not bound by the seven days: they stay until the next scan replaces them, and are deleted with the repository or your account. Keys in a shape birdsI recognises are masked before the passages, call sites and excerpts are stored.",
             "Backups made by the database host roll off within their own retention window after deletion.",
           ]}
         />
@@ -120,7 +120,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="Deleting your data">
         <LegalP>
-          In <Link href="/settings">Settings</Link> you can disconnect a repository, revoke terminal and MCP tokens, turn off email updates, and delete your account. Deleting your account removes your findings, scans, chats, fixes and tokens and disconnects every repository. Usage records remain only as anonymous totals. Pull requests birdsI opened stay on GitHub, because they belong to your repository.
+          In <Link href="/settings">Settings</Link> you can disconnect a repository, revoke terminal and MCP tokens, turn off email updates, and delete your account. Deleting your account removes your findings, scans, chats, fixes and tokens and disconnects every repository. Usage records remain without your name or email, so the daily limits still count them if you sign in again. Pull requests birdsI opened stay on GitHub, because they belong to your repository.
         </LegalP>
       </LegalSection>
 

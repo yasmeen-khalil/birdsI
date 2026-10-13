@@ -5,6 +5,7 @@ import {
   chunksForRepo,
   createFix,
   createScan,
+  discardScan,
   dependenciesForScan,
   enqueueJob,
   JOB_PRIORITY,
@@ -32,7 +33,7 @@ import { answerQuestion, loadEngineConfig, ModelClient } from "@birdsi/engine";
 import type { ChatMessage, CreateScanRequest, FindingResponse, ScanResponse } from "@birdsi/shared";
 import { ApiError } from "./api";
 import { envInt } from "./env";
-import { assertSpendCap, assertUserScanQuota, assertUserSpendCap, runningScanForRepo } from "./limits";
+import { assertSpendCap, assertUserScanQuota, assertUserSpendCap, firstActiveScanForRepo, runningScanForRepo } from "./limits";
 import { loadInventory } from "./ops";
 import { note, ownerAuthor, type RecordAuthor } from "./record";
 
@@ -67,7 +68,13 @@ export async function startScan(user: UserRow, input: CreateScanRequest, source:
     if (running) throw new ApiError(409, "already_running", "A scan of this repository is already running. Wait for it to finish or stop it first.");
   }
   const scan = await createScan({ repoId, snapshotId: input.snapshotId ?? null, ownerUserId: user.id, kind: input.kind, source, branch, appDescription: input.appDescription ?? null });
-  await enqueueJob("scan", { scanId: scan.id }, { priority: input.kind === "light" ? JOB_PRIORITY.interactive : JOB_PRIORITY.background });
+  if (repoId && (await firstActiveScanForRepo(repoId)) !== scan.id) {
+    // Another request queued a scan of this repository at the same moment; that one runs.
+    await discardScan(scan.id);
+    throw new ApiError(409, "already_running", "A scan of this repository is already running. Wait for it to finish or stop it first.");
+  }
+  // One attempt: a retry would start the scan from the beginning and pay for every model call again.
+  await enqueueJob("scan", { scanId: scan.id }, { maxAttempts: 1, priority: input.kind === "light" ? JOB_PRIORITY.interactive : JOB_PRIORITY.background });
   return toScan(scan);
 }
 

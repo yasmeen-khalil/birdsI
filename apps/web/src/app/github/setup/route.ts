@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUserRow } from "@/lib/auth";
-import { completeInstallation } from "@/lib/github";
+import { completeInstallation, InstallationTakenError, verifyInstallState } from "@/lib/github";
 
 /**
  * GitHub redirects here after the App is installed. The installation is
@@ -19,6 +19,10 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (action === "request") {
     return NextResponse.redirect(new URL("/connect?status=requested", url.origin));
   }
+  // The redirect must carry the signed state from this user's own install link.
+  if (!verifyInstallState(url.searchParams.get("state"), user.id)) {
+    return NextResponse.redirect(new URL("/connect?status=unconfirmed", url.origin));
+  }
   if (!Number.isFinite(installationId)) {
     return NextResponse.redirect(new URL("/connect?status=missing", url.origin));
   }
@@ -26,6 +30,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const { connected } = await completeInstallation(user, installationId);
     return NextResponse.redirect(new URL(`/connect?status=connected&count=${connected}`, url.origin));
   } catch (error) {
+    if (error instanceof InstallationTakenError) return NextResponse.redirect(new URL("/connect?status=taken", url.origin));
     console.error("github setup", error);
     return NextResponse.redirect(new URL("/connect?status=error", url.origin));
   }

@@ -75,34 +75,74 @@ export async function claimJob(workerId: string, kinds: JobKind[]): Promise<JobR
   return rows[0] ?? null;
 }
 
-export async function heartbeat(jobId: string): Promise<void> {
-  const db = getDb();
-  const { error } = await db.from("jobs").update({ heartbeat_at: new Date().toISOString() }).eq("id", jobId);
-  if (error) throw new Error(`heartbeat: ${error.message}`);
+/**
+ * The job is no longer this worker's: it was requeued or failed as stale
+ * while this worker was still on it. The worker stops and writes nothing.
+ */
+export class JobLostError extends Error {
+  override name = "JobLostError";
 }
 
-export async function completeJob(jobId: string): Promise<void> {
+/** Every write about a running job names the worker holding it, so a worker that lost the job changes nothing. */
+async function updateOwnJob(jobId: string, workerId: string, patch: Record<string, unknown>, context: string): Promise<void> {
   const db = getDb();
-  const { error } = await db.from("jobs").update({ status: "done", finished_at: new Date().toISOString(), locked_by: null }).eq("id", jobId);
-  if (error) throw new Error(`completeJob: ${error.message}`);
+  const { data, error } = await db.from("jobs").update(patch).eq("id", jobId).eq("locked_by", workerId).eq("status", "running").select("id");
+  if (error) throw new Error(`${context}: ${error.message}`);
+  if (((data ?? []) as unknown[]).length === 0) throw new JobLostError(`${context}: job ${jobId} is no longer held by ${workerId}`);
+}
+
+export async function heartbeat(jobId: string, workerId: string): Promise<void> {
+  await updateOwnJob(jobId, workerId, { heartbeat_at: new Date().toISOString() }, "heartbeat");
+}
+
+export async function completeJob(jobId: string, workerId: string): Promise<void> {
+  await updateOwnJob(jobId, workerId, { status: "done", finished_at: new Date().toISOString(), locked_by: null }, "completeJob");
+}
+
+/**
+ * Running jobs whose worker stopped reporting and that have no attempts left
+ * are failed before claim_job would requeue them, so a job that kills its
+ * worker every time does not loop forever. claim_job requeues after three
+ * minutes without a heartbeat (beats come every 15 seconds); this runs at two,
+ * so it gets there first. Returns the jobs it failed.
+ */
+export async function failExhaustedStaleJobs(staleAfterMs = 2 * 60_000): Promise<JobRow[]> {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - staleAfterMs).toISOString();
+  const { data, error } = await db.from("jobs").select().eq("status", "running").lt("heartbeat_at", cutoff).limit(100);
+  if (error) throw new Error(`failExhaustedStaleJobs: ${error.message}`);
+  const failed: JobRow[] = [];
+  for (const job of (data ?? []) as JobRow[]) {
+    if (job.attempts < job.max_attempts) continue;
+    const { data: rows, error: updateError } = await db
+      .from("jobs")
+      .update({ status: "failed", locked_by: null, locked_at: null, finished_at: new Date().toISOString(), last_error: `${job.last_error ?? ""} worker lost, no attempts left`.trim() })
+      .eq("id", job.id)
+      .eq("status", "running")
+      .lt("heartbeat_at", cutoff)
+      .select("id");
+    if (updateError) throw new Error(`failExhaustedStaleJobs: ${updateError.message}`);
+    if (((rows ?? []) as unknown[]).length > 0) failed.push(job);
+  }
+  return failed;
 }
 
 /** Fails the job; requeues with a delay while attempts remain. */
-export async function failJob(job: JobRow, message: string): Promise<void> {
-  const db = getDb();
+export async function failJob(job: JobRow, workerId: string, message: string): Promise<void> {
   const retry = job.attempts < job.max_attempts;
-  const { error } = await db
-    .from("jobs")
-    .update({
+  await updateOwnJob(
+    job.id,
+    workerId,
+    {
       status: retry ? "queued" : "failed",
       last_error: message.slice(0, 2000),
       locked_by: null,
       locked_at: null,
       run_after: retry ? new Date(Date.now() + 30_000).toISOString() : job.run_after,
       finished_at: retry ? null : new Date().toISOString(),
-    })
-    .eq("id", job.id);
-  if (error) throw new Error(`failJob: ${error.message}`);
+    },
+    "failJob",
+  );
 }
 
 /** True when a job of this kind with this payload key is queued or running. */

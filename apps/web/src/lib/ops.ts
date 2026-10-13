@@ -207,6 +207,7 @@ export async function decideActionRequest(actionId: string, user: UserRow, decis
   if (!row) throw new ApiError(404, "not_found", "Not found.");
   await repoForUser(row.repo_id, user.id);
   if (row.status !== "pending") throw new ApiError(409, "decided", `This request is already ${row.status}.`);
+  if (new Date(row.expires_at) <= new Date()) throw new ApiError(409, "expired", "This request expired before it was decided. The agent can propose it again.");
   const updated = await decideAction(row.id, user.id, decision);
   await note(row.repo_id, ownerAuthor(user), { kind: "action_decided", subject: row.command, text: `${decision === "approve" ? "Approved" : "Denied"}: ${row.title}`, why: row.reason, data: { actionId: row.id, decision } });
   return toAction(updated, null);

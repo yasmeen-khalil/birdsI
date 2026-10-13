@@ -10,6 +10,7 @@ import { glyphs, paint, plural, styleFor, wrap, type Style } from "../format";
 import { isInteractive, printJson, println, usageError } from "../output";
 import { askText, askYesNo } from "../prompt";
 import { openBrowser } from "./auth";
+import { LEGEND, q } from "../quote";
 
 /**
  * The operations layer from the terminal: vendors and limits, the questions
@@ -327,24 +328,24 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
       ...inv.vendors.flatMap((v) => [
         `## ${v.name}`,
         "",
-        `${v.what || "(no description yet)"}${v.purpose ? ` Used here for: ${v.purpose}` : ""}`,
+        `${v.what ? q(v.what) : "(no description yet)"}${v.purpose ? ` Used here for: ${q(v.purpose)}` : ""}`,
         "",
         `- Category: ${v.category}`,
         `- Found by: ${v.detectedBy.join(", ")}${v.packages.length ? `; packages ${v.packages.join(", ")}` : ""}${v.envVars.length ? `; env ${v.envVars.join(", ")}` : ""}`,
         ...(v.pricingUrl ? [`- Pricing: ${v.pricingUrl}`] : []),
-        ...v.facts.map((f) => `- ${f.label}: ${f.value} (${FACT_SOURCE_LABEL[f.source].toLowerCase()}${f.evidence.url ? `, ${f.evidence.url}` : ""})`),
-        ...(v.callSites.length ? ["", "Used in:", ...v.callSites.slice(0, 12).map((c) => `- ${c.path}:${c.line}`)] : []),
+        ...v.facts.map((f) => `- ${q(f.label)}: ${q(f.value)} (${FACT_SOURCE_LABEL[f.source].toLowerCase()}${f.evidence.url ? `, ${f.evidence.url}` : ""})`),
+        ...(v.callSites.length ? ["", "Used in:", ...v.callSites.slice(0, 12).map((c) => `- ${q(c.path)}:${c.line}`)] : []),
         "",
       ]),
     ].join("\n");
-    const alertsMd = [`# Alerts`, "", ...(inv.alerts.length ? inv.alerts.map((a) => `- [${a.level}] ${a.title}: ${a.detail}${a.suggestedCommand ? ` Try: \`${a.suggestedCommand}\`` : ""}`) : ["None."]), ""].join("\n");
-    const questionsMd = [`# Questions for the owner`, "", ...(questions.data.questions.length ? questions.data.questions.map((q) => `- ${q.question} (${q.why})${q.options.length ? ` Options: ${q.options.join(", ")}` : ""}`) : ["None open."]), "", `# Pending approvals`, "", ...(actions.data.actions.length ? actions.data.actions.map((a) => `- ${a.title}: \`${a.command}\` (${a.reason})`) : ["None."]), ""].join("\n");
+    const alertsMd = [`# Alerts`, "", ...(inv.alerts.length ? inv.alerts.map((a) => `- [${a.level}] ${q(a.title)}: ${q(a.detail)}${a.suggestedCommand ? ` Try: ${q(a.suggestedCommand)}` : ""}`) : ["None."]), ""].join("\n");
+    const questionsMd = [`# Questions for the owner`, "", ...(questions.data.questions.length ? questions.data.questions.map((x) => `- ${q(x.question)} (${q(x.why)})${x.options.length ? ` Options: ${q(x.options.join(", "))}` : ""}`) : ["None open."]), "", `# Pending approvals`, "", ...(actions.data.actions.length ? actions.data.actions.map((a) => `- ${q(a.title)}: ${q(a.command)} (${q(a.reason)})`) : ["None."]), ""].join("\n");
     const recordMd = [
       `# The record`,
       "",
       `What was decided, stated, fixed, answered, approved and run for ${inv.repo.fullName}, by whom and why. Newest first. Read it before deciding something that may already be decided.`,
       "",
-      ...(record.data.entries.length ? record.data.entries.map((e) => `- ${e.createdAt.slice(0, 16).replace("T", " ")} ${RECORD_KIND_LABEL[e.kind]} by ${e.authorLabel ?? RECORD_AUTHOR_LABEL[e.authorKind]}: ${e.text}${e.why ? ` (why: ${e.why})` : ""}${e.subject ? ` [${e.subject}]` : ""}`) : ["Nothing on record yet."]),
+      ...(record.data.entries.length ? record.data.entries.map((e) => `- ${e.createdAt.slice(0, 16).replace("T", " ")} ${RECORD_KIND_LABEL[e.kind]} by ${e.authorLabel ?? RECORD_AUTHOR_LABEL[e.authorKind]}: ${q(e.text)}${e.why ? ` (why: ${q(e.why)})` : ""}${e.subject ? ` [${q(e.subject)}]` : ""}`) : ["Nothing on record yet."]),
       "",
     ].join("\n");
     const readme = [
@@ -362,14 +363,20 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
       "",
       `For live data, run the birdsI MCP server: \`npx birdsi mcp\`.`,
       "",
+      LEGEND,
+      "",
     ].join("\n");
+    // Every file opens with the legend, since an agent may read one file without the README.
+    const withLegend = (md: string) => md.replace(/^(# [^\n]*\n)/, `$1\n${LEGEND}\n`);
     await Promise.all([
+      // Plans, spend and the owner's record stay out of git unless the owner chooses otherwise.
+      writeFile(join(dir, ".gitignore"), "*\n"),
       writeFile(join(dir, "README.md"), readme),
       writeFile(join(dir, "vision.md"), `# Vision\n\n${inv.vision.text || "(not written yet)"}\n`),
-      writeFile(join(dir, "vendors.md"), vendorsMd),
-      writeFile(join(dir, "record.md"), recordMd),
-      writeFile(join(dir, "alerts.md"), alertsMd),
-      writeFile(join(dir, "questions.md"), questionsMd),
+      writeFile(join(dir, "vendors.md"), withLegend(vendorsMd)),
+      writeFile(join(dir, "record.md"), withLegend(recordMd)),
+      writeFile(join(dir, "alerts.md"), withLegend(alertsMd)),
+      writeFile(join(dir, "questions.md"), withLegend(questionsMd)),
     ]);
     if (options.json) printJson({ dir, files: ["README.md", "vision.md", "vendors.md", "alerts.md", "questions.md"] });
     else println(`${paint.ok(style, "Wrote")} ${dir} (vision, vendors, alerts, questions). Agents can read these files directly.`);

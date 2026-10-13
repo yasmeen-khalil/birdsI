@@ -4,6 +4,7 @@ import type { CallSite, ProjectHints, VendorDraft } from "@birdsi/shared";
 import type { Inventory } from "../inventory/walk";
 import type { RawDependency } from "../inventory/manifests";
 import { CATALOG, CATALOG_BY_SLUG, type CatalogEntry } from "./catalog";
+import { maskSecrets } from "../checks/secrets";
 
 /**
  * Finds every outside service the code depends on, deterministically:
@@ -69,13 +70,45 @@ interface Hit {
   domains: Set<string>;
 }
 
-function hitFor(map: Map<string, Hit>, entry: CatalogEntry | null, slug: string, name: string): Hit {
+/** At most this many vendors per scan, catalog vendors first; each one can cost web searches and a model call later. */
+export const MAX_VENDORS_PER_SCAN = 60;
+/** Of those, at most this many that are not in the catalog (guessed from env names or Stripe Projects). */
+export const MAX_UNKNOWN_VENDORS = 10;
+
+/** Slugs end up in URLs and database filters, so they are reduced to [a-z0-9-] and 40 characters. */
+export function cleanSlug(raw: string): string | null {
+  const slug = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40)
+    .replace(/-$/, "");
+  return slug.length > 0 ? slug : null;
+}
+
+function hitFor(map: Map<string, Hit>, entry: CatalogEntry | null, rawSlug: string, name: string): Hit {
+  const slug = cleanSlug(rawSlug);
+  const fresh = (key: string): Hit => ({ entry, slug: key, name: name.slice(0, 60), detectedBy: new Set(), packages: new Set(), envVars: new Set(), callSites: [], domains: new Set() });
+  // An unusable slug still gets a hit to write into, but it is never kept.
+  if (!slug) return fresh("");
   let hit = map.get(slug);
   if (!hit) {
-    hit = { entry, slug, name, detectedBy: new Set(), packages: new Set(), envVars: new Set(), callSites: [], domains: new Set() };
+    hit = fresh(slug);
     map.set(slug, hit);
   }
   return hit;
+}
+
+/** Catalog vendors first, then the unknown ones with the most evidence, within the caps. */
+export function capVendors<T extends { entry: unknown; envVars: Set<string>; callSites: unknown[]; detectedBy: Set<unknown> }>(hits: T[]): T[] {
+  const weight = (h: T) => h.envVars.size + h.callSites.length + h.detectedBy.size;
+  const known = hits.filter((h) => h.entry !== null);
+  const unknown = hits
+    .filter((h) => h.entry === null)
+    .sort((a, b) => weight(b) - weight(a))
+    .slice(0, MAX_UNKNOWN_VENDORS);
+  return [...known, ...unknown].slice(0, MAX_VENDORS_PER_SCAN);
 }
 
 function slugFromEnv(name: string): { slug: string; label: string } | null {
@@ -179,7 +212,7 @@ export async function discoverVendors(inventory: Inventory, rawDependencies: Raw
           const hit = hitFor(hits, entry, entry.slug, entry.name);
           hit.detectedBy.add("env");
           hit.envVars.add(name);
-          if (!envFile && hit.callSites.length < 20) hit.callSites.push({ path: file.path, line: i + 1, excerpt: line.trim().slice(0, 160) });
+          if (!envFile && hit.callSites.length < 20) hit.callSites.push({ path: file.path, line: i + 1, excerpt: maskSecrets(line.trim()).slice(0, 160) });
           continue;
         }
         const guess = slugFromEnv(name);
@@ -187,7 +220,7 @@ export async function discoverVendors(inventory: Inventory, rawDependencies: Raw
         const hit = hitFor(hits, null, guess.slug, guess.label);
         hit.detectedBy.add("env");
         hit.envVars.add(name);
-        if (!envFile && hit.callSites.length < 20) hit.callSites.push({ path: file.path, line: i + 1, excerpt: line.trim().slice(0, 160) });
+        if (!envFile && hit.callSites.length < 20) hit.callSites.push({ path: file.path, line: i + 1, excerpt: maskSecrets(line.trim()).slice(0, 160) });
       }
       if (!envFile) {
         for (const m of line.matchAll(URL_REF)) {
@@ -198,7 +231,7 @@ export async function discoverVendors(inventory: Inventory, rawDependencies: Raw
           hit.detectedBy.add("url");
           hit.domains.add(domain);
           if (hit.callSites.length < 20 && !hit.callSites.some((c) => c.path === file.path && c.line === i + 1)) {
-            hit.callSites.push({ path: file.path, line: i + 1, excerpt: line.trim().slice(0, 160) });
+            hit.callSites.push({ path: file.path, line: i + 1, excerpt: maskSecrets(line.trim()).slice(0, 160) });
           }
         }
       }
@@ -215,7 +248,7 @@ export async function discoverVendors(inventory: Inventory, rawDependencies: Raw
 
   // The app's own hosting shows up only as config; GitHub shows up only as workflows. Both count.
   const drafts: VendorDraft[] = [];
-  for (const hit of hits.values()) {
+  for (const hit of capVendors([...hits.values()])) {
     const entry = hit.entry;
     drafts.push({
       slug: hit.slug,

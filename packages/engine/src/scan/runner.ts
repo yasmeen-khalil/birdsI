@@ -10,7 +10,7 @@ import type { EngineConfig } from "../config";
 import { collectDependencies } from "../inventory/manifests";
 import { prioritise } from "../inventory/priority";
 import { walkInventory, type Inventory } from "../inventory/walk";
-import { ModelClient, type Usage } from "../models/client";
+import { ModelClient, type BeforeCall, type Usage } from "../models/client";
 import type { Snapshot } from "../source/types";
 import { buildDigest } from "./digest";
 import { discoverVendors } from "../vendors/discover";
@@ -33,6 +33,8 @@ export interface ScanInput {
   signal?: AbortSignal;
   onEvent: (event: ScanEvent) => Promise<void>;
   onUsage?: (usage: Usage) => Promise<void> | void;
+  /** Runs before every model call; throwing refuses the call (a daily spending limit). */
+  beforeCall?: BeforeCall;
   traceMetadata?: Record<string, string>;
 }
 
@@ -77,6 +79,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
 
   const models = new ModelClient(config, {
     maxInputTokens: budget.maxInputTokens,
+    ...(input.beforeCall ? { beforeCall: input.beforeCall } : {}),
     ...(input.traceMetadata ? { traceMetadata: input.traceMetadata } : {}),
     onUsage: async (usage) => {
       stats.inputTokens += usage.inputTokens;

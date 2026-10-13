@@ -7,19 +7,23 @@ import { create as createTar } from "tar";
 import { CliError, EXIT } from "./exit";
 
 /**
- * Folders and file types never worth sending; matched at any depth.
- * Mirrors the engine's built-in list, except lockfiles: the server parses
- * them for exact dependency versions, so they must be in the snapshot.
+ * Files that carry credentials. They never leave the machine, whatever any
+ * .gitignore says: this list is applied after the .gitignore layers as a
+ * hard rule, so a "!.env" in a .gitignore cannot bring one back. Templates
+ * (.env.example and friends) are not secrets and stay.
  */
-export const ALWAYS_IGNORED: readonly string[] = [
-  // Secrets never leave the machine, whatever .gitignore says. .env.example is a template and stays.
+export const NEVER_UPLOADED: readonly string[] = [
   ".env",
   ".env.*",
   "!.env.example",
   "!.env.sample",
   "!.env.template",
+  ".envrc",
+  ".dev.vars",
+  ".dev.vars.*",
   "*.pem",
   "*.key",
+  "*.p8",
   "*.p12",
   "*.pfx",
   "*.jks",
@@ -29,11 +33,33 @@ export const ALWAYS_IGNORED: readonly string[] = [
   "id_ecdsa*",
   ".npmrc",
   ".netrc",
+  ".pypirc",
+  ".git-credentials",
   ".aws/",
   ".ssh/",
+  ".kube/",
+  "**/.docker/config.json",
+  "**/.config/gh/hosts.yml",
+  "**/birdsi/config.json",
   "credentials.json",
+  "application_default_credentials.json",
   "service-account*.json",
   "*-service-account*.json",
+  "secrets.toml",
+  "*.tfvars",
+  "*.tfvars.json",
+  "*.tfstate",
+  "*.tfstate.*",
+  "*_history",
+];
+
+/**
+ * Folders and file types never worth sending; matched at any depth.
+ * Mirrors the engine's built-in list, except lockfiles: the server parses
+ * them for exact dependency versions, so they must be in the snapshot.
+ */
+export const ALWAYS_IGNORED: readonly string[] = [
+  ...NEVER_UPLOADED,
   ".git/",
   "node_modules/",
   ".next/",
@@ -148,7 +174,8 @@ export async function walkSnapshot(root: string, options: WalkOptions = {}): Pro
 
   const result: WalkResult = { root, files: [], totalBytes: 0, skipped: 0, tooLarge: [] };
   const base: IgnoreLayer = { ig: ignore().add([...ALWAYS_IGNORED]), dir: "" };
-  await walkDir(root, root, [base], result, limits);
+  const deny = ignore().add([...NEVER_UPLOADED]);
+  await walkDir(root, root, [base], result, limits, deny);
   result.files.sort();
   return result;
 }
@@ -163,6 +190,7 @@ async function walkDir(
   layers: IgnoreLayer[],
   out: WalkResult,
   limits: typeof LIMITS,
+  deny: Ignore,
 ): Promise<void> {
   const dirRel = toPosix(relative(root, dir));
   let localLayers = layers;
@@ -185,15 +213,15 @@ async function walkDir(
       continue;
     }
     if (entry.isDirectory()) {
-      if (isIgnored(localLayers, rel, true)) {
+      if (isDenied(deny, rel, true) || isIgnored(localLayers, rel, true)) {
         out.skipped += 1;
         continue;
       }
-      await walkDir(root, full, localLayers, out, limits);
+      await walkDir(root, full, localLayers, out, limits, deny);
       continue;
     }
     if (!entry.isFile()) continue;
-    if (isIgnored(localLayers, rel, false)) {
+    if (isDenied(deny, rel, false) || isIgnored(localLayers, rel, false)) {
       out.skipped += 1;
       continue;
     }
@@ -224,6 +252,15 @@ async function walkDir(
         "Scan a smaller folder, or add large generated folders and data files to .gitignore.",
       );
     }
+  }
+}
+
+/** The credential list, checked on the full path and never overridden by a .gitignore. */
+function isDenied(deny: Ignore, rootRel: string, isDir: boolean): boolean {
+  try {
+    return deny.ignores(isDir ? rootRel + "/" : rootRel);
+  } catch {
+    return false;
   }
 }
 

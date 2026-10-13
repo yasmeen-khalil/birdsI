@@ -94,16 +94,24 @@ export async function installationsForUser(userId: string): Promise<Installation
   return (data ?? []) as InstallationRow[];
 }
 
-export async function connectRepo(input: { ownerUserId: string; installationId: string; githubRepoId: number; fullName: string; defaultBranch: string; private: boolean }): Promise<RepoRow> {
+/**
+ * Connects a GitHub repository to its owner. A repository that already
+ * belongs to another account is never moved: it is left as it is and null
+ * comes back. The owner is fixed by whoever connected it first.
+ */
+export async function connectRepo(input: { ownerUserId: string; installationId: string; githubRepoId: number; fullName: string; defaultBranch: string; private: boolean }): Promise<RepoRow | null> {
   const db = getDb();
-  const result = await db
+  const fields = { installation_id: input.installationId, full_name: input.fullName, default_branch: input.defaultBranch, private: input.private, archived_at: null };
+  // Insert when new; a row that appears at the same moment is left alone and read below.
+  const { error: insertError } = await db
     .from("repos")
-    .upsert(
-      { owner_user_id: input.ownerUserId, installation_id: input.installationId, github_repo_id: input.githubRepoId, full_name: input.fullName, default_branch: input.defaultBranch, private: input.private, archived_at: null },
-      { onConflict: "github_repo_id" },
-    )
-    .select()
-    .single();
+    .upsert({ owner_user_id: input.ownerUserId, github_repo_id: input.githubRepoId, ...fields }, { onConflict: "github_repo_id", ignoreDuplicates: true });
+  if (insertError) throw new Error(`connectRepo: ${insertError.message}`);
+  const { data, error } = await db.from("repos").select().eq("github_repo_id", input.githubRepoId).maybeSingle();
+  if (error) throw new Error(`connectRepo: ${error.message}`);
+  const existing = data as RepoRow | null;
+  if (!existing || existing.owner_user_id !== input.ownerUserId) return null;
+  const result = await db.from("repos").update(fields).eq("id", existing.id).eq("owner_user_id", input.ownerUserId).select().single();
   return unwrap(result, "connectRepo") as RepoRow;
 }
 

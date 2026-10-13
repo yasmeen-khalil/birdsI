@@ -48,12 +48,34 @@ export async function updateUserPreferences(userId: string, prefs: { emailUpdate
 }
 
 /**
- * Deletes everything the user owns. Repos, scans, findings, fixes, tokens
- * and chat cascade from the user row; the ledger keeps its rows with the
- * owner set to null so cost history stays true.
+ * Deletes everything the user owns, then keeps the user row itself as an
+ * empty shell: no name, no email, only the sign-in id, marked deleted. The
+ * usage ledger stays attached to it, so signing in again with the same
+ * identity returns to the same row and today's spending limits still count
+ * what was already spent. Children are removed explicitly, in the order the
+ * foreign keys need, because the cascades only fire on a hard delete.
  */
 export async function deleteUser(userId: string): Promise<void> {
   const db = getDb();
-  const { error } = await db.from("users").delete().eq("id", userId);
-  if (error) throw new Error(`deleteUser: ${error.message}`);
+  const steps: Array<[string, () => PromiseLike<{ error: { message: string } | null }>]> = [
+    // Repositories cascade to their scans, findings, vendors, questions, approvals, record and chat.
+    ["repos", () => db.from("repos").delete().eq("owner_user_id", userId)],
+    ["scans", () => db.from("scans").delete().eq("owner_user_id", userId)],
+    ["snapshots", () => db.from("snapshots").delete().eq("owner_user_id", userId)],
+    ["chat_messages", () => db.from("chat_messages").delete().eq("owner_user_id", userId)],
+    ["api_tokens", () => db.from("api_tokens").delete().eq("owner_user_id", userId)],
+    ["device_logins", () => db.from("device_logins").delete().eq("approved_by", userId)],
+    ["connections", () => db.from("connections").delete().eq("owner_user_id", userId)],
+    ["installations", () => db.from("installations").update({ connected_by: null }).eq("connected_by", userId)],
+    ["action_requests", () => db.from("action_requests").update({ decided_by: null }).eq("decided_by", userId)],
+    ["fixes", () => db.from("fixes").update({ requested_by: null }).eq("requested_by", userId)],
+    [
+      "users",
+      () => db.from("users").update({ github_login: null, github_user_id: null, email: null, email_updates: false, deleted_at: new Date().toISOString() }).eq("id", userId),
+    ],
+  ];
+  for (const [table, run] of steps) {
+    const { error } = await run();
+    if (error) throw new Error(`deleteUser ${table}: ${error.message}`);
+  }
 }

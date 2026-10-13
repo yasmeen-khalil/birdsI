@@ -1,13 +1,13 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { z } from "zod";
 import type { Finding } from "@birdsi/shared";
 import type { EngineConfig } from "../config";
-import { ModelClient, type UsageSink } from "../models/client";
+import { ModelClient, type BeforeCall, type UsageSink } from "../models/client";
 import { toJsonSchema } from "../models/schema";
 import { numberLines } from "../scan/digest";
 import type { Snapshot } from "../source/types";
 import { applyEdits, FileEdit, toUnifiedDiff, type AppliedFile } from "./edits";
+import { resolveInsideRoot } from "./paths";
 import { REVIEW_VOICE } from "../checks/model-findings";
 
 const FixOutput = z.object({
@@ -44,9 +44,10 @@ export interface GeneratedFix {
  * snapshot, and returns the resulting files and a patch. Nothing is written
  * to disk or to GitHub here.
  */
-export async function generateFix(config: EngineConfig, input: { finding: Finding; snapshot: Snapshot; onUsage?: UsageSink }): Promise<GeneratedFix> {
+export async function generateFix(config: EngineConfig, input: { finding: Finding; snapshot: Snapshot; onUsage?: UsageSink; beforeCall?: BeforeCall }): Promise<GeneratedFix> {
   const usage = { inputTokens: 0, outputTokens: 0, costMicrodollars: 0 };
   const models = new ModelClient(config, {
+    ...(input.beforeCall ? { beforeCall: input.beforeCall } : {}),
     onUsage: async (u) => {
       usage.inputTokens += u.inputTokens;
       usage.outputTokens += u.outputTokens;
@@ -56,8 +57,10 @@ export async function generateFix(config: EngineConfig, input: { finding: Findin
   });
   const { finding, snapshot } = input;
   const read = async (path: string): Promise<string | null> => {
+    const full = await resolveInsideRoot(snapshot.root, path);
+    if (!full) return null;
     try {
-      return await readFile(join(snapshot.root, path), "utf8");
+      return await readFile(full, "utf8");
     } catch {
       return null;
     }

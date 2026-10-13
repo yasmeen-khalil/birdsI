@@ -1,5 +1,5 @@
 import { hostname } from "node:os";
-import { claimJob, completeJob, enqueueJob, failJob, heartbeat, jobActive, purgeOldSnapshots, purgeStaleWorkers, reposDueForSync, userIdsWithConnections, workerSeen, type JobRow } from "@birdsi/db";
+import { claimJob, completeJob, enqueueJob, failExhaustedStaleJobs, failJob, heartbeat, JobLostError, jobActive, purgeOldSnapshots, purgeStaleWorkers, reposDueForSync, sweepDeviceLogins, updateFix, updateScan, userIdsWithConnections, workerSeen, type JobRow } from "@birdsi/db";
 import { loadEngineConfig } from "@birdsi/engine";
 import { runEmbedJob } from "./embed-job";
 import { runFixJob } from "./fix-job";
@@ -20,7 +20,7 @@ process.on("SIGINT", () => (stopping = true));
 
 async function handle(job: JobRow): Promise<void> {
   const beat = async () => {
-    await heartbeat(job.id);
+    await heartbeat(job.id, workerId);
     await present(job.id);
   };
   if (job.kind === "scan") return runScanJob(config, job, beat);
@@ -72,7 +72,7 @@ async function scheduleVendorSyncs(): Promise<number> {
   return queued;
 }
 
-/** Once an hour: snapshot files past retention go, stale worker rows go, due vendor syncs are queued. */
+/** Once an hour: snapshot files past retention go, stale worker rows go, old sign-in codes expire, due vendor syncs are queued. */
 async function sweep(): Promise<void> {
   if (Date.now() - lastSweep < SWEEP_MS) return;
   lastSweep = Date.now();
@@ -88,10 +88,35 @@ async function sweep(): Promise<void> {
     console.error(`[worker] worker sweep failed: ${error instanceof Error ? error.message : String(error)}`);
   }
   try {
+    const expired = await sweepDeviceLogins();
+    if (expired > 0) console.log(`[worker] expired ${expired} sign-in code(s)`);
+  } catch (error) {
+    console.error(`[worker] sign-in code sweep failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  try {
     const queued = await scheduleVendorSyncs();
     if (queued > 0) console.log(`[worker] scheduled ${queued} vendor sync(s)`);
   } catch (error) {
     console.error(`[worker] sync schedule failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+const STALE_SWEEP_MS = 30_000;
+let lastStaleSweep = 0;
+
+/** Jobs whose worker died with no attempts left are failed, and the scan or fix they were running says so. */
+async function failExhausted(): Promise<void> {
+  if (Date.now() - lastStaleSweep < STALE_SWEEP_MS) return;
+  lastStaleSweep = Date.now();
+  try {
+    for (const job of await failExhaustedStaleJobs()) {
+      console.error(`[worker] ${job.kind} ${job.id} failed: its worker stopped and no attempts are left`);
+      const finished_at = new Date().toISOString();
+      if (job.kind === "scan") await updateScan(String(job.payload["scanId"]), { status: "failed", finished_at, error: "The scanner stopped while working on this scan. Run it again." });
+      if (job.kind === "fix") await updateFix(String(job.payload["fixId"]), { status: "failed", error: "The scanner stopped while working on this fix. Try it again." });
+    }
+  } catch (error) {
+    console.error(`[worker] stale job sweep failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -100,6 +125,7 @@ async function loop(): Promise<void> {
   while (!stopping) {
     await sweep();
     await present(null);
+    await failExhausted();
     let job: JobRow | null = null;
     try {
       job = await claimJob(workerId, ["scan", "fix", "embed", "vendor_sync"]);
@@ -117,15 +143,19 @@ async function loop(): Promise<void> {
     await present(job.id, true);
     try {
       await handle(job);
-      await completeJob(job.id);
+      await completeJob(job.id, workerId);
       console.log(`[worker] ${job.kind} ${job.id} done in ${Math.round((Date.now() - started) / 1000)}s`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[worker] ${job.kind} ${job.id} failed: ${message}`);
-      try {
-        await failJob(job, message);
-      } catch (inner) {
-        console.error(`[worker] could not record failure: ${inner instanceof Error ? inner.message : String(inner)}`);
+      if (error instanceof JobLostError) {
+        console.error(`[worker] ${job.kind} ${job.id} was taken from this worker: ${message}`);
+      } else {
+        console.error(`[worker] ${job.kind} ${job.id} failed: ${message}`);
+        try {
+          await failJob(job, workerId, message);
+        } catch (inner) {
+          console.error(`[worker] could not record failure: ${inner instanceof Error ? inner.message : String(inner)}`);
+        }
       }
     }
     await present(null, true);

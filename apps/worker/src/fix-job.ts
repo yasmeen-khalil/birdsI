@@ -1,6 +1,7 @@
 import { findingById, fixById, recordUsage, repoWithInstallation, scanById, setFindingStatus, toFinding, updateFix, type JobRow } from "@birdsi/db";
 import { ecosystemHintFor, generateFix, GitHubSource, SandboxRunner, type EngineConfig, type Snapshot } from "@birdsi/engine";
 import { resolveSnapshot } from "./scan-job";
+import { assertWithinSpendCaps, SpendCapError, spendHook } from "./spend";
 
 /**
  * Produces a fix for one finding, tests it in a sandbox, and opens a pull
@@ -17,6 +18,14 @@ export async function runFixJob(config: EngineConfig, job: JobRow, heartbeat: ()
   const finding = toFinding(findingRow);
   const scan = await scanById(finding.scanId);
   if (!scan) throw new Error("scan not found");
+  try {
+    await assertWithinSpendCaps(scan.owner_user_id, { fresh: true });
+  } catch (error) {
+    if (!(error instanceof SpendCapError)) throw error;
+    await updateFix(fixId, { status: "failed", error: error.message });
+    return;
+  }
+  const spend = spendHook(scan.owner_user_id);
 
   const ticker = setInterval(() => void heartbeat().catch(() => {}), 15_000);
   let snapshot: Snapshot | null = null;
@@ -26,6 +35,7 @@ export async function runFixJob(config: EngineConfig, job: JobRow, heartbeat: ()
     const generated = await generateFix(config, {
       finding,
       snapshot,
+      beforeCall: spend.beforeCall,
       onUsage: (u) => recordUsage({ ownerUserId: scan.owner_user_id, scanId: scan.id, fixId, purpose: u.purpose, model: u.model, inputTokens: u.inputTokens, outputTokens: u.outputTokens, costMicrodollars: u.costMicrodollars }),
     });
     await updateFix(fixId, { summary: generated.summary, patch: generated.patch, files: generated.files, verify_command: generated.verifyCommand, follow_up: generated.followUp, status: "testing" });
@@ -89,7 +99,7 @@ export async function runFixJob(config: EngineConfig, job: JobRow, heartbeat: ()
     // No GitHub App path: the tested patch is the deliverable (CLI applies it locally).
     await updateFix(fixId, { status: "tested" });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = spend.refusal() ?? (error instanceof Error ? error.message : String(error));
     await updateFix(fixId, { status: "failed", error: message.slice(0, 1000) });
     throw error;
   } finally {

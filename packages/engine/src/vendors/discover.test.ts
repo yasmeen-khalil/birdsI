@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { walkInventory } from "../inventory/walk";
-import { discoverVendors } from "./discover";
+import { cleanSlug, discoverVendors, MAX_UNKNOWN_VENDORS, MAX_VENDORS_PER_SCAN } from "./discover";
 
 let root: string;
 
@@ -68,5 +68,30 @@ describe("discoverVendors", () => {
     const vendors = await discoverVendors(inventory, [], { stripeProjects: { state: { services: [{ provider: "supabase/postgres" }, { provider: "resend" }] }, collectedAt: new Date().toISOString() } });
     expect(vendors.map((v) => v.slug).sort()).toEqual(["resend", "supabase"]);
     expect(vendors.every((v) => v.detectedBy.includes("projects"))).toBe(true);
+  });
+
+  it("caps unknown vendors and keeps catalog vendors first", async () => {
+    const lines = Array.from({ length: 500 }, (_, i) => `ZZZ${i}_API_KEY=`).join("\n");
+    const dir = await fixture({ ".env.example": `${lines}\nSTRIPE_SECRET_KEY=\n` });
+    const inventory = await walkInventory(dir);
+    const vendors = await discoverVendors(inventory, [], null);
+    expect(vendors.length).toBeLessThanOrEqual(MAX_VENDORS_PER_SCAN);
+    expect(vendors.filter((v) => v.slug.startsWith("zzz"))).toHaveLength(MAX_UNKNOWN_VENDORS);
+    expect(vendors.map((v) => v.slug)).toContain("stripe");
+  });
+
+  it("reduces Stripe Projects providers to safe slugs", async () => {
+    const dir = await fixture({ "README.md": "hello" });
+    const inventory = await walkInventory(dir);
+    const vendors = await discoverVendors(inventory, [], { stripeProjects: { state: { services: [{ provider: 'evil") or (slug.neq.x' }] }, status: null, spend: null } } as never);
+    for (const v of vendors) expect(v.slug).toMatch(/^[a-z0-9-]{1,40}$/);
+  });
+});
+
+describe("cleanSlug", () => {
+  it("keeps only lowercase letters, digits and dashes, up to 40 characters", () => {
+    expect(cleanSlug('A"b) or (c')).toBe("a-b-or-c");
+    expect(cleanSlug("x".repeat(80))).toHaveLength(40);
+    expect(cleanSlug('"""')).toBeNull();
   });
 });

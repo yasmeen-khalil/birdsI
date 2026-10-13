@@ -1,5 +1,5 @@
 import { DecideActionRequest } from "@birdsi/shared";
-import { ApiError, handler, json, parseBody } from "@/lib/api";
+import { ApiError, assertSameOrigin, handler, json, parseBody } from "@/lib/api";
 import { currentUserRow } from "@/lib/auth";
 import { decideActionRequest } from "@/lib/ops";
 
@@ -12,6 +12,7 @@ export const POST = handler(async (request, { params }) => {
   if (request.headers.get("authorization")) {
     throw new ApiError(403, "browser_only", "Approvals are decided in the browser, never with a token. Open the Agent page in birdsI.");
   }
+  assertSameOrigin(request);
   const user = await currentUserRow();
   if (!user) throw new ApiError(401, "unauthorized", "Sign in to continue.");
   const { actionId } = await params;

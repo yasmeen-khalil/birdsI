@@ -96,6 +96,16 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
               Nothing was connected. Install the app again from the button below.
             </Banner>
           )}
+          {status === "unconfirmed" && (
+            <Banner tone="error" title="birdsI could not confirm this installation came from you">
+              Nothing was connected. Start the installation from the button below, so birdsI can tie it to your account.
+            </Banner>
+          )}
+          {status === "taken" && (
+            <Banner tone="error" title="This installation is connected to another birdsI account">
+              Nothing was changed. If it should be yours, remove the birdsI app on GitHub, then install it again from the button below.
+            </Banner>
+          )}
           {status === "error" && (
             <Banner tone="error" title="birdsI could not finish connecting to GitHub">
               The app may be installed, but birdsI could not read its repositories. Try again in a minute.

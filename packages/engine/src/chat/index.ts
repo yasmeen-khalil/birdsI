@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Finding } from "@birdsi/shared";
 import { REVIEW_VOICE } from "../checks/model-findings";
 import type { EngineConfig } from "../config";
-import { ModelClient, type UsageSink } from "../models/client";
+import { ModelClient, type BeforeCall, type UsageSink } from "../models/client";
 import { toJsonSchema } from "../models/schema";
 
 /**
@@ -63,8 +63,8 @@ export async function chunkFile(path: string, content: string, maxChars = 1800):
   return chunks;
 }
 
-export async function embedChunks(config: EngineConfig, chunks: Chunk[], onUsage?: UsageSink): Promise<Chunk[]> {
-  const models = new ModelClient(config, onUsage ? { onUsage } : {});
+export async function embedChunks(config: EngineConfig, chunks: Chunk[], onUsage?: UsageSink, beforeCall?: BeforeCall): Promise<Chunk[]> {
+  const models = new ModelClient(config, { ...(onUsage ? { onUsage } : {}), ...(beforeCall ? { beforeCall } : {}) });
   const out: Chunk[] = [];
   for (let i = 0; i < chunks.length; i += 32) {
     const batch = chunks.slice(i, i + 32);

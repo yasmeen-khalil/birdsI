@@ -17,8 +17,12 @@ import {
   type JobRow,
   type VendorRow,
 } from "@birdsi/db";
-import { CATALOG_BY_SLUG, CONNECTOR_BY_SLUG, knowledgeIsFresh, learnVendor, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
+import { CATALOG_BY_SLUG, CONNECTOR_BY_SLUG, knowledgeIsFresh, learnVendor, MAX_VENDORS_PER_SCAN, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
 import type { ProjectHints } from "@birdsi/shared";
+import { assertWithinSpendCaps, SpendCapError, spendHook } from "./spend";
+
+/** One sync holds the only worker while it runs, so it stops starting new vendors after this long. */
+const SYNC_BUDGET_MS = 10 * 60_000;
 
 /**
  * The ops stage. For every vendor of a repository: probe the connected
@@ -31,8 +35,10 @@ export async function runVendorSyncJob(config: EngineConfig, job: JobRow, heartb
   const ownerUserId = String(job.payload["ownerUserId"]);
   const hints = (job.payload["hints"] as ProjectHints | null | undefined) ?? null;
   const ticker = setInterval(() => void heartbeat().catch(() => {}), 15_000);
+  const deadline = Date.now() + SYNC_BUDGET_MS;
   try {
-    const vendors = await vendorsForRepo(repoId);
+    // Lists stored before the per-scan cap existed can be longer; the sync reads no more than a scan keeps.
+    const vendors = (await vendorsForRepo(repoId)).slice(0, MAX_VENDORS_PER_SCAN);
     if (vendors.length === 0) {
       await setVendorsSyncedAt(repoId, new Date());
       return;
@@ -44,11 +50,20 @@ export async function runVendorSyncJob(config: EngineConfig, job: JobRow, heartb
 
     // 1. Shared knowledge: what each vendor is and its tiers, from current pricing pages.
     const knowledge = await knowledgeFor(vendors.map((v) => v.slug));
+    const spend = spendHook(ownerUserId);
     for (const v of vendors) {
+      if (Date.now() > deadline) break;
       const existing = knowledge.get(v.slug);
       if (knowledgeIsFresh(existing)) continue;
+      // Each lookup costs web searches and a model call, so the daily limits are checked first.
       try {
-        const learned = await learnVendor(config, v.slug, v.name, [], { onUsage });
+        await assertWithinSpendCaps(ownerUserId, { fresh: true });
+      } catch (error) {
+        if (error instanceof SpendCapError) break;
+        throw error;
+      }
+      try {
+        const learned = await learnVendor(config, v.slug, v.name, [], { onUsage, beforeCall: spend.beforeCall });
         if (learned) {
           await saveKnowledge(learned);
           knowledge.set(v.slug, learned);
@@ -63,6 +78,7 @@ export async function runVendorSyncJob(config: EngineConfig, job: JobRow, heartb
 
     // 3. Connected accounts.
     for (const v of vendors) {
+      if (Date.now() > deadline) break;
       const connector = CONNECTOR_BY_SLUG.get(v.slug);
       const connection = bySlug.get(v.slug);
       const fromProjects = projectFacts.get(v.slug) ?? [];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CheckContext } from "./types";
-import { redact, secretsCheck } from "./secrets";
+import { maskSecrets, redact, secretsCheck } from "./secrets";
 
 function contextFor(files: Record<string, string>): CheckContext {
   const events: unknown[] = [];
@@ -62,5 +62,27 @@ describe("redact", () => {
     expect(line).toContain("AKIAIO");
     expect(line).toContain("PLE");
     expect(line).not.toContain("AKIAIOSFODNN7EXAMPLE");
+  });
+});
+
+describe("maskSecrets", () => {
+  it("masks every known key shape in a text and keeps the rest", () => {
+    const stripe = "sk_live_" + "a1B2c3D4e5F6g7H8i9J0k1L2";
+    const github = "ghp_" + "A".repeat(36);
+    const text = `const a = "${stripe}";\nconst b = "${github}";\nconst c = 1;`;
+    const masked = maskSecrets(text);
+    expect(masked).not.toContain(stripe);
+    expect(masked).not.toContain(github);
+    expect(masked).toContain("const c = 1;");
+    expect(masked.split("\n")).toHaveLength(3);
+  });
+
+  it("removes a private key block and keeps the line count", () => {
+    const text = "before\n-----BEGIN RSA PRIVATE KEY-----\nMIIEabc\nxyz\n-----END RSA PRIVATE KEY-----\nafter";
+    const masked = maskSecrets(text);
+    expect(masked).not.toContain("MIIEabc");
+    expect(masked).toContain("[private key removed]");
+    expect(masked.split("\n")).toHaveLength(text.split("\n").length);
+    expect(masked.endsWith("after")).toBe(true);
   });
 });

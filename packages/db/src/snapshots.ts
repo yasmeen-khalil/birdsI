@@ -62,8 +62,11 @@ export async function downloadSnapshot(row: SnapshotRow, toPath: string): Promis
   const db = getDb();
   const { data, error } = await db.storage.from(BUCKET).download(row.storage_path);
   if (error || !data) throw new Error(`downloadSnapshot: ${error?.message ?? "no data"}`);
-  const { writeFile } = await import("node:fs/promises");
-  await writeFile(toPath, Buffer.from(await data.arrayBuffer()));
+  // Written as a stream, so the file is not held in memory a second time.
+  const { createWriteStream } = await import("node:fs");
+  const { Readable } = await import("node:stream");
+  const { pipeline } = await import("node:stream/promises");
+  await pipeline(Readable.fromWeb(data.stream() as Parameters<typeof Readable.fromWeb>[0]), createWriteStream(toPath));
 }
 
 export async function deleteSnapshotFile(row: SnapshotRow): Promise<void> {

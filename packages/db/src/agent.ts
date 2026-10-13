@@ -165,8 +165,8 @@ export async function createActionRequest(repoId: string, input: { vendorId: str
 
 export async function actionsForRepo(repoId: string, status?: ActionRequest["status"]): Promise<ActionRow[]> {
   const db = getDb();
-  // Expire what nobody decided in time.
-  const { error: expError } = await db.from("action_requests").update({ status: "expired" }).eq("repo_id", repoId).eq("status", "pending").lt("expires_at", new Date().toISOString());
+  // Expire what nobody decided in time, and approvals nobody ran in time.
+  const { error: expError } = await db.from("action_requests").update({ status: "expired" }).eq("repo_id", repoId).in("status", ["pending", "approved"]).lt("expires_at", new Date().toISOString());
   if (expError) throw new Error(`actionsForRepo expire: ${expError.message}`);
   let query = db.from("action_requests").select().eq("repo_id", repoId).order("created_at", { ascending: false }).limit(200);
   if (status) query = query.eq("status", status);
@@ -189,6 +189,7 @@ export async function decideAction(actionId: string, userId: string, decision: "
     .update({ status: decision === "approve" ? "approved" : "denied", decided_by: userId, decided_at: new Date().toISOString() })
     .eq("id", actionId)
     .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
     .select()
     .maybeSingle();
   if (result.error) throw new Error(`decideAction: ${result.error.message}`);

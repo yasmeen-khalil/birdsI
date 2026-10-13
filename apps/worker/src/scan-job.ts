@@ -6,7 +6,7 @@ import {
   appendEvent,
   connectionsForUser,
   downloadSnapshot,
-  eventsAfter,
+  lastEventOfType,
   findingsForScan,
   latestDoneScan,
   factHistory,
@@ -24,10 +24,23 @@ import {
   snapshotById,
   stopRequested,
   updateScan,
+  JobLostError,
   type JobRow,
 } from "@birdsi/db";
 import { computeAlerts, computeRunway, computeWatches, GitHubSource, runScan, snapshotFromDirectory, snapshotFromTarball, type EngineConfig, type PreviousReview, type Snapshot } from "@birdsi/engine";
 import type { FindingDraft, OpsSummary, ProjectHints, ScanEvent } from "@birdsi/shared";
+import { assertWithinSpendCaps, SpendCapError, spendHook } from "./spend";
+
+/** An error written for the person who started the scan; its message is shown as it is. */
+export class PlainError extends Error {
+  override name = "PlainError";
+}
+
+/** What the scan page shows for a failure. Anything not written for people stays in the worker log and the job's last_error. */
+function shownError(error: unknown): string {
+  if (error instanceof PlainError || error instanceof SpendCapError) return error.message;
+  return "The scan stopped because of a problem on birdsI's side. Run it again in a few minutes.";
+}
 
 /**
  * Runs one scan job end to end: resolves the code, runs the engine, stores
@@ -48,17 +61,36 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
     await appendEvent(scanId, seq, event);
   };
 
+  // The daily limits are checked again now: a scan can wait in the queue while others spend.
+  try {
+    await assertWithinSpendCaps(scan.owner_user_id, { fresh: true });
+  } catch (error) {
+    if (!(error instanceof SpendCapError)) throw error;
+    await emit({ type: "scan_failed", error: error.message });
+    await updateScan(scanId, { status: "failed", finished_at: new Date().toISOString(), error: error.message });
+    return;
+  }
+  const spend = spendHook(scan.owner_user_id);
+
   // Stop requests from the UI and job heartbeats share one timer.
+  let lost = false;
   const ticker = setInterval(() => {
     void (async () => {
       try {
         await heartbeat();
         if (await stopRequested(scanId)) controller.abort();
-      } catch {
-        // Losing a heartbeat is not fatal; the claim function requeues stale jobs.
+      } catch (error) {
+        // A missed heartbeat is not fatal. A job that is no longer this worker's is: stop and write nothing.
+        if (error instanceof JobLostError) {
+          lost = true;
+          controller.abort();
+        }
       }
     })();
   }, 15_000);
+  const assertHeld = () => {
+    if (lost) throw new JobLostError(`scan ${scanId} was taken from this worker`);
+  };
 
   let snapshot: Snapshot | null = null;
   const hints: ProjectHints | null = scan.snapshot_id ? (((await snapshotById(scan.snapshot_id))?.project_hints as ProjectHints | null) ?? null) : null;
@@ -82,9 +114,13 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
       signal: controller.signal,
       onEvent: emit,
       traceMetadata: { scanId, kind: scan.kind, source: scan.source },
+      beforeCall: spend.beforeCall,
       onUsage: (u) => recordUsage({ ownerUserId: scan.owner_user_id, scanId, fixId: null, purpose: u.purpose, model: u.model, inputTokens: u.inputTokens, outputTokens: u.outputTokens, costMicrodollars: u.costMicrodollars }),
     });
+    const refusal = spend.refusal();
+    if (refusal) await emit({ type: "note", text: `This scan stopped early. ${refusal}` });
 
+    assertHeld();
     const rows = await insertFindings(scanId, scan.repo_id, result.findings);
     await insertDependencies(scanId, result.dependencies);
     const idByKey = new Map(rows.map((r) => [r.key, r.id]));
@@ -92,6 +128,7 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
     const audit = result.audit ? { ...result.audit, areas: result.audit.areas.map((a) => ({ ...a, findingIds: a.findingIds.map((k) => idByKey.get(k) ?? k) })) } : null;
 
     if (controller.signal.aborted) {
+      assertHeld();
       await emit({ type: "scan_stopped" });
       await updateScan(scanId, { status: "stopped", finished_at: new Date().toISOString(), summary, stats: result.stats });
       return;
@@ -105,14 +142,15 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
       if (scan.owner_user_id) await enqueueJob("vendor_sync", { repoId: scan.repo_id, ownerUserId: scan.owner_user_id, hints }, { maxAttempts: 1 });
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    assertHeld();
     if (controller.signal.aborted) {
       await emit({ type: "scan_stopped" });
       await updateScan(scanId, { status: "stopped", finished_at: new Date().toISOString() });
       return;
     }
-    await emit({ type: "scan_failed", error: message.slice(0, 500) });
-    await updateScan(scanId, { status: "failed", finished_at: new Date().toISOString(), error: message.slice(0, 1000) });
+    const shown = shownError(error);
+    await emit({ type: "scan_failed", error: shown.slice(0, 500) });
+    await updateScan(scanId, { status: "failed", finished_at: new Date().toISOString(), error: shown.slice(0, 1000) });
     throw error;
   } finally {
     clearInterval(ticker);
@@ -131,8 +169,8 @@ async function lastEventSeq(scanId: string): Promise<number> {
 async function previousReviewFor(repoId: string): Promise<PreviousReview | null> {
   const last = await latestDoneScan(repoId);
   if (!last) return null;
-  const events = await eventsAfter(last.id, 0, 5000);
-  const index = events.map((e) => e.event).find((e) => e.type === "review_index");
+  // Read directly: a deep scan's log runs past the 1,000 rows one request returns.
+  const index = await lastEventOfType(last.id, "review_index");
   if (!index || index.type !== "review_index") return null;
   const hashes = new Map(index.files.map((f) => [f.path, f.hash]));
   const findingsByPath = new Map<string, FindingDraft[]>();
@@ -194,7 +232,7 @@ async function demoSamplePath(): Promise<string> {
       // try the next
     }
   }
-  throw new Error("The demo sample repository is missing from this worker.");
+  throw new PlainError("The demo sample repository is missing from this worker.");
 }
 
 /** Where the code comes from: the GitHub App, an uploaded CLI snapshot, or the bundled demo sample. */
@@ -204,8 +242,8 @@ export async function resolveSnapshot(config: EngineConfig, repoId: string | nul
   }
   if (snapshotId) {
     const row = await snapshotById(snapshotId);
-    if (!row || !row.uploaded_at) throw new Error("The uploaded code snapshot is missing or incomplete.");
-    if (!row.storage_path) throw new Error("The uploaded code was deleted after the retention window (seven days). Run birdsi again to upload it.");
+    if (!row || !row.uploaded_at) throw new PlainError("The uploaded code snapshot is missing or incomplete.");
+    if (!row.storage_path) throw new PlainError("The uploaded code was deleted after the retention window (seven days). Run birdsi again to upload it.");
     const dir = await mkdtemp(join(tmpdir(), "birdsi-snap-"));
     const tarPath = join(dir, "snapshot.tgz");
     await downloadSnapshot(row, tarPath);
@@ -219,12 +257,12 @@ export async function resolveSnapshot(config: EngineConfig, repoId: string | nul
   }
   if (repoId) {
     const { repo, installation } = await repoWithInstallation(repoId);
-    if (!installation || installation.removed_at) throw new Error("The GitHub App is no longer installed for this repository. Reconnect it from Settings.");
-    if (installation.suspended_at) throw new Error("The GitHub App installation is suspended. Resume it on GitHub, then scan again.");
-    if (!GitHubSource.isConfigured(config)) throw new Error("The GitHub App is not configured on the server.");
+    if (!installation || installation.removed_at) throw new PlainError("The GitHub App is no longer installed for this repository. Reconnect it from Settings.");
+    if (installation.suspended_at) throw new PlainError("The GitHub App installation is suspended. Resume it on GitHub, then scan again.");
+    if (!GitHubSource.isConfigured(config)) throw new PlainError("The GitHub App is not configured on the server.");
     const [owner, name] = repo.full_name.split("/") as [string, string];
     const github = new GitHubSource(config);
     return github.snapshot({ owner, name, installationId: installation.github_installation_id }, branch ?? repo.default_branch);
   }
-  throw new Error("The scan has no code source.");
+  throw new PlainError("The scan has no code source.");
 }
