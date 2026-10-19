@@ -2,17 +2,16 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import type { ScanEventRecord, ScanKind, ScanStatus } from "@birdsi/shared";
+import type { ScanEventRecord, ScanStatus } from "@birdsi/shared";
 import { stopScanAction } from "@/lib/actions";
-import { aboutTime, clock, KIND_LABEL, KIND_SECONDS } from "../format";
+import { aboutTime, clock, MAP_SECONDS } from "../format";
 import { useElapsed, useScanEvents } from "./useScanEvents";
 import { scannerNote } from "@birdsi/shared";
 
-/** The overview's compact view of a running scan, with a link to the full live view. */
+/** The overview's compact view of a running map, with a link to the full live view. */
 export function ScanProgressCard({
   scanId,
   repoId,
-  kind,
   initialStatus,
   initialEvents,
   initialCursor,
@@ -21,7 +20,6 @@ export function ScanProgressCard({
 }: {
   scanId: string;
   repoId: string;
-  kind: ScanKind;
   initialStatus: ScanStatus;
   initialEvents: ScanEventRecord[];
   initialCursor: number;
@@ -36,44 +34,35 @@ export function ScanProgressCard({
   const [stopRequested, setStopRequested] = useState(false);
   const step = view.steps[view.runningIndex];
   const queued = status === "queued" || view.steps.length === 0;
-  const href = kind === "audit" ? `/app/${repoId}/audit` : `/app/${repoId}/scans/${scanId}`;
+  const href = `/app/${repoId}/scans/${scanId}`;
 
   return (
     <section className="panel flex flex-col gap-3.5" style={{ padding: "22px 24px" }} aria-live="polite" aria-labelledby="scan-running-title">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 id="scan-running-title" className="t-h2" style={{ fontSize: 23 }}>
-          {queued ? `${KIND_LABEL[kind]} is next` : `${KIND_LABEL[kind]} running`}
+          {queued ? "The map is next" : "Mapping the code"}
         </h2>
         {!queued && (
           <span className="t-small ca" style={{ fontWeight: 600 }}>
-            {clock(elapsed)} of about {aboutTime(KIND_SECONDS[kind])}
+            {clock(elapsed)} of about {aboutTime(MAP_SECONDS)}
           </span>
         )}
       </div>
-      <div className="bar" role="progressbar" aria-label="Scan progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(view.progress * 100)}>
+      <div className="bar" role="progressbar" aria-label="Map progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(view.progress * 100)}>
         <i style={{ width: `${Math.round(view.progress * 100)}%` }} />
       </div>
       <p className="t-small c2" id="scan-running-note">
         {queued ? (
-          (scanner ?? "Waiting for a free scanner. It starts in a moment.")
+          (scanner ?? "Waiting for the worker. It starts in a moment.")
         ) : step ? (
           <>
             Step {view.runningIndex + 1} of {view.steps.length}, {step.label.charAt(0).toLowerCase() + step.label.slice(1)}.
-            {view.reading && view.reading.step === step.step && (
-              <>
-                {" "}
-                Reading{" "}
-                <span className="path" style={{ color: "var(--text)" }}>
-                  {view.reading.path}
-                </span>
-              </>
-            )}
           </>
         ) : (
           "Finishing up."
         )}
       </p>
-      {hasEarlierResults && <p className="t-small c3">The results below are from the last finished scan until this one is done.</p>}
+      {hasEarlierResults && <p className="t-small c3">The page shows the last finished map until this one is done.</p>}
       <div className="flex flex-wrap items-center justify-between gap-3" style={{ marginTop: 4 }}>
         <button
           type="button"
@@ -87,7 +76,7 @@ export function ScanProgressCard({
             })
           }
         >
-          {stopRequested ? "Stopping" : "Stop scan"}
+          {stopRequested ? "Stopping" : "Stop"}
         </button>
         <Link className="btn btn-secondary btn-sm" href={href}>
           Watch progress

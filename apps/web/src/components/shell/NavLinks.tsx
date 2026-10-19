@@ -5,11 +5,10 @@ import { usePathname } from "next/navigation";
 
 export const NAV_ITEMS = [
   { key: "overview", label: "Overview", path: "" },
+  { key: "vendors", label: "Vendors", path: "/vendors" },
   { key: "findings", label: "Findings", path: "/findings" },
   { key: "dependencies", label: "Dependencies", path: "/dependencies" },
-  { key: "vendors", label: "Vendors", path: "/vendors" },
   { key: "agent", label: "Agent", path: "/agent" },
-  { key: "audit", label: "Pre-launch audit", path: "/audit" },
 ] as const;
 
 export function activeNav(pathname: string, repoId: string): string | null {

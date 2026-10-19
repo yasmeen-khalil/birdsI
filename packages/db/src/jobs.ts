@@ -1,7 +1,8 @@
 import { getDb, unwrap } from "./client";
 import { schemaHas } from "./schema";
 
-export type JobKind = "scan" | "fix" | "embed" | "vendor_sync";
+/** The map of the code, and the reads of the vendor accounts. ("fix" and "embed" jobs were removed in v3.) */
+export type JobKind = "scan" | "vendor_sync";
 
 export interface JobRow {
   id: string;
@@ -19,8 +20,8 @@ export interface JobRow {
   finished_at: string | null;
 }
 
-/** Jobs a person is waiting on run first: quick checks 10, fixes 5, everything else 0. */
-export const JOB_PRIORITY = { interactive: 10, fix: 5, background: 0 } as const;
+/** Jobs a person is waiting on run first: a map someone started 10, everything else 0. */
+export const JOB_PRIORITY = { interactive: 10, background: 0 } as const;
 
 export async function enqueueJob(kind: JobKind, payload: Record<string, unknown>, options: { maxAttempts?: number; priority?: number } = {}): Promise<JobRow> {
   const db = getDb();

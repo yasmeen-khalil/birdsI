@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { Wordmark } from "../Wordmark";
 import { initials } from "../format";
-import { AskButton } from "./ChatDock";
 import { MobileMenu } from "./MobileMenu";
 import { NavLinks } from "./NavLinks";
 import { RepoSwitcher, type RepoOption } from "./RepoSwitcher";
 
-/** The app's top bar: wordmark, repository, sections, Ask birdsI, and the account. */
+/** The app's top bar: wordmark, app, sections, and the account. */
 export function TopBar({ login, repos, current, settingsActive = false }: { login: string | null; repos: RepoOption[]; current: RepoOption | null; settingsActive?: boolean }) {
   const navRepo = current ?? repos[0] ?? null;
   return (
@@ -17,7 +16,6 @@ export function TopBar({ login, repos, current, settingsActive = false }: { logi
         {navRepo && <NavLinks repoId={navRepo.id} />}
         <span className="inline-flex items-center gap-3.5" style={{ marginLeft: "auto" }}>
           <span className="tag">Demo</span>
-          {current && <AskButton repoId={current.id} />}
           <Link className="avatar" href="/settings" aria-label="Settings" style={{ textDecoration: "none", ...(settingsActive ? { borderColor: "var(--text-2)", color: "var(--text)" } : {}) }}>
             {initials(login)}
           </Link>
@@ -30,7 +28,6 @@ export function TopBar({ login, repos, current, settingsActive = false }: { logi
           <span className="tag" style={{ marginRight: 6 }}>
             Demo
           </span>
-          {current && <AskButton repoId={current.id} iconOnly />}
           <MobileMenu repoId={navRepo?.id ?? null} />
         </span>
       </div>

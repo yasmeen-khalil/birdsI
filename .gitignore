@@ -8,8 +8,6 @@ internal/
 .env
 .env.*
 !.env.example
-# The demo sample deliberately ships a flawed env file with placeholder values.
-!samples/**/.env.*
 
 # Dependencies and builds
 node_modules/

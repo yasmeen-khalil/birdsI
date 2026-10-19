@@ -21,7 +21,6 @@ export const freshnessCheck: Check = {
   id: "freshness",
   step: "dependencies",
   label: "Comparing each package with its latest release",
-  tiers: ["light", "deep", "audit"],
   available: () => true,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     const findings: FindingDraft[] = [];

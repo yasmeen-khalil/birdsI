@@ -31,9 +31,9 @@ export function EmailToggle({ initial }: { initial: boolean }) {
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
         <span className="flex flex-col gap-0.5">
           <span id="email-label" className="t-body">
-            Email me when a full scan or audit finishes
+            Email me the alerts
           </span>
-          <span className="t-small c3">Not sent yet. Your choice is saved for when email arrives, to the address on your GitHub account.</span>
+          <span className="t-small c3">Not sent yet. Your choice is saved for when birdsI has a sending key, to the address on your GitHub account.</span>
         </span>
         <span className="inline-flex items-center justify-center" style={{ minWidth: 44, minHeight: 44 }}>
           <button type="button" className="switch" role="switch" aria-checked={on} aria-labelledby="email-label" disabled={pending} onClick={() => save(!on)} />
@@ -62,7 +62,7 @@ export function DisconnectRepo({ repoId, name }: { repoId: string; name: string 
     <TwoStepButton
       label="Disconnect"
       prompt={`Disconnect ${name}?`}
-      detail="birdsI stops scanning it and deletes its scans, findings, chats and other results. To stop birdsI reading it on GitHub too, remove it from the app’s repositories there. You can connect it again later, starting from a new scan."
+      detail="birdsI stops mapping it and deletes its maps, findings, vendors and record. To stop birdsI reading it on GitHub too, remove it from the app’s repositories there. You can connect it again later, starting from a new map."
       confirmLabel="Disconnect"
       cancelLabel="Keep it"
       style={{ alignSelf: "flex-start", marginTop: 6, fontSize: 13, minHeight: 32 }}
@@ -118,7 +118,7 @@ export function DeleteAccount({ expected, repoCount }: { expected: string; repoC
         </h3>
         <ul className="t-small c2 flex flex-col gap-1" style={{ margin: 0, paddingLeft: 18 }}>
           <li>{repoCount === 1 ? "1 repository is disconnected" : `${repoCount} repositories are disconnected`}</li>
-          <li>Your findings, scans, vendor details, chats and tokens are deleted</li>
+          <li>Your apps, maps, findings, vendor details, keys and tokens are deleted</li>
           <li>Pull requests birdsI opened stay on GitHub</li>
         </ul>
         <div className="flex items-center justify-between gap-3" style={{ marginTop: 6 }}>

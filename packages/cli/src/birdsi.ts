@@ -1,7 +1,6 @@
 import { Command, CommanderError, Option } from "commander";
 import { toCliError } from "./api";
-import { askCommand, dismissCommand, explainCommand, findingsCommand, fixedCommand, reposCommand } from "./commands/findings";
-import { fixCommand } from "./commands/fix";
+import { dismissCommand, explainCommand, findingsCommand, fixedCommand, reposCommand } from "./commands/findings";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth";
 import { approvalsCommand, changesCommand, decideCommand, exportCommand, inventoryCommand, questionsCommand, recordCommand, vendorsCommand, visionCommand } from "./commands/ops";
 import { scanCommand } from "./commands/scan";
@@ -34,23 +33,16 @@ export function buildProgram(): Command {
   const program = new Command();
   program
     .name("birdsi")
-    .description("birdsI, the operations record for an app. Run it in a project to map the code, the vendors (outside services) it runs on, their limits and spend, and what needs you.")
+    .description("birdsI, the cockpit for your apps. Run it in an app's folder to map the code: the services it runs on, its deployments, crons, webhooks, store apps and migrations, and what needs you.")
     .version(VERSION, "-v, --version", "print the version")
     .helpOption("-h, --help", "show help")
     .showHelpAfterError("(run birdsi --help for the full list)")
     .exitOverride()
-    .argument("[path]", "folder to scan (default: the current one)")
-    .option("--full", "Full scan: reads the code and checks it against current docs (10 to 20 minutes)")
-    .option("--describe <text>", "what the app does, in a sentence or two")
-    .option("--no-open", "do not open the dashboard in the browser")
-    .option("--no-fix-prompt", "do not offer fixes after the scan")
+    .argument("[path]", "the app's folder (default: the current one)")
+    .option("--no-open", "do not open the app's page in the browser")
     .addOption(jsonOption())
     .addOption(asciiOption())
-    .action(
-      run((path: string | undefined, options: { full?: boolean; describe?: string; open: boolean; fixPrompt: boolean; json?: boolean; ascii?: boolean }) =>
-        scanCommand(path, { ...(options.full ? { full: true } : {}), describe: options.describe, open: options.open, fixPrompt: options.fixPrompt, json: options.json, ascii: options.ascii }),
-      ),
-    );
+    .action(run((path: string | undefined, options: { open: boolean; json?: boolean; ascii?: boolean }) => scanCommand(path, { open: options.open, json: options.json, ascii: options.ascii })));
 
   program
     .command("login")
@@ -70,29 +62,25 @@ export function buildProgram(): Command {
     .action(run((options: { json?: boolean }) => whoamiCommand(options)));
 
   program
-    .command("scan")
-    .description("scan a folder: a Quick check unless you add a flag (default folder: the current one)")
-    .argument("[path]", "folder to scan")
-    .option("--full", "Full scan: reads the code and checks it against current docs (10 to 20 minutes)")
-    .option("--deep", "Full scan, the same as --full")
-    .option("--audit", "pre-launch audit: a launch verdict, area by area (20 to 40 minutes)")
-    .option("--open", "open the dashboard in the browser")
-    .option("--describe <text>", "what the app does, in a sentence or two")
+    .command("map")
+    .alias("scan")
+    .description("map an app's code: services, deployments, crons, webhooks, store apps, migrations (default folder: the current one)")
+    .argument("[path]", "the app's folder")
+    .option("--open", "open the app's page in the browser")
     .option("--branch <name>", "branch name to record, if not the current one")
     .addOption(jsonOption())
-    .option("--no-fix-prompt", "do not offer fixes after the scan")
     .addOption(asciiOption())
     .addHelpText(
       "after",
-      "\nExit codes: 0 nothing open at or above High, 1 open Critical or High, 2 the scan could not finish,\n3 stopped with Ctrl+C, 4 not signed in, 5 usage error.",
+      "\nExit codes: 0 nothing open at or above High, 1 open Critical or High, 2 the map could not finish,\n3 stopped with Ctrl+C, 4 not signed in, 5 usage error.",
     )
     .action(run((path: string | undefined, options: Parameters<typeof scanCommand>[1]) => scanCommand(path, options)));
 
   program
     .command("findings")
     .alias("list")
-    .description("list the findings of a scan (default: your newest scan)")
-    .argument("[scanId]", "scan id")
+    .description("list the findings of a map (default: your newest map)")
+    .argument("[scanId]", "the map's id")
     .addOption(jsonOption())
     .addOption(asciiOption())
     .action(run((scanId: string | undefined, options: { json?: boolean; ascii?: boolean }) => findingsCommand(scanId, options)));
@@ -100,35 +88,23 @@ export function buildProgram(): Command {
   program
     .command("explain")
     .description("everything about one finding: what, why, evidence, steps")
-    .argument("<finding>", "finding id, or its number in your newest scan")
+    .argument("<finding>", "finding id, or its number in your newest map")
     .addOption(jsonOption())
     .addOption(asciiOption())
     .action(run((ref: string, options: { json?: boolean; ascii?: boolean }) => explainCommand(ref, options)));
 
   program
-    .command("fix")
-    .description("have birdsI fix a finding: opens a pull request, or gives you the change")
-    .argument("<finding>", "finding id, or its number in your newest scan")
-    .option("--apply", "apply the change to your local folder when there is no pull request")
-    .option("--path <dir>", "folder to apply the change in (default: the current one)")
-    .addOption(jsonOption())
-    .addOption(asciiOption())
-    .action(
-      run((ref: string, options: { apply?: boolean; path?: string; json?: boolean; ascii?: boolean }) => fixCommand(ref, options)),
-    );
-
-  program
     .command("dismiss")
     .description("dismiss a finding so it stops counting")
-    .argument("<finding>", "finding id, or its number in your newest scan")
+    .argument("<finding>", "finding id, or its number in your newest map")
     .option("-y, --yes", "dismiss without asking")
     .addOption(jsonOption())
     .action(run((ref: string, options: { yes?: boolean; json?: boolean }) => dismissCommand(ref, options)));
 
   program
     .command("fixed")
-    .description("say a finding is fixed in the code. The next scan confirms it or reopens it.")
-    .argument("<finding>", "finding id, or its number in your newest scan")
+    .description("say a finding is fixed in the code. The next map confirms it or reopens it.")
+    .argument("<finding>", "finding id, or its number in your newest map")
     .option("--note <text>", "what was done")
     .addOption(jsonOption())
     .action(run((ref: string, options: { note?: string; json?: boolean }) => fixedCommand(ref, options)));
@@ -175,14 +151,6 @@ export function buildProgram(): Command {
     .action(run((options: { json?: boolean }) => reposCommand(options)));
 
   program
-    .command("ask")
-    .description("ask a question about one of your repositories")
-    .argument("<repo>", "repository id or owner/name")
-    .argument("<question...>", "your question")
-    .addOption(jsonOption())
-    .action(run((repo: string, question: string[], options: { json?: boolean }) => askCommand(repo, question, options)));
-
-  program
     .command("inventory")
     .description("everything birdsI knows about the project in one read: vision, vendors, alerts, stages, what needs you")
     .addOption(repoOption())
@@ -192,8 +160,8 @@ export function buildProgram(): Command {
 
   program
     .command("changes")
-    .description("new and resolved findings since the previous scan, by stable key")
-    .argument("[scanId]", "compare from this scan instead of the previous one")
+    .description("new and resolved findings since the previous map, by stable key")
+    .argument("[scanId]", "compare from this map instead of the previous one")
     .addOption(repoOption())
     .addOption(jsonOption())
     .addOption(asciiOption())
@@ -201,8 +169,8 @@ export function buildProgram(): Command {
 
   program
     .command("vendors")
-    .description("the services the app runs on: plans, usage, limits, spend, alerts")
-    .option("--sync", "refresh from connected accounts and current pricing pages first")
+    .description("the services the app runs on: what each account says, the plan's limits, alerts")
+    .option("--sync", "read the connected accounts first")
     .addOption(repoOption())
     .addOption(jsonOption())
     .addOption(asciiOption())
@@ -241,7 +209,7 @@ export function buildProgram(): Command {
 
   program
     .command("export")
-    .description("write the knowledge base as Markdown under .birdsi/ for agents that read files")
+    .description("write what birdsI knows about the app as Markdown under .birdsi/ for agents that read files")
     .option("--path <dir>", "project folder (default: the current one)")
     .addOption(repoOption())
     .addOption(jsonOption())

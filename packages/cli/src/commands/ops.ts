@@ -24,7 +24,7 @@ interface PrintOptions {
   repo?: string;
 }
 
-/** The repository to act on: --repo (id or owner/name), else the newest scan's repository. */
+/** The repository to act on: --repo (id or owner/name), else the newest map's repository. */
 export async function resolveRepo(api: ApiClient, ref: string | undefined): Promise<{ id: string; fullName: string }> {
   const repos = (await api.repos()).data.repos;
   if (ref) {
@@ -297,7 +297,7 @@ export async function visionCommand(text: string[] | undefined, options: PrintOp
       return EXIT.ok;
     }
     if (!vision.text) {
-      println("No vision written yet. The vision is what you are building and why. Your agent and birdsI chat read it.");
+      println("No vision written yet. The vision is what you are building and why. Your coding agent reads it.");
       println(paint.dim(style, 'Write it with: birdsi vision "What this app is for and where it is going", or --file VISION.md'));
       return EXIT.ok;
     }
@@ -386,7 +386,7 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
   }
 }
 
-/** The lines printed after a scan: limit alerts, questions, approvals and the dashboard link. */
+/** The lines printed after a map: limit alerts, questions, approvals and the dashboard link. */
 export function formatNeedsYou(openQuestions: number, pendingActions: number, alerts: readonly Alert[], dashboardUrl: string | null, style: Style): string {
   const lines: string[] = [];
   const serious = alerts.filter((a) => a.level !== "info");
@@ -413,7 +413,7 @@ export async function inventoryCommand(options: PrintOptions): Promise<number> {
     println(paint.bold(style, inv.repo.fullName));
     println(wrap(inv.vision.text ? `Vision: ${inv.vision.text}` : "Vision: not written yet (birdsi vision \"...\")", style, ""));
     println(paint.dim(style, `Stages: ${inv.stages.map((s) => `${s.label} ${s.freshness}`).join(", ")}`));
-    if (inv.latestScan) println(paint.dim(style, `Latest scan: ${kindWord(inv.latestScan.kind)}, ${plural(inv.latestScan.findings, "open finding")}`));
+    if (inv.latestScan) println(paint.dim(style, `Latest map: ${kindWord(inv.latestScan.kind)}, ${plural(inv.latestScan.findings, "open finding")}`));
     if (inv.decisions.length > 0) {
       println();
       println(paint.bold(style, "Decisions on record"));
@@ -429,7 +429,7 @@ export async function inventoryCommand(options: PrintOptions): Promise<number> {
   }
 }
 
-/** New and resolved findings since the previous scan, by stable key. */
+/** New and resolved findings since the previous map, by stable key. */
 export async function changesCommand(since: string | undefined, options: PrintOptions): Promise<number> {
   const style = styleFor(process.stdout, options);
   const { api } = await ApiClient.fromEnvironment();

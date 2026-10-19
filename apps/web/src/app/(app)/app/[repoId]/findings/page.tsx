@@ -9,10 +9,10 @@ import { Dropdown } from "@/components/Dropdown";
 import { FindingRow } from "@/components/FindingRow";
 import { Frame } from "@/components/Frame";
 import { LocalTime } from "@/components/LocalTime";
-import { ScanButtons } from "@/components/ScanActions";
+import { ScanAgainButton } from "@/components/ScanActions";
 import { SeverityMeter } from "@/components/Severity";
 import { orNotFound } from "@/components/guard";
-import { compareFindings, CONFIDENCE_LABEL, KIND_LABEL, KIND_LOWER, plural, SEVERITY_LABEL, shortDuration, shortSha } from "@/components/format";
+import { compareFindings, CONFIDENCE_LABEL, plural, scanName, SEVERITY_LABEL, shortDuration, shortSha } from "@/components/format";
 import { icon14, icon20 } from "@/components/icon";
 import { latestDone, recentScans, repoContext, runningOf } from "@/components/server/data";
 import { loadScan } from "@/lib/scans";
@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Findings" };
 type Search = { scan?: string; sev?: string; conf?: string; who?: string; dismissed?: string; file?: string; group?: string };
 type Group = "severity" | "confidence" | "action";
 
-const WHO_LABEL: Record<ActionKind, string> = { fix: "birdsI can fix", steps: "You need to do" };
+const WHO_LABEL: Record<ActionKind, string> = { fix: "A code change", steps: "Outside the code" };
 const GROUP_LABEL: Record<Group, string> = { severity: "Severity", confidence: "Confidence", action: "Who acts" };
 
 function pick<T extends string>(value: string | undefined, allowed: readonly T[]): T | null {
@@ -49,9 +49,9 @@ export default async function FindingsPage({ params, searchParams }: { params: P
         <h1 className="t-h1">Findings</h1>
         <section className="panel flex flex-col gap-3.5" style={{ padding: "22px 24px", maxWidth: 560 }}>
           <h2 className="t-h2" style={{ fontSize: 23 }}>
-            {running ? "The first scan is running" : "No findings yet"}
+            {running ? "The first map is running" : "No findings yet"}
           </h2>
-          <p className="t-small c2">{running ? "Findings appear here as soon as it finishes." : "A finding is a problem birdsI found in the code. Run a scan and each one shows here, most serious first."}</p>
+          <p className="t-small c2">{running ? "Findings appear here as soon as it finishes." : "A finding is a problem a rule or a database found in the code: a committed key, a known vulnerability, a package far behind. Map the code and each one shows here, most serious first."}</p>
           {running ? (
             <div className="flex justify-end">
               <Link className="btn btn-secondary btn-sm" href={`${base}/scans/${running.id}`}>
@@ -59,7 +59,9 @@ export default async function FindingsPage({ params, searchParams }: { params: P
               </Link>
             </div>
           ) : (
-            <ScanButtons repoId={repo.id} runningKind={null} layout="compact" />
+            <div className="flex justify-end">
+              <ScanAgainButton repoId={repo.id} label="Map the code" />
+            </div>
           )}
         </section>
       </main>
@@ -95,7 +97,7 @@ export default async function FindingsPage({ params, searchParams }: { params: P
       ? SEVERITY_ORDER.map((s) => ({ key: s, head: <SeverityMeter severity={s} />, items: shown.filter((f) => f.severity === s) }))
       : group === "confidence"
         ? CONFIDENCE_ORDER.map((c) => ({ key: c, head: <ConfidencePill confidence={c} />, items: shown.filter((f) => f.confidence === c) }))
-        : (["fix", "steps"] as const).map((a) => ({ key: a, head: <span className="t-label">{a === "fix" ? "birdsI can fix this" : "You need to do this"}</span>, items: shown.filter((f) => f.actionKind === a) }));
+        : (["fix", "steps"] as const).map((a) => ({ key: a, head: <span className="t-label">{a === "fix" ? "A code change fixes this" : "Needs you outside the code"}</span>, items: shown.filter((f) => f.actionKind === a) }));
 
   const filterWords = [sev ? SEVERITY_LABEL[sev] : null, conf ? CONFIDENCE_LABEL[conf] : null].filter(Boolean);
   const chipStyle = { minHeight: 32 };
@@ -106,7 +108,7 @@ export default async function FindingsPage({ params, searchParams }: { params: P
         <div className="flex flex-col gap-2.5">
           <h1 className="t-h1">{plural(open.length, "finding")}</h1>
           <p className="t-body c2">
-            {KIND_LABEL[scan.kind]} of {scan.branch ?? repo.default_branch}, <LocalTime iso={scan.finishedAt ?? scan.createdAt} />.
+            {scanName(scan.kind)} of {scan.branch ?? repo.default_branch}, <LocalTime iso={scan.finishedAt ?? scan.createdAt} />.
             {scan.stats ? ` ${plural(scan.stats.filesSeen, "file")} and ${plural(scan.stats.dependencies, "dependency", "dependencies")} in ${shortDuration(scan.stats.durationMs)}` : ""}
             {shortSha(scan.commitSha) ? (
               <>
@@ -116,19 +118,19 @@ export default async function FindingsPage({ params, searchParams }: { params: P
                 </span>
               </>
             ) : null}
-            .{scan.status === "stopped" ? " This scan was stopped early, so it may be missing findings." : ""}
+            .{scan.status === "stopped" ? " This map was stopped early, so it may be missing findings." : ""}
           </p>
         </div>
         {pickable.length > 1 && (
           <div className="flex items-center gap-3">
-            <span className="t-small c3">Scan</span>
+            <span className="t-small c3">Map</span>
             <Dropdown
               align="right"
-              menuLabel="Choose a scan"
-              buttonLabel="Choose a scan"
+              menuLabel="Choose a map"
+              buttonLabel="Choose a map"
               button={
                 <>
-                  {KIND_LABEL[scan.kind]}, <LocalTime iso={scan.finishedAt ?? scan.createdAt} style="list" />
+                  {scanName(scan.kind)}, <LocalTime iso={scan.finishedAt ?? scan.createdAt} style="list" />
                   <ChevronDown {...icon14} className="i c3" />
                 </>
               }
@@ -136,7 +138,7 @@ export default async function FindingsPage({ params, searchParams }: { params: P
               {pickable.map((s) => (
                 <Link key={s.id} href={`${base}/findings?scan=${s.id}`} aria-current={s.id === scan.id ? "true" : undefined}>
                   <span className="flex flex-col">
-                    <span>{KIND_LABEL[s.kind]}</span>
+                    <span>{scanName(s.kind)}</span>
                     <span className="t-small c3">
                       <LocalTime iso={s.finishedAt ?? s.createdAt} style="list" />
                       {s.status === "stopped" ? ", stopped early" : ""}
@@ -240,11 +242,11 @@ export default async function FindingsPage({ params, searchParams }: { params: P
             Nothing needs you right now
           </h2>
           <p className="t-small c2">
-            The {KIND_LOWER[scan.kind]} checked {scan.stats ? `${plural(scan.stats.filesSeen, "file")} and ${plural(scan.stats.dependencies, "dependency", "dependencies")}` : "your code"} and found no problems.
+            The {scanName(scan.kind).toLowerCase()} checked {scan.stats ? `${plural(scan.stats.filesSeen, "file")} and ${plural(scan.stats.dependencies, "dependency", "dependencies")}` : "your code"} and found no problems.
           </p>
           <div>
-            <Link className="btn btn-secondary btn-sm" href={`${base}/audit`}>
-              Run the pre-launch audit
+            <Link className="btn btn-secondary btn-sm" href={`${base}/vendors`}>
+              See the vendors
             </Link>
           </div>
         </section>

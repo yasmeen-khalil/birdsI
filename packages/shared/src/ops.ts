@@ -31,8 +31,8 @@ export type FactSource = z.infer<typeof FactSource>;
 
 export const FACT_SOURCE_LABEL: Record<FactSource, string> = {
   static: "Found in the code",
-  connector: "From the connected account",
-  docs: "From the vendor's current docs",
+  connector: "Read from the account",
+  docs: "From birdsI's checked limits list",
   estimate: "Estimated by birdsI",
   asked: "You told birdsI",
   agent: "Your coding agent told birdsI",
@@ -118,28 +118,6 @@ export type Vendor = z.infer<typeof Vendor>;
 export const VendorDraft = Vendor.omit({ id: true, repoId: true, facts: true, updatedAt: true, connected: true });
 export type VendorDraft = z.infer<typeof VendorDraft>;
 
-export const PlanTier = z.object({
-  name: z.string(),
-  /** Monthly price in US dollars, null for usage-based or custom. */
-  priceUsd: z.number().nullable(),
-  priceNote: z.string().nullable(),
-  limits: z.array(z.object({ metric: z.string(), label: z.string(), amount: z.number().nullable(), unit: z.string().nullable(), note: z.string().nullable() })),
-});
-export type PlanTier = z.infer<typeof PlanTier>;
-
-/** Knowledge about a vendor that is true for every app: what it is, its tiers. Cached and refreshed. */
-export const VendorKnowledge = z.object({
-  slug: z.string(),
-  name: z.string(),
-  what: z.string(),
-  pricingUrl: z.string().nullable(),
-  tiers: z.array(PlanTier),
-  /** The documents the tiers were read from. */
-  sources: z.array(z.object({ url: z.string(), title: z.string(), publishedAt: z.string().optional() })),
-  fetchedAt: z.string(),
-});
-export type VendorKnowledge = z.infer<typeof VendorKnowledge>;
-
 export const AlertLevel = z.enum(["info", "warning", "critical"]);
 export type AlertLevel = z.infer<typeof AlertLevel>;
 
@@ -186,17 +164,6 @@ export const Runway = z.object({
   observations: z.number().int(),
 });
 export type Runway = z.infer<typeof Runway>;
-
-/** What the audit sees of operations, built from stored facts before a scan runs. */
-export const OpsSummary = z.object({
-  vendors: z.number().int().nonnegative(),
-  plansKnown: z.number().int().nonnegative(),
-  connected: z.number().int().nonnegative(),
-  alerts: z.array(z.object({ level: AlertLevel, title: z.string() })),
-  watches: z.array(z.object({ title: z.string() })),
-  lastSyncAt: z.string().nullable(),
-});
-export type OpsSummary = z.infer<typeof OpsSummary>;
 
 export const QuestionStatus = z.enum(["open", "answered", "dismissed"]);
 export type QuestionStatus = z.infer<typeof QuestionStatus>;
@@ -307,8 +274,8 @@ export const ProjectHints = z.object({
 });
 export type ProjectHints = z.infer<typeof ProjectHints>;
 
-/** The pipeline stages in dependency order, with when each last ran. */
-export const StageId = z.enum(["inventory", "docs", "audit", "ops"]);
+/** The two things that go stale: the map of the code, and the reads of the vendor accounts. */
+export const StageId = z.enum(["map", "reads"]);
 export type StageId = z.infer<typeof StageId>;
 
 export const StageState = z.object({
@@ -322,14 +289,12 @@ export const StageState = z.object({
 export type StageState = z.infer<typeof StageState>;
 
 export const STAGE_LABEL: Record<StageId, string> = {
-  inventory: "Map the code",
-  docs: "Check current docs",
-  audit: "Read the code",
-  ops: "Sync vendors and limits",
+  map: "Map the code",
+  reads: "Read the accounts",
 };
 
-/** How long a stage stays fresh, in hours. */
-export const STAGE_FRESH_HOURS: Record<StageId, number> = { inventory: 24, docs: 24 * 7, audit: 24, ops: 24 };
+/** How long a stage stays fresh, in hours. The worker reads accounts every hour, so two hours old is stale. */
+export const STAGE_FRESH_HOURS: Record<StageId, number> = { map: 24 * 7, reads: 2 };
 
 // API shapes
 
@@ -523,13 +488,22 @@ export interface FindingLike {
   confidence: string;
   status: string;
   path: string | null;
+  /** The check that produced it, when known. */
+  checkId?: string;
 }
+
+/** Checks removed in v3 with the model review. A map after v3 cannot produce their findings. */
+export const RETIRED_CHECKS: readonly string[] = ["review", "crosscheck"];
 
 /**
  * New, resolved and unchanged findings between two scans, by stable key.
  * Dismissed findings are neither new nor resolved; fixed ones are not open.
+ * Findings of a retired check are left out when the later scan could not have
+ * produced them, so they never show as resolved: their check is gone.
  */
-export function diffFindings(from: FindingLike[], to: FindingLike[]): Pick<ChangesResponse, "newFindings" | "resolved" | "stillOpen" | "dismissed"> {
+export function diffFindings(fromAll: FindingLike[], to: FindingLike[]): Pick<ChangesResponse, "newFindings" | "resolved" | "stillOpen" | "dismissed"> {
+  const laterHasRetired = to.some((f) => f.checkId !== undefined && RETIRED_CHECKS.includes(f.checkId));
+  const from = laterHasRetired ? fromAll : fromAll.filter((f) => f.checkId === undefined || !RETIRED_CHECKS.includes(f.checkId));
   const fromKeys = new Set(from.map((f) => f.key));
   const toKeys = new Set(to.map((f) => f.key));
   const open = to.filter((f) => f.status !== "dismissed" && f.status !== "fixed");

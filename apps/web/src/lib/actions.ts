@@ -3,13 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { approveDeviceLogin, deleteRepo, deleteUser, denyDeviceLogin, purgeSnapshotsForUser, revokeToken, updateUserPreferences } from "@birdsi/db";
-import { AnswerQuestionRequest, RequestActionRequest, ScanKind, SetVisionRequest } from "@birdsi/shared";
+import { AnswerQuestionRequest, RequestActionRequest, SetVisionRequest } from "@birdsi/shared";
 import type { z } from "zod";
 import { ApiError } from "./api";
 import { requireUser } from "./auth";
 import { answerQuestion, changePolicy, connectVendor, decideActionRequest, disconnectVendor, dismissQuestion, requestAction, resyncAllRepos, saveVision, startVendorSync } from "./ops";
-import { askRepo, dismissFinding, reopenFinding, startFix, startScan, stopScan } from "./scans";
-import { startedThisDemo } from "./demo-owner";
+import { dismissFinding, reopenFinding, startScan, stopScan } from "./scans";
 
 /**
  * Server actions used by the web pages. Each one resolves the signed-in
@@ -36,11 +35,10 @@ function checked<T>(schema: z.ZodType<T>, value: unknown, message: string): T {
   return parsed.data;
 }
 
-export async function startScanAction(input: { repoId: string; kind: string; appDescription?: string; full?: boolean }): Promise<ActionResult<{ scanId: string }>> {
+export async function startScanAction(input: { repoId: string }): Promise<ActionResult<{ scanId: string }>> {
   return run(async () => {
     const user = await requireUser();
-    const kind = ScanKind.parse(input.kind);
-    const scan = await startScan(user, { repoId: input.repoId, kind, ...(input.appDescription ? { appDescription: input.appDescription } : {}), ...(input.full ? { full: true } : {}) }, "web");
+    const scan = await startScan(user, { repoId: input.repoId }, "web");
     revalidatePath(`/app/${input.repoId}`);
     return { scanId: scan.id };
   });
@@ -146,23 +144,6 @@ export async function stopScanAction(scanId: string): Promise<ActionResult> {
   });
 }
 
-export async function stopDemoScanAction(scanId: string): Promise<ActionResult> {
-  return run(async () => {
-    if (!(await startedThisDemo(scanId))) throw new ApiError(403, "demo", "Only the visitor who started this sample scan can stop it.");
-    await stopScan(scanId, null);
-    return undefined;
-  });
-}
-
-export async function startFixAction(findingId: string): Promise<ActionResult<{ fixId: string }>> {
-  return run(async () => {
-    const user = await requireUser();
-    const fix = await startFix(findingId, user);
-    if (!fix) throw new ApiError(500, "server_error", "The fix did not start. Try again in a moment.");
-    return { fixId: fix.id };
-  });
-}
-
 export async function dismissFindingAction(findingId: string, repoId: string): Promise<ActionResult> {
   return run(async () => {
     const user = await requireUser();
@@ -178,13 +159,6 @@ export async function reopenFindingAction(findingId: string, repoId: string): Pr
     await reopenFinding(findingId, user);
     revalidatePath(`/app/${repoId}/findings`);
     return undefined;
-  });
-}
-
-export async function askAction(repoId: string, question: string) {
-  return run(async () => {
-    const user = await requireUser();
-    return askRepo(repoId, user, question);
   });
 }
 

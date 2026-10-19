@@ -7,7 +7,7 @@ import { latestDoneScan, tokensForUser, toScan, usageForUser } from "@birdsi/db"
 import { LocalTime } from "@/components/LocalTime";
 import { ConnectAccount, DeleteAccount, DisconnectAccount, DisconnectRepo, EmailToggle, RevokeToken } from "@/components/SettingsControls";
 import { TopBar } from "@/components/shell/TopBar";
-import { initials, KIND_LABEL, plural, repoName } from "@/components/format";
+import { initials, plural, repoName, scanName } from "@/components/format";
 import { icon } from "@/components/icon";
 import { appUser, toOption, userRepos } from "@/components/server/data";
 import { connectorCatalog, listConnections } from "@/lib/ops";
@@ -93,10 +93,10 @@ export default async function SettingsPage() {
                         {r.source === "local" ? "Uploaded from your terminal. " : ""}
                         {s ? (
                           <>
-                            Last {KIND_LABEL[s.kind].toLowerCase()} <LocalTime iso={s.finishedAt} />. {plural(n, "finding")}.
+                            Last {scanName(s.kind).toLowerCase()} <LocalTime iso={s.finishedAt} />. {plural(n, "finding")}.
                           </>
                         ) : (
-                          "Not scanned yet."
+                          "Not mapped yet."
                         )}
                       </span>
                       <DisconnectRepo repoId={r.id} name={repoName(r.full_name)} />
@@ -202,7 +202,7 @@ export default async function SettingsPage() {
 
         <Section title="Delete account" muted last>
           <p className="t-small c2" style={{ maxWidth: 560 }}>
-            Removes your findings, scans, vendor details, questions and chats from birdsI, and disconnects every repository. Your code on GitHub is not touched.
+            Removes your apps, maps, findings, vendor details, keys, questions and record from birdsI, and disconnects every repository. Your code on GitHub is not touched.
           </p>
           <DeleteAccount expected={login} repoCount={repos.length} />
         </Section>

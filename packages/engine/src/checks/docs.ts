@@ -1,8 +1,7 @@
 import { tavily, type TavilyClient } from "@tavily/core";
 import { findingKey, type Dependency, type FindingDraft } from "@birdsi/shared";
-import { filterModelFindings, MODEL_FINDINGS_JSON_SCHEMA, ModelFindings, REVIEW_VOICE, toDraft } from "./model-findings";
+import { errorMessage, filterModelFindings, isBudget, MODEL_FINDINGS_JSON_SCHEMA, ModelFindings, REVIEW_VOICE, toDraft } from "./model-findings";
 import { runPool } from "./pool";
-import { errorMessage, isBudget } from "./review";
 import type { Check, CheckContext } from "./types";
 
 const SYSTEM = `You are birdsI, comparing how an application uses a package with what the package's current official documentation says. ${REVIEW_VOICE}
@@ -32,8 +31,7 @@ export const docsCheck: Check = {
   id: "docs",
   step: "docs",
   label: "Checking packages against their current documentation",
-  tiers: ["light", "deep", "audit"],
-  available: (config) => config.tavilyApiKey !== null,
+  available: (config) => config.tavilyApiKey !== null && config.anthropic.apiKey !== null,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     if (!ctx.config.tavilyApiKey) return [];
     const client = tavily({ apiKey: ctx.config.tavilyApiKey });
@@ -56,8 +54,6 @@ export const docsCheck: Check = {
         } else {
           const allowed = new Map(hits.map((h) => [h.url, { title: h.title, ...(h.publishedAt ? { publishedAt: h.publishedAt } : {}) }]));
           const result = await ctx.models.complete({
-            tier: "nano",
-            fast: ctx.budget.fast,
             purpose: "docs",
             system: SYSTEM,
             user: [
@@ -67,7 +63,6 @@ export const docsCheck: Check = {
             ].join("\n\n"),
             schema: ModelFindings,
             jsonSchema: MODEL_FINDINGS_JSON_SCHEMA,
-            schemaName: "findings",
             maxOutputTokens: 4000,
             signal: ctx.signal,
           });

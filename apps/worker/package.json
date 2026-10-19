@@ -2,7 +2,7 @@
   "name": "@birdsi/worker",
   "version": "0.1.0",
   "private": true,
-  "description": "Runs birdsI scans and fixes as background jobs.",
+  "description": "Runs birdsI maps of the code and the reads of the vendor accounts as background jobs.",
   "license": "MPL-2.0",
   "type": "module",
   "scripts": {

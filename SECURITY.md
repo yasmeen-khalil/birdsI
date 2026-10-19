@@ -9,20 +9,19 @@ Include what you found, how to reproduce it, and what it exposes. If you have a 
 ## Scope
 
 - The web app and its `/api/v1` API
-- The worker and the scan engine
+- The worker and the engine
 - The `birdsi` CLI and MCP server
 - The GitHub App integration
 
-Out of scope: the third-party services birdsI calls (Anthropic, Nebius Token Factory, Tavily, Supabase, Clerk, GitHub), which have their own programmes.
+Out of scope: the third-party services birdsI calls (Supabase, Clerk, GitHub, Anthropic, Tavily, and the vendors whose accounts you connect), which have their own programmes.
 
-## How birdsI handles your code
+## How birdsI handles your code and keys
 
-- Repository snapshots fetched from GitHub are deleted when the scan ends. Uploads from the terminal tool live in private storage for up to seven days, so a fix can be applied to the same code, then a scheduled sweep deletes them. Deleting your account deletes them at once.
+- Repository snapshots fetched from GitHub live only for the duration of a map. Uploads from the terminal tool are deleted as soon as their map has run, and within a day if the map never starts. Deleting your account deletes them at once.
 - The terminal tool never uploads `.env` files, private keys, certificates (`*.pem`, `*.crt`, `*.cer`) or credential files, whatever `.gitignore` says.
-- Findings, dependency lists, chat messages and usage records are stored per account until you delete them or the account.
-- Code excerpts are sent to Anthropic (Claude) or, when the operator chooses it, Nebius Token Factory, for analysis. Package names and versions go to Tavily, OSV and deps.dev. They are not used to train models. When the operator turns on tracing, LangSmith receives the same passages. The npm, PyPI and crates.io registries receive package names.
+- No model reads your code to make the map. The optional docs check sends a few lines around a package's import to Anthropic, with pages of that package's own documentation that Tavily finds from its name. Package names and versions go to OSV and deps.dev, and the npm, PyPI and crates.io registries receive package names. Nothing is used to train models.
+- Vendor keys you connect are encrypted at rest (AES-256-GCM under a server-side secret), decrypted only inside the worker while it reads that account, and never shown again. Use keys that only read wherever the vendor offers them.
 - Actions proposed by coding agents are approved in the browser only (never with an API token), may only start with an allowlisted program, and run on your own computer with a minimal environment. Nothing proposed by an agent runs on birdsI's servers.
 - Text that birdsI read from a repository or the web is marked as data in everything it hands to an agent, so it cannot pose as an instruction.
 - Every database table has row level security enabled with no client policies. All access goes through server code that checks ownership on every query.
-- Fixes run in an isolated sandbox before a pull request opens when sandbox testing is set up. Otherwise the pull request says the change was not run. The sandbox never has your secrets.
-- The GitHub App writes only to branches it creates, and only opens pull requests. It never pushes to your default branch.
+- The GitHub App only reads: contents and metadata of the repositories you choose. It never writes.

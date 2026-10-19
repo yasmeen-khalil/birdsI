@@ -1,4 +1,4 @@
-import type { AuditArea, FindingDraft, ScanEventRecord, ScanKind, ScanStatus, ScanStep } from "@birdsi/shared";
+import type { FindingDraft, ScanEventRecord, ScanKind, ScanStatus, ScanStep } from "@birdsi/shared";
 
 /**
  * Pure reduction of a scan's event log into what the live view shows.
@@ -26,8 +26,9 @@ export interface ScanView {
   reading: { path: string; checks: string[]; step: ScanStep } | null;
   readPaths: string[];
   findings: Array<FindingDraft & { id: string }>;
+  /** Services the map found, in the order it found them. */
+  vendors: Array<{ slug: string; name: string; category: string; detectedBy: string[] }>;
   notes: string[];
-  areas: Array<{ area: AuditArea; verdict: "pass" | "attention" | "blocker"; note: string }>;
   finished: { findings: number; durationMs: number } | null;
   failed: string | null;
   stopped: boolean;
@@ -61,8 +62,8 @@ export function deriveScanView(events: ScanEventRecord[], stepLabels: Record<str
     reading: null,
     readPaths: [],
     findings: [],
+    vendors: [],
     notes: [],
-    areas: [],
     finished: null,
     failed: null,
     stopped: false,
@@ -124,8 +125,8 @@ export function deriveScanView(events: ScanEventRecord[], stepLabels: Record<str
         if (view.reading?.step === event.step) view.reading = null;
         break;
       }
-      case "audit_area":
-        view.areas = view.areas.filter((a) => a.area !== event.area).concat({ area: event.area, verdict: event.verdict, note: event.note });
+      case "vendor":
+        if (!view.vendors.some((v) => v.slug === event.slug)) view.vendors.push({ slug: event.slug, name: event.name, category: event.category, detectedBy: event.detectedBy });
         break;
       case "note":
         view.notes.push(event.text);

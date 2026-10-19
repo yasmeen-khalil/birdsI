@@ -1,18 +1,15 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, Check, PlaneTakeoff } from "lucide-react";
-import { eventsAfter, latestDoneScan, toScan } from "@birdsi/db";
+import { ArrowRight, Check } from "lucide-react";
+import { eventsAfter } from "@birdsi/db";
 import { STEP_LABELS } from "@birdsi/engine";
 import { CONFIDENCE_ORDER, SEVERITY_ORDER, type Confidence, type Finding, type Scan, type Severity } from "@birdsi/shared";
-import { BirdsEyeMap, hitsFromFindings } from "@/components/BirdsEyeMap";
 import { ConfidencePill } from "@/components/Confidence";
-import { DependencyTable } from "@/components/DependencyTable";
 import { FindingRow } from "@/components/FindingRow";
-import { Frame } from "@/components/Frame";
 import { LocalTime } from "@/components/LocalTime";
-import { ScanAgainButton, ScanButtons, ScanControls } from "@/components/ScanActions";
+import { ScanAgainButton, ScanControls } from "@/components/ScanActions";
 import { SeverityMeter } from "@/components/Severity";
-import { compareFindings, findingsHeadline, KIND_LABEL, KIND_LOWER, plural, repoName, shortDuration, shortSha } from "@/components/format";
+import { compareFindings, findingsHeadline, plural, repoName, scanName, shortDuration, shortSha } from "@/components/format";
 import { icon14, icon20 } from "@/components/icon";
 import { AlertList, PipelineStrip } from "@/components/ops/OpsParts";
 import { VisionEditor } from "@/components/ops/VisionEditor";
@@ -37,16 +34,14 @@ function scanResult(s: Scan): { text: string; tone?: string } {
   if (s.status === "failed") return { text: "Did not finish", tone: "var(--critical)" };
   if (s.status === "stopped") return { text: "Stopped", tone: "var(--critical)" };
   const n = s.summary ? Object.values(s.summary.bySeverity).reduce((a, b) => a + b, 0) : 0;
-  if (s.kind === "audit" && s.audit) return { text: s.audit.verdict === "ready" ? "Ready to launch" : s.audit.verdict === "not_ready" ? "Not ready yet" : "No verdict" };
   return { text: plural(n, "finding") };
 }
 
 export default async function OverviewPage({ params }: { params: Promise<{ repoId: string }> }) {
   const { repoId } = await params;
   const { user, repo } = await repoContext(repoId);
-  const [scans, latest, lastAuditRow] = await Promise.all([recentScans(repo.id), latestDone(repo.id), latestDoneScan(repo.id, "audit")]);
+  const [scans, latest] = await Promise.all([recentScans(repo.id), latestDone(repo.id)]);
   const running = runningOf(scans);
-  const lastAudit = lastAuditRow ? toScan(lastAuditRow) : null;
   const name = repoName(repo.full_name);
   const [result, inventory, runningEvents, ops] = await Promise.all([latest ? loadScan(latest.id, user) : null, latest ? inventoryOf(latest.id) : null, running ? eventsAfter(running.id, 0) : null, loadInventory(repo.id, user)]);
   const newest = scans[0] ?? null;
@@ -63,6 +58,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
   if (startWith.length === 0) startWith = open.filter((f) => f.severity === "critical" || f.severity === "high").slice(0, 3);
   const deps = result?.dependencies ?? [];
   const base = `/app/${repo.id}`;
+  const readRunning = ops.stages.some((s) => s.id === "reads" && s.freshness === "running");
 
   const local = repo.source === "local";
   const description = inventory
@@ -70,7 +66,6 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
     : local
       ? `Uploaded from your terminal, ${repo.default_branch} branch.`
       : `${repo.private ? "Private" : "Public"} repository on GitHub, ${repo.default_branch} branch.`;
-  const syncRunning = ops.stages.some((s) => s.id === "ops" && s.freshness === "running");
   const needs = [ops.openQuestions > 0 ? plural(ops.openQuestions, "question") : null, ops.pendingActions > 0 ? plural(ops.pendingActions, "approval") : null].filter(Boolean).join(" and ");
 
   return (
@@ -80,7 +75,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
           <h1 className="t-h1 break-words">{name}</h1>
           <p className="t-body c2">{description}</p>
         </div>
-        <ScanControls repoId={repo.id} runningKind={running?.kind ?? null} syncRunning={syncRunning} />
+        <ScanControls repoId={repo.id} mapRunning={Boolean(running)} readRunning={readRunning} />
       </section>
 
       {needs && (
@@ -101,7 +96,6 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
         <ScanProgressCard
           scanId={running.id}
           repoId={repo.id}
-          kind={running.kind}
           initialStatus={running.status}
           initialEvents={runningEvents}
           initialCursor={runningEvents[runningEvents.length - 1]?.seq ?? 0}
@@ -113,18 +107,18 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
       {lastProblem && !running && (
         <section className="panel flex flex-col gap-3.5" style={{ padding: "22px 24px" }} aria-labelledby="scan-problem">
           <h2 id="scan-problem" className="t-h2" style={{ fontSize: 23 }}>
-            {lastProblem.status === "stopped" ? `The ${KIND_LOWER[lastProblem.kind]} was stopped` : `The ${KIND_LOWER[lastProblem.kind]} did not finish`}
+            {lastProblem.status === "stopped" ? "The map was stopped" : "The map did not finish"}
           </h2>
           <p className="t-small c2">
             {lastProblem.status === "stopped" ? "It was stopped before it finished. " : `${lastProblem.error ?? "It stopped with an error before it finished."} `}
-            {latest ? "The results below are from the last scan that finished." : "Nothing was lost. Start it again when you are ready."}
+            {latest ? "The page shows the last map that finished." : "Nothing was lost. Start it again when you are ready."}
           </p>
-          <p className="t-mono-s c3">Reference: scan {lastProblem.id.slice(0, 6)}</p>
+          <p className="t-mono-s c3">Reference: map {lastProblem.id.slice(0, 6)}</p>
           <div className="flex flex-wrap items-center justify-end gap-2.5">
             <Link className="btn btn-secondary btn-sm" href={`${base}/scans/${lastProblem.id}`}>
               What happened
             </Link>
-            <ScanAgainButton repoId={repo.id} kind={lastProblem.kind} />
+            <ScanAgainButton repoId={repo.id} />
           </div>
         </section>
       )}
@@ -132,10 +126,12 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
       {!latest && !running && (
         <section className="panel flex flex-col gap-3.5" style={{ padding: "22px 24px", maxWidth: 560 }} aria-labelledby="no-scans">
           <h2 id="no-scans" className="t-h2" style={{ fontSize: 23 }}>
-            No scans of {name} yet
+            {name} is not mapped yet
           </h2>
-          <p className="t-small c2">Start with a full scan. It maps the code, reads up to 400 files and checks them against current docs, then finds the vendors (outside services) the app runs on. 10 to 20 minutes.</p>
-          <ScanButtons repoId={repo.id} runningKind={null} layout="compact" />
+          <p className="t-small c2">The map reads every file, package and outside service the app runs on, in about a minute, with no model. Then birdsI reads the accounts you connect.</p>
+          <div className="flex justify-end">
+            <ScanAgainButton repoId={repo.id} label="Map the code" />
+          </div>
         </section>
       )}
 
@@ -166,7 +162,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
               {findingsHeadline(open.length, fixable)}
             </h2>
             <p className="t-body c2">
-              From the {KIND_LOWER[latest.kind]} of {latest.branch ?? repo.default_branch}, finished <LocalTime iso={latest.finishedAt} />
+              From the {scanName(latest.kind).toLowerCase()} of {latest.branch ?? repo.default_branch}, finished <LocalTime iso={latest.finishedAt} />
               {shortSha(latest.commitSha) ? (
                 <>
                   {" "}
@@ -178,12 +174,6 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
               ) : null}
               .{all.length > open.length ? ` ${plural(all.length - open.length, "finding")} dismissed.` : ""}
             </p>
-            {inventory && (
-              <figure className="m-0 flex flex-col gap-[18px] min-[901px]:mt-9">
-                <BirdsEyeMap folders={inventory.folders} hits={hitsFromFindings(open)} findingsHref={`${base}/findings`} label={`${name} seen from above, one square per file. Ringed files have findings.`} />
-                <figcaption className="t-small c3">Ringed files have findings. Select one to see them.</figcaption>
-              </figure>
-            )}
           </div>
           <aside className="flex flex-col gap-9 min-[901px]:col-span-4 min-[901px]:col-start-9">
             <div className="grid grid-cols-2 gap-x-5 min-[901px]:grid-cols-1 min-[901px]:gap-y-9">
@@ -239,26 +229,14 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
 
       <VisionEditor repoId={repo.id} initial={ops.vision.text} updatedAt={ops.vision.updatedAt} />
 
-      {latest && (
-        <section id="deps" className="flex flex-col gap-5" aria-labelledby="deps-title">
-          <div className="flex flex-col gap-1.5">
-            <h2 id="deps-title" className="t-h2 max-[900px]:text-[24px]!">
-              Dependencies
-            </h2>
-            <p className="t-body c2">{deps.length === 0 ? "No package manifests were found in this repository." : `${plural(deps.length, "package")}. Each one is checked for known problems, and full scans check it against its current docs.`}</p>
-          </div>
-          {deps.length > 0 && <DependencyTable dependencies={deps} limit={8} showAllHref={`${base}/dependencies`} />}
-        </section>
-      )}
-
       <section className="grid grid-cols-1 gap-y-12 min-[901px]:grid-cols-12 min-[901px]:gap-x-6">
         <div className="flex flex-col min-[901px]:col-span-7">
           <h2 className="t-h2 max-[900px]:text-[24px]!" style={{ paddingBottom: 14 }}>
-            Recent scans
+            Recent maps
           </h2>
           {scans.length === 0 ? (
             <p className="t-small c3" style={{ padding: "13px 0", borderTop: "1px solid var(--line)" }}>
-              No scans yet.
+              No maps yet.
             </p>
           ) : (
             scans.map((s, i) => {
@@ -266,11 +244,11 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
               return (
                 <Link
                   key={s.id}
-                  href={s.kind === "audit" && s.status === "done" ? `${base}/audit?scan=${s.id}` : `${base}/scans/${s.id}`}
+                  href={s.status === "done" ? `${base}/findings?scan=${s.id}` : `${base}/scans/${s.id}`}
                   className="t-small grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 min-[901px]:grid-cols-[130px_minmax(0,1fr)_90px_120px_80px]"
                   style={{ padding: "13px 0", minHeight: 44, borderTop: "1px solid var(--line)", ...(i === scans.length - 1 ? { borderBottom: "1px solid var(--line)" } : {}), textDecoration: "none", color: "var(--text)" }}
                 >
-                  <span style={{ fontWeight: 600 }}>{KIND_LABEL[s.kind]}</span>
+                  <span style={{ fontWeight: 600 }}>{scanName(s.kind)}</span>
                   <span className="c2 max-[900px]:col-start-1 max-[900px]:row-start-2">
                     <LocalTime iso={s.startedAt ?? s.createdAt} style="list" />
                   </span>
@@ -284,21 +262,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
             })
           )}
         </div>
-        <Frame arm={32} bend={23} className="flex flex-col gap-3.5 px-[30px] py-7 min-[901px]:col-span-4 min-[901px]:col-start-9 max-[900px]:px-[22px] max-[900px]:py-6">
-          <PlaneTakeoff {...icon20} className="i i20 c2" />
-          <h2 className="t-h2 max-[900px]:text-[24px]!">Before you launch</h2>
-          <p className="t-body c2">The pre-launch audit is the deepest check birdsI runs. It goes area by area, from sign-in to services and limits, and says plainly if you are ready. 20 to 40 minutes.</p>
-          {lastAudit?.audit ? (
-            <p className="t-small c3">
-              Last audit <LocalTime iso={lastAudit.finishedAt} />: {lastAudit.audit.verdict === "ready" ? "ready to launch" : lastAudit.audit.verdict === "not_ready" ? "not ready yet" : "no verdict"}.
-            </p>
-          ) : (
-            <p className="t-small c3">Not run on {name} yet.</p>
-          )}
-          <Link className="btn btn-secondary self-start" href={`${base}/audit`} style={{ marginTop: 6 }}>
-            {running?.kind === "audit" ? "Watch the audit" : lastAudit ? "See the report" : "Set up the audit"}
-          </Link>
-        </Frame>
+
       </section>
     </main>
   );

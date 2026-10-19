@@ -19,7 +19,6 @@ import {
   isSecretsKeyConfigured,
   scanForViewer,
   jobActive,
-  knowledgeFor,
   latestDoneScan,
   policyForRepo,
   questionById,
@@ -45,7 +44,6 @@ import { note, ownerAuthor, type RecordAuthor } from "./record";
 import type { ActionRequest, ActionsResponse, AgentPolicy, AskOwnerRequest, ChangesResponse, RecordEntry, RecordKind, WriteRecordRequest, InventoryResponse, Question, RequestActionRequest, UpdatePolicyRequest, Vendor, VendorsResponse, Vision } from "@birdsi/shared";
 import { ALLOWED_COMMANDS, isAllowedCommand } from "@birdsi/shared";
 import { ApiError } from "./api";
-import { assertSpendCap, assertUserSpendCap } from "./limits";
 
 /**
  * The operations record: vendors and their facts, alerts, the pipeline
@@ -57,16 +55,9 @@ export async function loadVendors(repoId: string, user: UserRow): Promise<Vendor
   const repo = await repoForUser(repoId, user.id);
   const [rows, connections, scans] = await Promise.all([vendorsForRepo(repo.id), connectionsForUser(user.id), scansForRepo(repo.id, 12)]);
   const facts = await factsForVendors(rows.map((r) => r.id));
-  const knowledge = await knowledgeFor(rows.map((r) => r.slug));
   const connected = new Set(connections.map((c) => c.vendor_slug));
   const errors = new Map(connections.filter((c) => c.last_status === "failed" && c.last_error).map((c) => [c.vendor_slug, c.last_error!]));
-  const vendors: Vendor[] = rows.map((r) => {
-    const v = toVendor(r, facts.filter((f) => f.vendor_id === r.id), connected.has(r.slug));
-    const k = knowledge.get(r.slug);
-    if (k && (!v.what || v.what.trim() === "")) v.what = k.what;
-    if (k && !v.pricingUrl) v.pricingUrl = k.pricingUrl;
-    return v;
-  });
+  const vendors: Vendor[] = rows.map((r) => toVendor(r, facts.filter((f) => f.vendor_id === r.id), connected.has(r.slug)));
   const history = await factHistory(rows.map((r) => r.id));
   const runways: Record<string, ReturnType<typeof computeRunway>> = {};
   const runwayMap = new Map<string, ReturnType<typeof computeRunway>>();
@@ -75,40 +66,34 @@ export async function loadVendors(repoId: string, user: UserRow): Promise<Vendor
     if (r.length > 0) runways[v.id] = r;
     runwayMap.set(v.id, r);
   }
-  const alerts = computeAlerts(vendors, knowledge, errors, runwayMap);
-  const watches = computeWatches(vendors, knowledge);
+  const alerts = computeAlerts(vendors, errors, runwayMap);
+  const watches = computeWatches(vendors);
   const running = scans.some((s) => s.status === "queued" || s.status === "running");
   const latestDone = scans.find((s) => s.status === "done") ?? null;
-  const latestAudit = scans.find((s) => s.status === "done" && (s.kind === "deep" || s.kind === "audit")) ?? null;
   const syncRunning = await jobActive("vendor_sync", "repoId", repo.id);
-  const stages = stageStates({
-    lastScanAt: latestDone?.finished_at ?? null,
-    lastScanRunning: running,
-    lastDocsAt: latestDone?.finished_at ?? null,
-    lastAuditAt: latestAudit?.finished_at ?? null,
-    lastOpsAt: repo.vendors_synced_at,
-    opsRunning: syncRunning,
-  });
-  return { vendors, alerts, watches, runways, stages, monthlyUsd: monthlySpend(vendors, knowledge), syncRunning, lastSyncAt: repo.vendors_synced_at };
+  const stages = stageStates({ lastMapAt: latestDone?.finished_at ?? null, mapRunning: running, lastReadAt: repo.vendors_synced_at, readRunning: syncRunning });
+  return { vendors, alerts, watches, runways, stages, monthlyUsd: monthlySpend(vendors)?.totalUsd ?? null, syncRunning, lastSyncAt: repo.vendors_synced_at };
 }
 
-/** Starts the ops stage alone. Needs a finished scan first, because vendors come from the scan. */
+/** Reads the accounts now, without waiting for the hourly read. Needs a map first, because the vendors come from the code. */
 export async function startVendorSync(repoId: string, user: UserRow): Promise<{ queued: boolean; reason?: string }> {
   const repo = await repoForUser(repoId, user.id);
   const latest = await latestDoneScan(repo.id);
-  if (!latest) return { queued: false, reason: "Run a scan first: the vendor list comes from the code." };
-  if (await jobActive("vendor_sync", "repoId", repo.id)) return { queued: false, reason: "A vendor refresh is already running." };
-  await assertSpendCap();
-  await assertUserSpendCap(user.id);
+  if (!latest) return { queued: false, reason: "Map the code first: the list of services comes from it." };
+  if (await jobActive("vendor_sync", "repoId", repo.id)) return { queued: false, reason: "A read of the accounts is already running." };
   await enqueueJob("vendor_sync", { repoId: repo.id, ownerUserId: user.id, hints: null }, { maxAttempts: 1 });
   return { queued: true };
 }
 
+/**
+ * Questions for the owner. Only a coding agent asks since v3: birdsI stopped
+ * asking for plans and dashboard numbers, so its older questions are not listed.
+ */
 export async function loadQuestions(repoId: string, user: UserRow, status?: Question["status"]): Promise<Question[]> {
   const repo = await repoForUser(repoId, user.id);
   const [rows, vendors] = await Promise.all([questionsForRepo(repo.id, status), vendorsForRepo(repo.id)]);
   const names = new Map(vendors.map((v) => [v.id, v.name]));
-  return rows.map((r) => toQuestion(r, r.vendor_id ? (names.get(r.vendor_id) ?? null) : null));
+  return rows.filter((r) => r.asked_by === "agent").map((r) => toQuestion(r, r.vendor_id ? (names.get(r.vendor_id) ?? null) : null));
 }
 
 export async function answerQuestion(questionId: string, user: UserRow, answer: string): Promise<Question> {
@@ -133,10 +118,6 @@ export async function answerQuestion(questionId: string, user: UserRow, answer: 
       source: "asked",
       evidence: { note: `Answered by the owner on ${new Date().toISOString().slice(0, 10)}.` },
     });
-    if (row.updates.kind === "plan") {
-      // A new plan means new limits: refresh the ops stage.
-      await enqueueJob("vendor_sync", { repoId: row.repo_id, ownerUserId: user.id, hints: null }, { maxAttempts: 1 }).catch(() => undefined);
-    }
   }
   const vendors = await vendorsForRepo(row.repo_id);
   return toQuestion(updated, row.vendor_id ? (vendors.find((v) => v.id === row.vendor_id)?.name ?? null) : null);
@@ -301,7 +282,7 @@ export async function writeRecord(repoId: string, user: UserRow, input: WriteRec
 /** Everything an agent needs about a repository in one call. */
 export async function loadInventory(repoId: string, user: UserRow): Promise<InventoryResponse> {
   const repo = await repoForUser(repoId, user.id);
-  const [vendors, vision, questions, actions, latest, decisions] = await Promise.all([loadVendors(repo.id, user), visionForRepo(repo.id), questionsForRepo(repo.id, "open"), actionsForRepo(repo.id, "pending"), latestDoneScan(repo.id), recordForRepo(repo.id, { kind: "decision", limit: 20 })]);
+  const [vendors, vision, questions, actions, latest, decisions] = await Promise.all([loadVendors(repo.id, user), visionForRepo(repo.id), loadQuestions(repo.id, user, "open"), actionsForRepo(repo.id, "pending"), latestDoneScan(repo.id), recordForRepo(repo.id, { kind: "decision", limit: 20 })]);
   const findings = latest ? await findingsForScan(latest.id) : [];
   return {
     repo: { id: repo.id, fullName: repo.full_name, branch: repo.default_branch },
@@ -385,7 +366,7 @@ export async function changesSince(repoId: string, user: UserRow, sinceScanId: s
   if (from && from.id === latest.id) from = done[1] ?? null;
   const toRows = await findingsForScan(latest.id);
   const fromRows = from ? await findingsForScan(from.id) : [];
-  const like = (f: (typeof toRows)[number]) => ({ id: f.id, key: f.key, title: f.title, severity: f.severity, confidence: f.confidence, status: f.status, path: f.location?.path ?? null });
+  const like = (f: (typeof toRows)[number]) => ({ id: f.id, key: f.key, title: f.title, severity: f.severity, confidence: f.confidence, status: f.status, path: f.location?.path ?? null, checkId: f.check_id });
   return {
     repoId: repo.id,
     from: from ? { scanId: from.id, finishedAt: from.finished_at } : null,

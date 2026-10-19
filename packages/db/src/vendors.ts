@@ -1,4 +1,4 @@
-import type { FactKind, FactSource, PlanTier, Vendor, VendorDraft, VendorFact, VendorKnowledge } from "@birdsi/shared";
+import type { FactKind, FactSource, Vendor, VendorDraft, VendorFact } from "@birdsi/shared";
 import { getDb, unwrap } from "./client";
 
 export interface VendorRow {
@@ -236,34 +236,6 @@ export async function setVendorsSyncedAt(repoId: string, at: Date | null): Promi
   const db = getDb();
   const { error } = await db.from("repos").update({ vendors_synced_at: at ? at.toISOString() : null }).eq("id", repoId);
   if (error) throw new Error(`setVendorsSyncedAt: ${error.message}`);
-}
-
-// Shared knowledge
-
-export async function knowledgeFor(slugs: string[]): Promise<Map<string, VendorKnowledge>> {
-  const out = new Map<string, VendorKnowledge>();
-  if (slugs.length === 0) return out;
-  const db = getDb();
-  const { data, error } = await db.from("vendor_knowledge").select().in("slug", slugs);
-  if (error) throw new Error(`knowledgeFor: ${error.message}`);
-  for (const r of (data ?? []) as Array<Record<string, unknown>>) {
-    out.set(r["slug"] as string, {
-      slug: r["slug"] as string,
-      name: r["name"] as string,
-      what: r["what"] as string,
-      pricingUrl: (r["pricing_url"] as string | null) ?? null,
-      tiers: (r["tiers"] as PlanTier[]) ?? [],
-      sources: (r["sources"] as VendorKnowledge["sources"]) ?? [],
-      fetchedAt: r["fetched_at"] as string,
-    });
-  }
-  return out;
-}
-
-export async function saveKnowledge(k: VendorKnowledge): Promise<void> {
-  const db = getDb();
-  const { error } = await db.from("vendor_knowledge").upsert({ slug: k.slug, name: k.name, what: k.what, pricing_url: k.pricingUrl, tiers: k.tiers, sources: k.sources, fetched_at: k.fetchedAt }, { onConflict: "slug" });
-  if (error) throw new Error(`saveKnowledge: ${error.message}`);
 }
 
 /** Usage the owner typed goes stale; after the window it is removed so the question is asked again. */

@@ -2,10 +2,11 @@ import { totalSpend, usageForUser } from "@birdsi/db";
 import { BudgetExceededError, type BeforeCall } from "@birdsi/engine";
 
 /**
- * The daily spending limits, enforced while work runs and not only when it
- * is queued: at the start of every job and before every model call. The
- * ledger totals are cached for half a minute, so the overshoot is at most the
- * calls made inside that window.
+ * The daily spending limits on model calls. Since v3 only the official-docs
+ * check calls a model, so a limit never stops a map: it stops the docs check,
+ * and the map says so. Checked before every model call; the ledger totals are
+ * cached for half a minute, so the overshoot is at most the calls made inside
+ * that window.
  */
 const CACHE_MS = 30_000;
 const DAY_MS = 86_400_000;
@@ -40,13 +41,13 @@ export async function assertWithinSpendCaps(ownerUserId: string | null, options:
   const globalCap = capUsd("BIRDSI_DAILY_SPEND_CAP_USD", 50);
   const globalSpent = await spentFor("global", () => totalSpend(since()), fresh);
   if (globalSpent >= globalCap * 1_000_000) {
-    throw new SpendCapError("birdsI has reached its daily scan budget. Scans open again within 24 hours.");
+    throw new SpendCapError("birdsI has reached its daily budget for docs checks. Maps still run, without the docs check, and the budget opens again within 24 hours.");
   }
   if (!ownerUserId) return;
   const userCap = capUsd("BIRDSI_USER_DAILY_SPEND_CAP_USD", 5);
   const userSpent = await spentFor(`user:${ownerUserId}`, async () => (await usageForUser(ownerUserId, since())).costMicrodollars, fresh);
   if (userSpent >= userCap * 1_000_000) {
-    throw new SpendCapError(`You have used today's scan budget ($${userCap}). It opens again within 24 hours.`);
+    throw new SpendCapError(`You have used today's docs check budget ($${userCap}). Maps still run, without the docs check, and the budget opens again within 24 hours.`);
   }
 }
 

@@ -53,7 +53,6 @@ export const secretsCheck: Check = {
   id: "secrets",
   step: "secrets",
   label: "Looking for keys and passwords committed to the code",
-  tiers: ["light", "deep", "audit"],
   available: () => true,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     const findings: FindingDraft[] = [];

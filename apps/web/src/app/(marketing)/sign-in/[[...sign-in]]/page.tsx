@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SignIn } from "@clerk/nextjs";
-import { Check, GitPullRequest, Mail } from "lucide-react";
+import { Check, KeyRound, Mail } from "lucide-react";
 import type { Metadata } from "next";
 import { Frame } from "@/components/Frame";
 import { SiteHeader } from "@/components/marketing/SiteChrome";
@@ -39,13 +39,6 @@ export default function SignInPage() {
               By continuing you agree to the <Link href="/terms">Terms</Link> and the <Link href="/privacy">Privacy policy</Link>.
             </p>
           </div>
-          <p className="t-small c2 min-[901px]:mt-auto">
-            Only want a look first?{" "}
-            <Link href="/" style={{ fontWeight: 600, color: "var(--text)" }}>
-              Try the sample
-            </Link>{" "}
-            without signing in.
-          </p>
         </div>
         <div className="flex flex-col gap-2 min-[901px]:col-span-5 min-[901px]:col-start-8 min-[901px]:pt-2.5">
           <h2 className="t-h3">What birdsI can do once connected</h2>
@@ -57,9 +50,9 @@ export default function SignInPage() {
               </span>
             </li>
             <li className="grid grid-cols-[32px_minmax(0,1fr)]" style={{ padding: "18px 0", borderBottom: "1px solid var(--line)" }}>
-              <GitPullRequest {...icon} style={{ marginTop: 4 }} />
+              <KeyRound {...icon} style={{ marginTop: 4 }} />
               <span className="t-body">
-                <b>Open pull requests</b> with fixes. It never merges them and never pushes to your main branch.
+                <b>Read the vendor accounts</b> you connect, with keys that only read. It never writes to a repository or an account.
               </span>
             </li>
             <li className="grid grid-cols-[32px_minmax(0,1fr)]" style={{ padding: "18px 0", borderBottom: "1px solid var(--line)" }}>

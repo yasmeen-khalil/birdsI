@@ -32,7 +32,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
         <div className="flex min-w-0 flex-col gap-2.5" style={{ maxWidth: 720 }}>
           <h1 className="t-h1">Vendors</h1>
           <p className="t-body c2">
-            Vendors are the outside services this app runs on: hosting, database, payments, email. Each with its plan, usage and limits.{" "}
+            Vendors are the outside services this app runs on: hosting, database, payments, email. Each with what its account says, and the plan&apos;s limits from birdsI&apos;s checked list.{" "}
             {data.lastSyncAt ? (
               <>
                 Last read <LocalTime iso={data.lastSyncAt} />.
@@ -50,27 +50,27 @@ export default async function VendorsPage({ params }: { params: Promise<{ repoId
           <h2 className="t-h2" style={{ fontSize: 23 }}>
             No vendors found yet
           </h2>
-          <p className="t-small c2">Run a full scan. birdsI maps the code, finds every service it calls, then reads each plan and limit. 10 to 20 minutes.</p>
+          <p className="t-small c2">Map the code. birdsI finds every service it calls from the packages, env names, addresses and config files, in about a minute.</p>
           <div className="flex justify-end">
-            <ScanAgainButton repoId={repo.id} kind="deep" full label={running ? "A scan is running" : "Full scan"} disabled={Boolean(running)} />
+            <ScanAgainButton repoId={repo.id} label={running ? "A map is running" : "Map the code"} disabled={Boolean(running)} />
           </div>
         </div>
       ) : (
         <>
           <section className="grid grid-cols-1 gap-y-6 min-[901px]:grid-cols-12 min-[901px]:gap-x-6" aria-label="Summary">
             <div className="flex flex-col gap-1.5 min-[901px]:col-span-5">
-              <span className="t-label c3">Monthly spend</span>
+              <span className="t-label c3">Spend read this month</span>
               {monthlyUsd !== null ? (
                 <p className="t-display max-[900px]:text-[34px]!" style={{ fontSize: 44 }}>
                   {usd(monthlyUsd)}
                   <span className="t-body c2" style={{ fontFamily: "var(--sans)" }}>
                     {" "}
-                    /month across {plural(vendors.length, "vendor")}
+                    so far, from the accounts that report it
                   </span>
                 </p>
               ) : (
                 <p className="t-body c2" style={{ maxWidth: 420 }}>
-                  Spend not known yet. Connect an account or answer a question.
+                  No account has reported spend yet. Plan prices are on each vendor below and are never added in.
                 </p>
               )}
               <p className="t-small c3">

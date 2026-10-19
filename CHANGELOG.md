@@ -1,5 +1,32 @@
 # Changelog
 
+## v3 (2026-10-18, unreleased): the cockpit
+
+birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.
+
+### Step 1: the cut
+
+Removed, with their routes, screens, strings, tests and dependencies:
+- The model-driven code audit: the model review (Judgment findings), the cross-file pass, the Pre-launch audit and its page, fixes and pull requests, sandbox testing, chat and its code index. `birdsi fix`, `birdsi ask`, `birdsi_fix` and `birdsi_ask` are gone, and so are `--full`, `--deep`, `--audit`, `--describe` and the fix prompts.
+- The hackathon scaffolding: the Nemotron provider, Token Factory embeddings and Sandboxes, LangSmith tracing, the sample bakery app and its no-sign-in demo. `openai` and `langsmith` left the dependencies.
+- Plan tiers read from pricing pages by a model every week, and the questions that asked the owner to type a plan or a dashboard number.
+- Nothing was dropped from the database: `20261018000000_v3_retire_audit.sql` marks the retired tables (chat messages, code passages, fixes, the pricing cache) and keeps every row.
+
+What replaced them:
+- One kind of run: a map of the code. `npx birdsi` and `birdsi map` (also `birdsi scan`) map the app in about a minute. No model reads the code. The rule-based checks stay (committed keys, unsafe settings, OSV vulnerabilities, packages far behind), and the docs check stays, optional, on Claude only, citing the package's own documentation.
+- A checked limits list (`packages/shared/src/limits.ts`): sixteen vendors, each plan's limits, what ends it and the next price, read on 18 October 2026 from each vendor's own page, every number with the page's exact words. Two records it corrected: OneSignal's free plan sends mobile push only under 1,000 monthly active users since 1 October 2026, and Resend's free plan allows 3 domains.
+- The read job writes the plan's checked limits as facts citing the page and the date, and alerts compare usage with them.
+- `supabase/verify.sql`: one read-only query that says which of birdsI's own migrations have run.
+
+Fixed:
+- Uploaded code was kept seven days for fixes that no longer exist. It is now deleted as soon as its map has run, and within a day if the map never starts.
+- Monthly spend no longer adds a plan's list price to money read from accounts.
+- The Vercel connector no longer calls a personal account Hobby without reading it.
+- Stripe revenue reads every page of the month's charges (up to 1,000) and takes refunds off, instead of the first 100 with refunds counted.
+- The landing page and footer linked to a private repository and an unpublished package. The links are gone, and the privacy page and terms point to the operator on GitHub.
+- `changes` leaves the removed model review's findings out, so they never show as resolved after the cut.
+- The privacy page, terms and security policy describe what v3 does.
+
 ## v2 (2026-10-03, unreleased)
 
 The operations record for an app, built for coding agents.

@@ -1,12 +1,12 @@
 import { eventsAfter, lastWorkerSeenAt, scanForViewer } from "@birdsi/db";
 import type { ScanEventsResponse } from "@birdsi/shared";
-import { handler, json, optionalCaller } from "@/lib/api";
+import { handler, json, requireCaller } from "@/lib/api";
 
 /** Progress log for live views. `after` is the last seq the client has seen. */
 export const GET = handler(async (request, { params }) => {
-  const user = await optionalCaller(request);
+  const user = await requireCaller(request);
   const { scanId } = await params;
-  const scan = await scanForViewer(scanId!, user?.id ?? null);
+  const scan = await scanForViewer(scanId!, user.id);
   const url = new URL(request.url);
   const after = Math.max(0, Number.parseInt(url.searchParams.get("after") ?? "0", 10) || 0);
   const events = await eventsAfter(scan.id, after);

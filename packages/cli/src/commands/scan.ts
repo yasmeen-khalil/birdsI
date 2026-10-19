@@ -1,40 +1,33 @@
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { Finding, ScanEventRecord, ScanKind, ScanResponse, ScanStatus } from "@birdsi/shared";
+import type { ScanEventRecord, ScanResponse, ScanStatus } from "@birdsi/shared";
 import { ApiClient, toCliError, type Result } from "../api";
 import { CliError, EXIT, exitCodeForScan } from "../exit";
-import { KIND_WORD, formatScanReport, glyphs, orderFindings, paint, plural, styleFor, wrap, type Style } from "../format";
+import { formatScanReport, glyphs, paint, plural, styleFor, wrap } from "../format";
 import { displayName, readGitInfo } from "../git";
 import { withInterrupt } from "../interrupt";
-import { askYesNo } from "../prompt";
-import { isInteractive, printJson, println, usageError } from "../output";
+import { printJson, println, usageError } from "../output";
 import { ScanProgress } from "../progress";
 import { formatBytes } from "../snapshot";
 import { VERSION } from "../version";
 import { followScan, sendSnapshot, startScan, withRetry } from "../workflow";
 import { openBrowser } from "./auth";
-import { runFix } from "./fix";
 import { formatNeedsYou } from "./ops";
 import { scannerNote } from "@birdsi/shared";
 
 export interface ScanOptions {
-  deep?: boolean;
-  audit?: boolean;
-  /** The bare command's --full: the same scan as --deep. */
-  full?: boolean;
-  /** Open the dashboard in the browser once the scan starts. */
+  /** Open the app's page in the browser once the map starts. */
   open?: boolean;
-  describe?: string;
   branch?: string;
   json?: boolean;
-  fixPrompt?: boolean;
   ascii?: boolean;
 }
 
-export function scanKind(options: Pick<ScanOptions, "deep" | "audit" | "full">): ScanKind {
-  return options.audit ? "audit" : options.deep || options.full ? "deep" : "light";
-}
-
+/**
+ * Maps the app in a folder: uploads a snapshot (env files and keys never
+ * leave the computer), follows the map, prints what it found and what needs
+ * the owner. The upload is deleted on birdsI as soon as the map has run.
+ */
 export async function scanCommand(pathArg: string | undefined, options: ScanOptions): Promise<number> {
   const json = Boolean(options.json);
   const style = styleFor(process.stdout, options);
@@ -42,15 +35,11 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
   const say = (line = ""): void => {
     if (!json) println(line);
   };
-  if (options.describe !== undefined && options.describe.length > 2000) {
-    throw usageError("The description is longer than 2,000 characters.", "Keep --describe to a short paragraph.");
-  }
 
   const root = resolve(pathArg ?? process.cwd());
   const rootInfo = await stat(root).catch(() => null);
   if (!rootInfo) throw usageError(`There is no folder at ${root}.`);
   if (!rootInfo.isDirectory()) throw usageError(`${root} is a file. Point birdsI at a folder.`);
-  const kind = scanKind(options);
   const { api } = await ApiClient.fromEnvironment();
   api.requireAuth();
 
@@ -69,7 +58,7 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
   if (git?.commitSha) where.push(`at ${git.commitSha.slice(0, 7)}`);
   say();
   say(`${paint.bold(style, `birdsI ${VERSION}`)}  ${where.join(" ")}`);
-  say(`${KIND_WORD[kind]}. Signed in as ${login}.`);
+  say(`Map of the code. Signed in as ${login}.`);
 
   let scanId: string;
   let repoId: string | null = null;
@@ -86,25 +75,19 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
       say(paint.dim(style, `Left out ${plural(sent.walk.tooLarge.length, "file")} over the size limit, for example ${sent.walk.tooLarge[0]}.`));
     }
     say();
-    const scan = await startScan(api, {
-      snapshotId: sent.snapshotId,
-      kind,
-      branch: sent.branch,
-      describe: options.describe,
-      ...(options.full ? { full: true } : {}),
-    });
+    const scan = await startScan(api, { snapshotId: sent.snapshotId, branch: sent.branch });
     scanId = scan.id;
     repoId = scan.repoId;
     dashboardUrl = scan.dashboardUrl ?? null;
     if (dashboardUrl) {
-      say(paint.dim(style, `Dashboard: ${dashboardUrl}`));
+      say(paint.dim(style, `The app's page: ${dashboardUrl}`));
       if (options.open && process.stdout.isTTY) openBrowser(dashboardUrl);
     }
   } catch (error) {
     throw toCliError(error, "that");
   }
 
-  // 4: follow progress, Ctrl+C stops the scan on the server.
+  // 4: follow progress, Ctrl+C stops the map on the server.
   const progress = json ? null : new ScanProgress(process.stdout, style);
   let failure: string | null = null;
   const onEvents = (records: ScanEventRecord[]): void => {
@@ -121,8 +104,8 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
       (count) => {
         if (count === 1) {
           stopRequested = true;
-          progress?.setStatus("Stopping the scan. Press Ctrl+C again to leave now.");
-          if (!progress && !json) println("Stopping the scan.");
+          progress?.setStatus("Stopping the map. Press Ctrl+C again to leave now.");
+          if (!progress && !json) println("Stopping the map.");
           api.stopScan(scanId).catch(() => undefined);
           // If the server does not confirm within 20 seconds, leave anyway.
           setTimeout(() => controller.abort(), 20_000).unref();
@@ -146,7 +129,7 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
     );
   } catch (error) {
     progress?.finish("running");
-    throw toCliError(error, "the scan");
+    throw toCliError(error, "the map");
   } finally {
     if (ticker) clearInterval(ticker);
   }
@@ -158,27 +141,27 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
   try {
     result = await withRetry(() => api.scan(scanId));
   } catch (error) {
-    if (json || status === "done") throw toCliError(error, "the scan result");
+    if (json || status === "done") throw toCliError(error, "the map's result");
   }
   if (json && result) printJson(result.raw);
 
   if (status === "stopped") {
     say();
-    say(`${paint.fail(style, g.failed)} You stopped the scan. Nothing in your repository changed.`);
+    say(`${paint.fail(style, g.failed)} You stopped the map. Nothing in your repository changed.`);
     return EXIT.stopped;
   }
   if (status === "failed") {
     const message = failure ?? result?.data.scan.error ?? "No reason was reported.";
     const step = progress?.currentStepNumber;
     say();
-    say(`  ${paint.fail(style, g.failed)} ${paint.bold(style, step ? `Scan stopped at step ${step}.` : "The scan could not finish.")}`);
+    say(`  ${paint.fail(style, g.failed)} ${paint.bold(style, step ? `The map stopped at step ${step}.` : "The map could not finish.")}`);
     say(wrap(message, style, "    "));
     say();
     say(paint.dim(style, `  Nothing in your repository changed. Exit code ${EXIT.failed}.`));
     return EXIT.failed;
   }
   if (status !== "done" || !result) {
-    throw new CliError("birdsI stopped answering before the scan finished.", EXIT.failed, `The scan id is ${scanId}. Try: birdsi findings ${scanId}`);
+    throw new CliError("birdsI stopped answering before the map finished.", EXIT.failed, `The map's id is ${scanId}. Try: birdsi findings ${scanId}`);
   }
 
   const { scan, findings } = result.data;
@@ -187,15 +170,6 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
 
   say();
   say(formatScanReport(scan, findings, style));
-
-  const wantsPrompt = options.fixPrompt !== false && isInteractive();
-  if (wantsPrompt) {
-    const stopped = await walkFixes(api, orderFindings(findings), { style, dir: root });
-    if (stopped) return EXIT.stopped;
-  } else if (findings.some((f) => f.actionKind === "fix" && f.status === "open")) {
-    say();
-    say(paint.dim(style, "Start any fix with: birdsi fix <number>"));
-  }
 
   // What needs the owner outside the code: limits, questions, approvals.
   if (repoId) {
@@ -211,45 +185,4 @@ export async function scanCommand(pathArg: string | undefined, options: ScanOpti
     }
   }
   return exitCode;
-}
-
-/**
- * One question per fixable finding, in severity order. Enter alone means
- * no. Returns true when the user pressed Ctrl+C to leave. A terminal scan
- * uploads a snapshot, so a fix comes back as a change to apply here, never
- * as a pull request.
- */
-async function walkFixes(
-  api: ApiClient,
-  ordered: Finding[],
-  options: { style: Style; dir: string },
-): Promise<boolean> {
-  const { style } = options;
-  const fixable = ordered.filter((f) => f.actionKind === "fix" && f.status === "open");
-  for (const [i, finding] of fixable.entries()) {
-    println();
-    println(paint.bold(style, `Fix ${i + 1} of ${fixable.length}: ${finding.title}`));
-    if (finding.fixPlan) {
-      println(wrap(`- ${finding.fixPlan.summary}`, style, "  "));
-      if (finding.fixPlan.paths.length > 0) println(wrap(`- Changes ${finding.fixPlan.paths.join(", ")}`, style, "  "));
-    }
-    const question = "Make this fix in your local files? [y/N]";
-    println();
-    const yes = await askYesNo(paint.accent(style, question));
-    if (yes === null) return true;
-    if (!yes) {
-      println(paint.dim(style, "  Skipped."));
-      continue;
-    }
-    try {
-      const outcome = await runFix(api, finding, { style, apply: true, dir: options.dir, expectPr: false });
-      if (outcome.kind === "interrupted") return true;
-    } catch (error) {
-      const cli = toCliError(error, "that fix");
-      if (cli.exitCode === EXIT.notSignedIn) throw cli;
-      println(`  ${paint.fail(style, glyphs(style).failed)} ${cli.message}`);
-      if (cli.hint) println(paint.dim(style, `    ${cli.hint}`));
-    }
-  }
-  return false;
 }

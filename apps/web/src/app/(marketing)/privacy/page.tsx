@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalList, LegalP, LegalPage, LegalSection } from "@/components/marketing/Legal";
-import { GITHUB_REPO_URL } from "@/components/marketing/SiteChrome";
 
 /** Who runs this instance of birdsI. A self-hosted copy names its own operator here. */
 const OPERATOR_NAME = "yasmeen-khalil";
-const EFFECTIVE_DATE = "28 September 2026";
-const SECURITY_POLICY_URL = `${GITHUB_REPO_URL}/security/policy`;
+const OPERATOR_URL = "https://github.com/yasmeen-khalil";
+const EFFECTIVE_DATE = "18 October 2026";
 
 export const metadata: Metadata = { title: "Privacy policy" };
 
@@ -17,16 +16,17 @@ export default function PrivacyPage() {
       effective={EFFECTIVE_DATE}
       intro={
         <>
-          birdsI reads your code, and the vendor accounts you connect, to find problems and track the services your app runs on. This policy says what it keeps, for how long, who else processes it, and how you remove it. birdsI is run by {OPERATOR_NAME} (“the operator”).
+          birdsI maps the code of your apps, and reads the vendor accounts you connect, to show what each app runs on and what needs you. This policy says what it keeps, for how long, who else processes it, and how you remove it. birdsI is run by {OPERATOR_NAME} (“the operator”).
         </>
       }
     >
       <LegalSection title="The short version">
         <LegalList
           items={[
-            "Code uploaded by the terminal tool is kept for up to seven days so a fix can be applied, then deleted. Passages of it indexed for chat stay until the next scan replaces them. Your environment files and private keys are never uploaded at all.",
-            "Findings, vendor details, answers to questions, approvals and chats are kept until you delete your account.",
-            "Your code is sent to an AI model provider to be read, and search queries about your packages and vendors go to Tavily. Your code is never used to train models unless you opt in, and birdsI offers no such opt-in today.",
+            "Code uploaded by the terminal tool is deleted as soon as its map has run. Your environment files and private keys are never uploaded at all.",
+            "The map keeps file paths, line numbers, short excerpts with secrets masked, and the names of the settings your code reads. It never keeps their values.",
+            "Keys you give birdsI for your vendor accounts are stored encrypted and used only to read those accounts.",
+            "No AI model reads your code to make the map. The optional docs check sends the lines around a package's import to an AI model provider. Nothing is used to train models.",
             "You can disconnect a repository or delete everything from Settings at any time.",
           ]}
         />
@@ -36,34 +36,31 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             <>
-              <b>Your account.</b> Your GitHub username and user id, the email address on your GitHub account, and whether you want email updates. birdsI sends no email yet. Sign-in itself is handled by Clerk.
+              <b>Your account.</b> Your GitHub username and user id, the email address on your GitHub account, and whether you want alerts by email. birdsI sends no email yet. Sign-in itself is handled by Clerk.
             </>,
             <>
-              <b>Repositories you connect.</b> Their names, default branches, and the GitHub App installation that grants access.
+              <b>Apps and repositories you connect.</b> Their names, default branches, and the GitHub App installation that grants read access.
             </>,
             <>
-              <b>Repository snapshots.</b> A copy of the repository, fetched from GitHub for the duration of a scan, or uploaded by the birdsI terminal tool and kept for up to seven days so a fix can be applied to the same code. The terminal tool never uploads environment files or private keys.
+              <b>The map of each app.</b> The services and packages the code uses, the names of the settings (environment variables) it reads, its crons, webhooks, store apps, migrations and public pages, each with the file and line it came from. Findings from the checks, with short code excerpts as evidence and secrets masked.
             </>,
             <>
-              <b>Findings and scan results.</b> Each finding’s title, explanation, file path and line, and a short code excerpt as evidence, with secrets masked. Also the scan’s progress log, summary, and pre-launch audit report.
+              <b>What the accounts say.</b> With a key you connect: deployments and their state, the names of the settings each project has (never their values), whether a database is paused, its advisor warnings and size, push subscriber and delivery counts. Each reading is dated and kept with the address it came from.
             </>,
             <>
-              <b>Dependency and vendor lists.</b> The packages and outside services your code uses, with versions, plans, usage, limits, spend, known problems and documentation checks. Your answers to questions and your vision text are stored with them.
+              <b>The record.</b> Decisions, facts, approvals, questions and answers written by you or your coding agent, and the vision you write for an app.
             </>,
             <>
-              <b>Chat.</b> Your questions and birdsI’s answers, and short passages of your code indexed so chat can find the right files.
+              <b>Usage records.</b> Which AI model was called for the docs check, how much text it read and wrote, and when. These enforce the daily limits.
             </>,
             <>
-              <b>Fixes and approvals.</b> The change birdsI proposed, the output of its test, the pull request it opened, and each command proposed to you with your decision and its output.
+              <b>Keys and tokens.</b> Terminal and MCP tokens are stored only as one-way hashes. Vendor account keys you connect are stored encrypted on birdsI&apos;s servers.
             </>,
             <>
-              <b>Usage records.</b> Which AI models were called for you, how much text they read and wrote, and when. These enforce fair-use limits.
+              <b>Sign-in starts.</b> A one-way hash of the network address and browser name, to limit how often a terminal sign-in can be started.
             </>,
             <>
-              <b>Tokens.</b> Terminal and MCP tokens are stored only as one-way hashes. Vendor account tokens you connect are stored encrypted, so birdsI can read plans and usage.
-            </>,
-            <>
-              <b>Sample scans.</b> Visitors who try the sample are not asked to sign in. birdsI keeps a one-way hash of the network address and browser name, to limit how often the sample runs.
+              <b>From before 18 October 2026.</b> Chat messages, code passages indexed for chat, proposed fixes and pull request details stay in the database from when birdsI had them. Nothing reads them now, and they are deleted with the repository or your account.
             </>,
           ]}
         />
@@ -72,10 +69,9 @@ export default function PrivacyPage() {
       <LegalSection title="How long it is kept">
         <LegalList
           items={[
-            "Repository snapshots uploaded by the terminal tool are kept for up to seven days, so a fix can be applied to the same code, then deleted. They are deleted at once when you delete your account. Environment files and private keys are never uploaded in the first place.",
-            "Findings, scan results, dependency lists, chats and fixes are kept until you delete your account. Disconnecting a repository stops birdsI from reading it and deletes its scans, findings and other results.",
+            "Code uploaded by the terminal tool is deleted as soon as its map has run, and within a day if the map never starts. Code fetched from GitHub lives only for the duration of the map.",
+            "Maps, findings, readings, the record and your keys are kept until you disconnect the repository or delete your account.",
             "Usage records are kept for cost accounting. When you delete your account they stay, without your name or email, tied only to your sign-in account number, so the daily limits still count them if you sign in again.",
-            "Indexed code passages for chat are not bound by the seven days: they stay until the next scan replaces them, and are deleted with the repository or your account. Keys in a shape birdsI recognises are masked before the passages, call sites and excerpts are stored.",
             "Backups made by the database host roll off within their own retention window after deletion.",
           ]}
         />
@@ -86,36 +82,29 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             <>
-              <b>Anthropic</b> runs the Claude models that read your code, write fixes and answer chat. It receives the code passages being read. When the operator turns it on, <b>Nebius Token Factory</b> runs the models or the search behind chat instead, and receives the same passages.
+              <b>Vendors you connect</b>, such as Vercel, Supabase and OneSignal, receive read requests made with your key.
             </>,
             <>
-              <b>Nebius sandboxes</b>, when enabled, run your project’s build and tests on a proposed fix before a pull request opens. They receive a copy of the repository for that test.
-            </>,
-            <>
-              <b>Tavily</b> searches current documentation and vendor pricing pages. It receives search queries built from package and vendor names, not your source files. <b>Vendors you connect</b> receive read-only requests made with your token.
+              <b>Anthropic</b> runs the Claude model behind the optional docs check. It receives a few lines of code around where a package is imported, and pages of that package&apos;s own documentation. <b>Tavily</b> finds those pages, from search queries built from package names, not your source files.
             </>,
             <>
               <b>OSV</b> and <b>deps.dev</b> receive the names and versions of your packages, to check them for known problems. The <b>npm</b>, <b>PyPI</b> and <b>crates.io</b> registries receive package names, to look up their latest versions.
             </>,
             <>
-              <b>LangSmith</b>, when enabled by the operator, records model calls, including the passages sent, to measure how accurate findings are.
+              <b>GitHub</b> provides the code through the birdsI GitHub App, which only reads.
             </>,
             <>
-              <b>GitHub</b> provides the code through the birdsI GitHub App and receives the pull requests you ask for.
-            </>,
-            <>
-              <b>Clerk</b> handles sign-in. <b>Supabase</b> hosts the database. <b>Vercel</b> hosts the website.
+              <b>Clerk</b> handles sign-in. <b>Supabase</b> hosts the database and the short-lived uploads. <b>Vercel</b> hosts the website and <b>Railway</b> runs the worker.
             </>,
           ]}
         />
-        <LegalP>Your code is never used to train AI models without your opt-in. birdsI does not sell or share personal information for advertising.</LegalP>
+        <LegalP>Your code is never used to train AI models. birdsI does not sell or share personal information for advertising.</LegalP>
       </LegalSection>
 
       <LegalSection title="GitHub App permissions">
         <LegalList
           items={[
-            "Read access to code and metadata, only in the repositories you choose on GitHub.",
-            "Write access to pull requests and to new branches, so a fix can be opened as a pull request. birdsI never merges a pull request and never pushes to your main branch.",
+            "Read access to code and metadata, only in the repositories you choose on GitHub. birdsI never writes to a repository.",
             "You can change which repositories birdsI can read, or remove it entirely, in your GitHub settings under Applications.",
           ]}
         />
@@ -123,12 +112,12 @@ export default function PrivacyPage() {
 
       <LegalSection title="Deleting your data">
         <LegalP>
-          In <Link href="/settings">Settings</Link> you can disconnect a repository, revoke terminal and MCP tokens, choose whether you want email updates (none are sent yet), and delete your account. Deleting your account removes your findings, scans, chats, fixes and tokens and disconnects every repository. Usage records remain without your name or email, so the daily limits still count them if you sign in again. Pull requests birdsI opened stay on GitHub, because they belong to your repository.
+          In <Link href="/settings">Settings</Link> you can disconnect a repository, remove a vendor key, revoke terminal and MCP tokens, and delete your account. Deleting your account removes your apps, maps, findings, readings, keys, record and tokens and disconnects every repository. Usage records remain without your name or email, so the daily limits still count them if you sign in again.
         </LegalP>
       </LegalSection>
 
       <LegalSection title="Security">
-        <LegalP>Data travels encrypted. Tokens are stored as hashes. Secrets found in your code are masked before any excerpt is saved. If you find a security problem in birdsI, report it privately through the security policy below.</LegalP>
+        <LegalP>Data travels encrypted. Tokens are stored as hashes and vendor keys encrypted. Secrets found in your code are masked before any excerpt is saved, and birdsI never asks a vendor for the value of a setting.</LegalP>
       </LegalSection>
 
       <LegalSection title="Age">
@@ -143,9 +132,9 @@ export default function PrivacyPage() {
 
       <LegalSection title="Changes and contact">
         <LegalP>
-          If this policy changes in a way that matters, the new version is posted here with a new date before it takes effect. To ask a question or make a request, contact the operator through the{" "}
-          <a href={SECURITY_POLICY_URL} style={{ color: "var(--text)" }}>
-            security policy of the birdsI repository on GitHub
+          If this policy changes in a way that matters, the new version is posted here with a new date before it takes effect. To ask a question or make a request, contact the operator on GitHub,{" "}
+          <a href={OPERATOR_URL} style={{ color: "var(--text)" }}>
+            @{OPERATOR_NAME}
           </a>
           .
         </LegalP>

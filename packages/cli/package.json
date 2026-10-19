@@ -1,7 +1,7 @@
 {
   "name": "birdsi",
   "version": "0.2.0",
-  "description": "birdsI from the terminal, the operations record for an app, built for coding agents: scan a codebase, read findings in plain words, approve fixes. Also runs the birdsI MCP server.",
+  "description": "birdsI from the terminal, the cockpit for your apps: map an app's code, read what needs you, and run the birdsI MCP server for coding agents.",
   "license": "MPL-2.0",
   "author": "yasmeen-khalil",
   "repository": {
@@ -10,10 +10,10 @@
   },
   "homepage": "https://github.com/yasmeen-khalil/birdsI",
   "keywords": [
-    "audit",
-    "security",
+    "operations",
+    "cockpit",
+    "vendors",
     "dependencies",
-    "code review",
     "mcp",
     "cli"
   ],

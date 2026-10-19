@@ -35,7 +35,7 @@ export function toRepo(row: RepoRow): Repo {
 /**
  * A repository uploaded by the terminal tool. One per owner and name; the
  * name is the GitHub remote when there is one, otherwise the folder name.
- * Everything a GitHub-connected repository has (findings, chat, vendors,
+ * Everything a GitHub-connected repository has (findings, vendors,
  * questions) hangs off it the same way.
  */
 export async function localRepoFor(ownerUserId: string, fullName: string, branch: string | null): Promise<RepoRow> {
@@ -142,7 +142,7 @@ export async function repoByGithubId(githubRepoId: number): Promise<RepoRow | nu
 
 /**
  * Disconnecting is the user's explicit request to forget the repository:
- * scans, findings, chat and chunks cascade away. Ledger rows keep their
+ * scans, findings, vendors and older chat rows cascade away. Ledger rows keep their
  * scan reference set to null so cost history stays true.
  */
 export async function deleteRepo(repoId: string, userId: string): Promise<void> {

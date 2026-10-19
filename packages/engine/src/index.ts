@@ -1,5 +1,5 @@
-export { loadEngineConfig, detectProvider, DEFAULT_MODELS, ANTHROPIC_MODELS, NEBIUS_MODELS, DEFAULT_BUDGETS, type EngineConfig, type ScanBudget, type ModelIds, type Provider } from "./config";
-export { ModelClient, BudgetExceededError, EmbeddingsUnavailableError, extractJson, type Usage, type UsageSink, type BeforeCall, type ModelTier } from "./models/client";
+export { loadEngineConfig, DEFAULT_BUDGET, DOCS_MODEL, type EngineConfig, type ScanBudget } from "./config";
+export { ModelClient, BudgetExceededError, extractJson, type Usage, type UsageSink, type BeforeCall } from "./models/client";
 export { toJsonSchema } from "./models/schema";
 export type { Snapshot } from "./source/types";
 export { snapshotFromTarball, snapshotFromDirectory, MAX_SNAPSHOT_BYTES, MAX_SNAPSHOT_FILES } from "./source/tarball";
@@ -9,14 +9,8 @@ export { collectDependencies, cleanVersion, type RawDependency } from "./invento
 export { languageOf, isCodeLanguage } from "./inventory/languages";
 export { prioritise, priorityOf } from "./inventory/priority";
 export { ALL_CHECKS, checksFor } from "./checks/registry";
-export type { Check, CheckContext, PreviousReview } from "./checks/types";
+export type { Check, CheckContext } from "./checks/types";
 export { redact, maskSecrets } from "./checks/secrets";
-export { AREA_LABELS, areaOf, operationsArea } from "./checks/audit";
 export { runScan, STEP_LABELS, type ScanInput, type ScanResult } from "./scan/runner";
 export { rankFindings, summarise } from "./scan/rank";
-export { buildDigest, numberLines } from "./scan/digest";
-export { applyEdits, toUnifiedDiff, FileEdit, EditError, type AppliedFile } from "./fix/edits";
-export { generateFix, type GeneratedFix } from "./fix/generate";
-export { SandboxRunner, ecosystemHintFor, type SandboxRun } from "./fix/sandbox";
-export { answerQuestion, chunkFile, embedChunks, cosine, keywordScore, type Chunk } from "./chat/index";
 export * from "./vendors/index";

@@ -13,7 +13,7 @@ export default async function FindingPage({ params, searchParams }: { params: Pr
   const sp = await searchParams;
   const { user, repo } = await repoContext(p.repoId);
   const findingId = requireId(p.findingId);
-  const { finding, fix } = await orNotFound(loadFinding(findingId, user));
+  const { finding } = await orNotFound(loadFinding(findingId, user));
   if (finding.repoId !== repo.id) notFound();
   const { scan, findings } = await loadScan(finding.scanId, user);
 
@@ -25,9 +25,7 @@ export default async function FindingPage({ params, searchParams }: { params: Pr
   return (
     <FindingDetail
       finding={finding}
-      fix={fix}
       scan={scan}
-      mode="app"
       repo={{ id: repo.id, fullName: repo.full_name, defaultBranch: repo.default_branch }}
       position={{ index, total: ordered.length, prevHref: href(index - 1), nextHref: href(index + 1) }}
       backHref={`/app/${repo.id}/findings${suffix}`}

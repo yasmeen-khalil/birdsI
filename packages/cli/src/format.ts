@@ -1,10 +1,8 @@
 import {
   CONFIDENCE_ORDER,
   SEVERITY_ORDER,
-  type AuditReport,
   type Confidence,
   type Finding,
-  type Fix,
   type Repo,
   type Scan,
   type ScanKind,
@@ -99,7 +97,7 @@ export const CONFIDENCE_WORD: Record<Confidence, string> = {
 export const CONFIDENCE_MEANING: Record<Confidence, string> = {
   proven: "A fixed rule or tool found this, not a model. Same answer every run.",
   doc_verified: "Checked against the current official docs, cited below.",
-  judgment: "birdsI's reading of the code, with no rule or doc behind it. Usually right, worth a look.",
+  judgment: "A model's reading of the code, from before birdsI stopped reading code with a model. Check it before acting.",
 };
 
 export function severityWord(severity: Severity): string {
@@ -112,8 +110,9 @@ export function paintSeverity(severity: Severity, style: Style, text: string = s
   return paint.bold(style, text);
 }
 
+/** Every scan since v3 is a map; older full scans and audits keep their names. */
 export const KIND_WORD: Record<ScanKind, string> = {
-  light: "Quick check",
+  light: "Map",
   deep: "Full scan",
   audit: "Pre-launch audit",
 };
@@ -129,6 +128,7 @@ export const STEP_LABEL: Record<ScanStep, string> = {
   inventory: "Read the repository",
   dependencies: "Map dependencies",
   vendors: "Find the services it runs on",
+  map: "Map deployments, crons, webhooks and migrations",
   secrets: "Look for exposed keys",
   vulnerabilities: "Check known problems",
   docs: "Check against current docs",
@@ -144,6 +144,7 @@ export const STEP_UNIT: Record<ScanStep, string> = {
   inventory: "files",
   dependencies: "packages",
   vendors: "services",
+  map: "entries",
   secrets: "files",
   vulnerabilities: "packages",
   docs: "libraries",
@@ -287,8 +288,8 @@ export function findingBlock(finding: FindingLike, style: Style, number: number,
   lines.push(indent + evidenceLine(finding));
   const status = statusNote(finding.status);
   if (status) lines.push(indent + paint.dim(style, `Status: ${status}.`));
-  else if (finding.actionKind === "fix") lines.push(indent + paint.bold(style, "birdsI can fix this."));
-  else lines.push(`${indent}${paint.bold(style, "You need to do this.")} Steps: ${paint.bold(style, `birdsi explain ${number}`)}`);
+  else if (finding.actionKind === "fix") lines.push(indent + paint.bold(style, "A code change fixes this."));
+  else lines.push(`${indent}${paint.bold(style, "Needs you outside the code.")} Steps: ${paint.bold(style, `birdsi explain ${number}`)}`);
   return lines.join("\n");
 }
 
@@ -316,17 +317,17 @@ export function confidenceLegend(style: Style, counts?: Record<Confidence, numbe
   ).join("   ");
 }
 
-/** "12 findings. birdsI can fix 7 of them. 5 need you." */
-export function countsLine(total: number, fixable: number, needsYou: number): string {
+/** "12 findings. A code change fixes 7 of them. 5 need you outside the code." */
+export function countsLine(total: number, inCode: number, outside: number): string {
   if (total === 0) return "No findings.";
   const head = `${plural(total, "finding")}.`;
-  if (fixable === total) return `${head} birdsI can fix ${total === 1 ? "it" : total === 2 ? "both" : "all of them"}.`;
-  if (fixable === 0) return `${head} ${total === 1 ? "It needs" : "They need"} you.`;
-  return `${head} birdsI can fix ${fixable} of them. ${needsYou} ${needsYou === 1 ? "needs" : "need"} you.`;
+  if (inCode === total) return `${head} A code change fixes ${total === 1 ? "it" : total === 2 ? "both" : "all of them"}.`;
+  if (inCode === 0) return `${head} ${total === 1 ? "It needs" : "They need"} you outside the code.`;
+  return `${head} A code change fixes ${inCode} of them. ${outside} ${outside === 1 ? "needs" : "need"} you outside the code.`;
 }
 
 /**
- * The summary after a scan: counts line, headline, Critical and High as
+ * The summary after a map: counts line, headline, Critical and High as
  * blocks, Medium and Low as numbered rows, and the confidence legend.
  */
 export function formatScanReport(scan: Scan, findings: readonly Finding[], style: Style): string {
@@ -336,7 +337,6 @@ export function formatScanReport(scan: Scan, findings: readonly Finding[], style
   const lines: string[] = [];
   lines.push(paint.bold(style, countsLine(active.length, fixable, active.length - fixable)));
   if (scan.summary?.headline) lines.push(wrap(scan.summary.headline, style, ""));
-  if (scan.audit) lines.push("", formatAudit(scan.audit, style));
 
   const width = String(ordered.length).length;
   for (const severity of SEVERITY_ORDER) {
@@ -362,7 +362,7 @@ export function formatScanReport(scan: Scan, findings: readonly Finding[], style
 /** Findings list for "birdsi findings": every finding as a block, grouped by severity. */
 export function formatFindingsList(findings: readonly Finding[], style: Style): string {
   const ordered = orderFindings(findings);
-  if (ordered.length === 0) return "No findings in this scan.";
+  if (ordered.length === 0) return "No findings in this map.";
   const width = String(ordered.length).length;
   const lines: string[] = [];
   for (const severity of SEVERITY_ORDER) {
@@ -376,42 +376,8 @@ export function formatFindingsList(findings: readonly Finding[], style: Style): 
   return lines.join("\n");
 }
 
-const AUDIT_AREA_WORD: Record<AuditReport["areas"][number]["area"], string> = {
-  auth: "Sign-in and access",
-  secrets: "Keys and secrets",
-  data: "User data",
-  dependencies: "Packages",
-  errors: "Failure handling",
-  config: "Deployment settings",
-  operations: "Services and limits",
-  legal: "Legal pages",
-  tests: "Tests and checks",
-};
-
-export const AUDIT_VERDICT_WORD = { pass: "Cleared", attention: "Fix before launch", blocker: "Blocks launch" } as const;
-
-export function formatAuditArea(
-  area: AuditReport["areas"][number]["area"],
-  verdict: keyof typeof AUDIT_VERDICT_WORD,
-  note: string,
-  style: Style,
-): string {
-  const g = glyphs(style);
-  const mark = verdict === "pass" ? paint.ok(style, g.done) : verdict === "blocker" ? paint.fail(style, g.failed) : paint.high(style, style.unicode ? "△" : "*");
-  return `  ${mark} ${AUDIT_AREA_WORD[area].padEnd(20)} ${AUDIT_VERDICT_WORD[verdict]}. ${note}`;
-}
-
-export function formatAudit(audit: AuditReport, style: Style): string {
-  const verdict =
-    audit.verdict === "ready" ? "Ready to launch." : audit.verdict === "not_ready" ? "Not ready to launch yet." : "The audit did not run.";
-  const lines = [paint.bold(style, `Pre-launch audit: ${verdict}`)];
-  if (audit.headline) lines.push(wrap(audit.headline, style, ""));
-  for (const area of audit.areas) lines.push(formatAuditArea(area.area, area.verdict, area.note, style));
-  return lines.join("\n");
-}
-
 /** Everything about one finding, in reading order. Used by "birdsi explain" and the MCP server. */
-export function formatFindingDetail(finding: Finding, fix: Fix | null, style: Style, number?: number): string {
+export function formatFindingDetail(finding: Finding, style: Style, number?: number): string {
   const lines: string[] = [];
   const heading = `${confidenceGlyph(finding.confidence, style)} ${finding.title}`;
   lines.push(paint.bold(style, number !== undefined ? `${number}  ${heading}` : heading));
@@ -439,61 +405,25 @@ export function formatFindingDetail(finding: Finding, fix: Fix | null, style: St
   if (evidence.length > 0) lines.push("", paint.bold(style, "Evidence"), ...evidence);
 
   if (finding.actionKind === "fix" && finding.fixPlan) {
-    lines.push("", paint.bold(style, "birdsI can fix this"));
+    lines.push("", paint.bold(style, "A code change fixes this"));
     lines.push(wrap(finding.fixPlan.summary, style, "  "));
     if (finding.fixPlan.paths.length > 0) lines.push(wrap(`Files: ${finding.fixPlan.paths.join(", ")}`, style, "  "));
     if (finding.fixPlan.followUp.length > 0) {
-      lines.push("  After the fix, you still need to:");
+      lines.push("  After the change, you still need to:");
       for (const item of finding.fixPlan.followUp) lines.push(wrap(`- ${item}`, style, "    "));
     }
-    if (!fix) lines.push(paint.dim(style, `  Start it: birdsi fix ${finding.id}`));
+    lines.push(paint.dim(style, "  birdsI writes no code. Your coding agent can make the change, then map again to confirm it."));
   }
   if (finding.steps.length > 0) {
-    lines.push("", paint.bold(style, finding.actionKind === "fix" ? "Steps" : "What you need to do"));
+    lines.push("", paint.bold(style, finding.actionKind === "fix" ? "Steps" : "What to do outside the code"));
     finding.steps.forEach((step, i) => {
       lines.push(wrap(`${i + 1}. ${step.title}`, style, "  "));
       if (step.detail) lines.push(wrap(step.detail, style, "     "));
       if (step.snippet) lines.push(...step.snippet.replace(/\s+$/, "").split(/\r?\n/).map((l) => `       ${l}`));
     });
   }
-  if (fix) {
-    lines.push("", paint.bold(style, "Fix"), `  ${fixStatusLine(fix)}`);
-    if (fix.prUrl) lines.push(`  ${fix.prUrl}`);
-  }
   if (finding.status !== "open") lines.push("", paint.dim(style, `Status: ${statusNote(finding.status) ?? finding.status}.`));
   return lines.join("\n");
-}
-
-export function fixStatusLine(fix: Fix): string {
-  switch (fix.status) {
-    case "proposed":
-      return "Queued. birdsI is writing the fix.";
-    case "testing":
-      return "Testing the fix on a separate copy of your code.";
-    case "tested":
-      return sandboxRan(fix) ? "Tested on a separate copy, and it passed." : "Ready. It was not run on a separate copy.";
-    case "pr_open":
-      return fix.prNumber ? `Pull request #${fix.prNumber} is open.` : "The pull request is open.";
-    case "failed":
-      return `The fix did not pass${fix.error ? `: ${fix.error}` : "."}`;
-  }
-}
-
-/** True when the fix ran in the sandbox. The worker starts the log with the command it ran, and otherwise says why it did not run. */
-export function sandboxRan(fix: Pick<Fix, "testLog">): boolean {
-  return fix.testLog?.startsWith("$ ") ?? false;
-}
-
-/** Last meaningful line of the sandbox log, e.g. "build passes, 38 of 38 tests pass". */
-export function sandboxResult(fix: Fix): string | null {
-  if (!fix.testLog) return null;
-  const lines = fix.testLog
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l !== "");
-  const last = lines[lines.length - 1];
-  if (!last) return null;
-  return last.length > 160 ? `${last.slice(0, 157)}...` : last;
 }
 
 export function formatRepos(repos: readonly Repo[], style: Style): string {

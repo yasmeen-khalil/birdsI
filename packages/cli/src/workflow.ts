@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { Fix, Scan, ScanEventRecord, ScanEventsResponse, ScanKind, ScanStatus } from "@birdsi/shared";
+import type { Scan, ScanEventRecord, ScanEventsResponse, ScanStatus } from "@birdsi/shared";
 import { ApiClient, delay, isTransient, type Result } from "./api";
 import { readConfig, updateConfig } from "./config";
 import { CliError, EXIT } from "./exit";
@@ -10,7 +10,6 @@ import { buildSnapshot, formatBytes, type WalkResult } from "./snapshot";
 import { collectHints } from "./hints";
 
 export const TERMINAL_SCAN: readonly ScanStatus[] = ["done", "failed", "stopped"];
-export const TERMINAL_FIX: readonly Fix["status"][] = ["tested", "pr_open", "failed"];
 
 export interface SentSnapshot {
   snapshotId: string;
@@ -45,9 +44,9 @@ export async function sendSnapshot(
     const created = (await api.createSnapshot(body)).data;
     if (snapshot.bytes > created.maxBytes) {
       throw new CliError(
-        `The packed files are ${formatBytes(snapshot.bytes)}, over the ${formatBytes(created.maxBytes)} birdsI accepts in one scan.`,
+        `The packed files are ${formatBytes(snapshot.bytes)}, over the ${formatBytes(created.maxBytes)} birdsI accepts in one map.`,
         EXIT.usage,
-        "Scan a smaller folder, or add large data files to .gitignore.",
+        "Map a smaller folder, or add large data files to .gitignore.",
       );
     }
     options.onStage?.({ stage: "uploading", files: snapshot.walk.files.length, bytes: snapshot.bytes });
@@ -63,17 +62,12 @@ export async function sendSnapshot(
   }
 }
 
-export async function startScan(
-  api: ApiClient,
-  input: { snapshotId: string; kind: ScanKind; branch?: string | undefined; describe?: string | undefined; full?: boolean },
-): Promise<Scan & { dashboardUrl?: string }> {
+/** Starts a map of an uploaded snapshot. */
+export async function startScan(api: ApiClient, input: { snapshotId: string; branch?: string | undefined }): Promise<Scan & { dashboardUrl?: string }> {
   const created = (
     await api.createScan({
-      kind: input.kind,
       snapshotId: input.snapshotId,
       ...(input.branch ? { branch: input.branch } : {}),
-      ...(input.describe ? { appDescription: input.describe } : {}),
-      ...(input.full ? { full: true } : {}),
     })
   ).data;
   const scan = created.scan;
@@ -143,59 +137,8 @@ export async function followScan(
 }
 
 /**
- * True when the finding's repository came through the GitHub App, so a fix
- * ends in a pull request. Repositories uploaded from the terminal never get
- * one. When the list cannot be read, it assumes a pull request may come.
- */
-export async function expectsPullRequest(api: ApiClient, repoId: string | null): Promise<boolean> {
-  if (!repoId) return false;
-  try {
-    const repo = (await api.repos()).data.repos.find((r) => r.id === repoId);
-    return repo ? repo.source === "github" : true;
-  } catch {
-    return true;
-  }
-}
-
-/**
- * Polls a fix every 3 seconds until it is tested, has a pull request, or
- * failed. When a pull request is expected (the repo is connected through
- * the GitHub App), a tested fix gets a short grace period to become pr_open.
- */
-export async function waitForFix(
-  api: ApiClient,
-  fix: Fix,
-  options: { onUpdate?: (fix: Fix) => void; signal?: AbortSignal; expectPr?: boolean; timeoutMs?: number } = {},
-): Promise<Fix> {
-  const deadline = Date.now() + (options.timeoutMs ?? 20 * 60_000);
-  let current = fix;
-  let prGraceUntil: number | null = null;
-  for (;;) {
-    options.onUpdate?.(current);
-    const done = TERMINAL_FIX.includes(current.status);
-    if (done) {
-      const waitingForPr = current.status === "tested" && !current.prUrl && options.expectPr;
-      if (!waitingForPr) return current;
-      prGraceUntil ??= Date.now() + 45_000;
-      if (Date.now() > prGraceUntil) return current;
-    }
-    if (options.signal?.aborted) return current;
-    if (Date.now() > deadline) {
-      throw new CliError(
-        "The fix is taking longer than expected. It keeps running on birdsI.",
-        EXIT.failed,
-        `Check on it later: birdsi fix ${current.findingId}`,
-      );
-    }
-    await delay(3000, options.signal);
-    if (options.signal?.aborted) return current;
-    current = (await withRetry(() => api.fix(current.id), options.signal ? { signal: options.signal } : {})).data.fix;
-  }
-}
-
-/**
  * A finding reference is either a finding id or the number shown next to
- * it in the newest scan run from this computer ("birdsi explain 3").
+ * it in the newest map run from this computer ("birdsi explain 3").
  */
 export async function resolveFindingRef(api: ApiClient, ref: string): Promise<{ findingId: string; number?: number }> {
   const trimmed = ref.trim();
@@ -203,9 +146,9 @@ export async function resolveFindingRef(api: ApiClient, ref: string): Promise<{ 
   const config = await readConfig();
   if (!config.lastScanId) {
     throw new CliError(
-      `There is no recent scan to take finding ${trimmed} from.`,
+      `There is no recent map to take finding ${trimmed} from.`,
       EXIT.usage,
-      "Run birdsi scan first, or pass the finding id.",
+      "Run birdsi first, or pass the finding id.",
     );
   }
   const scan = (await api.scan(config.lastScanId)).data;
@@ -214,7 +157,7 @@ export async function resolveFindingRef(api: ApiClient, ref: string): Promise<{ 
   const finding = ordered[n - 1];
   if (!finding) {
     throw new CliError(
-      `The newest scan has ${ordered.length} ${ordered.length === 1 ? "finding" : "findings"}, so there is no number ${n}.`,
+      `The newest map has ${ordered.length} ${ordered.length === 1 ? "finding" : "findings"}, so there is no number ${n}.`,
       EXIT.usage,
       "See them all: birdsi findings",
     );

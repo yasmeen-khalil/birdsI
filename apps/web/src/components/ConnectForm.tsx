@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ScanLine, ScanSearch } from "lucide-react";
-import type { ScanKind } from "@birdsi/shared";
+import { ScanLine } from "lucide-react";
 import { ButtonArc } from "./Arc";
 import { LocalTime } from "./LocalTime";
 import { useStartScan } from "./ScanActions";
@@ -19,11 +18,10 @@ export interface ConnectRepo {
   scanned: boolean;
 }
 
-/** Pick a connected repository and the first scan, then start it. */
+/** Pick a connected repository and map it. */
 export function ConnectForm({ repos }: { repos: ConnectRepo[] }) {
   const firstUnscanned = repos.find((r) => !r.scanned) ?? repos[0];
   const [repoId, setRepoId] = useState(firstUnscanned?.id ?? "");
-  const [kind, setKind] = useState<Extract<ScanKind, "light" | "deep">>("light");
   const selected = repos.find((r) => r.id === repoId) ?? null;
   const { run, pending, error, clearError } = useStartScan(repoId);
 
@@ -42,7 +40,7 @@ export function ConnectForm({ repos }: { repos: ConnectRepo[] }) {
       className="flex flex-col"
       onSubmit={(e) => {
         e.preventDefault();
-        if (selected) run(kind);
+        if (selected) run();
       }}
     >
       <fieldset className="flex flex-col" style={{ border: 0, margin: 0, padding: 0 }}>
@@ -60,34 +58,14 @@ export function ConnectForm({ repos }: { repos: ConnectRepo[] }) {
                 {r.private ? "Private" : "Public"}, connected <LocalTime iso={r.createdAt} style="relative" />
               </span>
             </span>
-            <span className="t-small c3">{r.scanned ? "Scanned" : ""}</span>
+            <span className="t-small c3">{r.scanned ? "Mapped" : ""}</span>
           </label>
         ))}
       </fieldset>
 
-      <fieldset className="flex flex-col gap-3" style={{ border: 0, margin: "32px 0 0", padding: 0 }}>
-        <legend className="t-h3" style={{ padding: "0 0 12px" }}>
-          First scan
-        </legend>
-        <div className="grid grid-cols-1 gap-3 min-[901px]:grid-cols-2">
-          {(
-            [
-              ["light", "Quick check", "About 2 minutes. The vendors, packages, exposed keys, known problems."],
-              ["deep", "Full scan", "10 to 20 minutes. Also reads up to 400 files and checks them against current docs."],
-            ] as const
-          ).map(([value, title, body]) => (
-            <label key={value} className="grid grid-cols-[28px_minmax(0,1fr)]" style={{ padding: "14px 16px", border: `1px solid ${kind === value ? "var(--text-2)" : "var(--line-strong)"}`, borderRadius: "var(--r-md)", background: kind === value ? "var(--raised)" : "transparent", cursor: "pointer" }}>
-              <input type="radio" name="scan" value={value} checked={kind === value} onChange={() => setKind(value)} style={{ accentColor: "var(--accent)", width: 16, height: 16, margin: "3px 0 0" }} />
-              <span className="flex flex-col gap-[3px]">
-                <span className="t-body" style={{ fontWeight: 600 }}>
-                  {title}
-                </span>
-                <span className="t-small c2">{body}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <p className="t-small c2" style={{ marginTop: 24 }}>
+        The map reads every file, package and outside service, the deployments, crons, webhooks, store apps and migrations, in about a minute. No model reads the code.
+      </p>
 
       <div className="flex flex-col-reverse items-stretch gap-3 min-[901px]:flex-row min-[901px]:items-center min-[901px]:justify-between" style={{ marginTop: 40 }}>
         {selected ? (
@@ -98,8 +76,8 @@ export function ConnectForm({ repos }: { repos: ConnectRepo[] }) {
           <span />
         )}
         <button type="submit" className="btn btn-primary btn-lg" disabled={!selected || pending}>
-          {pending ? <ButtonArc /> : kind === "light" ? <ScanLine {...icon} /> : <ScanSearch {...icon} />}
-          {selected ? `Start ${kind === "light" ? "a quick check" : "a full scan"} of ${repoName(selected.fullName)}` : "Choose a repository"}
+          {pending ? <ButtonArc /> : <ScanLine {...icon} />}
+          {selected ? `Map ${repoName(selected.fullName)}` : "Choose a repository"}
         </button>
       </div>
       {error && (

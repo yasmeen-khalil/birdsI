@@ -20,12 +20,8 @@ export function integrationStatus() {
   return {
     database: Boolean(env("SUPABASE_URL") && env("SUPABASE_SECRET_KEY")),
     clerk: Boolean(env("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") && env("CLERK_SECRET_KEY")),
-    anthropic: Boolean(env("ANTHROPIC_API_KEY")),
-    tokenFactory: Boolean(env("NEBIUS_API_KEY")),
     secretsKey: Boolean(env("BIRDSI_SECRETS_KEY") && env("BIRDSI_SECRETS_KEY")!.length >= 16),
-    sandboxes: Boolean(env("NEBIUS_API_KEY") && env("NEBIUS_AI_PROJECT")),
-    tavily: Boolean(env("TAVILY_API_KEY")),
-    langsmith: env("LANGSMITH_TRACING") === "true" && Boolean(env("LANGSMITH_API_KEY")),
+    docsCheck: Boolean(env("ANTHROPIC_API_KEY") && env("TAVILY_API_KEY")),
     github: Boolean(env("GITHUB_APP_ID") && env("GITHUB_APP_PRIVATE_KEY") && env("GITHUB_APP_SLUG")),
   };
 }

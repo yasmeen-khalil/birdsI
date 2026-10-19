@@ -35,4 +35,13 @@ describe("diffFindings", () => {
     expect(diffFindings([], [row("a")]).newFindings).toHaveLength(1);
     expect(diffFindings([], [row("a")]).resolved).toHaveLength(0);
   });
+
+  it("never calls a finding of the removed model review resolved when the later map could not produce it", () => {
+    const review = { ...row("r"), checkId: "review" };
+    const secret = { ...row("s"), checkId: "secrets" };
+    const diff = diffFindings([review, secret], [{ ...row("t"), checkId: "secrets" }]);
+    expect(diff.resolved.map((f) => f.key)).toEqual(["s"]);
+    const bothOld = diffFindings([review], [{ ...row("q"), checkId: "review" }]);
+    expect(bothOld.resolved.map((f) => f.key)).toEqual(["r"]);
+  });
 });

@@ -22,7 +22,7 @@ export async function allowedScanRoot(requested: string, cwd: string = process.c
   const allowed = bases.filter((b) => !tooWide.has(b)).some((b) => target === b || target.startsWith(b.endsWith(sep) ? b : b + sep));
   if (!allowed) {
     throw new CliError(
-      "birdsI scans only the folder this agent was started in, or the git repository around it.",
+      "birdsI maps only the folder this agent was started in, or the git repository around it.",
       EXIT.usage,
       "Start the agent in the project folder, or run npx birdsi there.",
     );

@@ -81,7 +81,7 @@ export function VisionEditor({ repoId, initial, updatedAt }: { repoId: string; i
       ) : empty ? (
         <div className="panel flex flex-col gap-3" style={{ padding: "22px 24px", maxWidth: 640 }}>
           <p className="t-body">No vision written yet.</p>
-          <p className="t-small c2">The vision is what you are building and why. Your coding agent reads it, and chat answers with it in mind.</p>
+          <p className="t-small c2">The vision is what you are building and why. Your coding agent reads it.</p>
           <div className="flex justify-end">
             <button type="button" className="btn btn-primary btn-sm" onClick={open}>
               Write the vision
@@ -100,7 +100,7 @@ export function VisionEditor({ repoId, initial, updatedAt }: { repoId: string; i
           )}
         </div>
       )}
-      {saved && <Toast onClose={() => setSaved(false)}>Vision saved. Your coding agent and chat can read it now.</Toast>}
+      {saved && <Toast onClose={() => setSaved(false)}>Vision saved. Your coding agent can read it now.</Toast>}
     </section>
   );
 }

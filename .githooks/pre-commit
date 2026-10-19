@@ -55,12 +55,11 @@ if [ -f "$local_file" ]; then
 fi
 
 while IFS= read -r file; do
-  # Skip the hook itself, the engine's own detection rules, and the demo
-  # sample, which deliberately contains placeholder secrets to find.
+  # Skip the hook itself and the engine's own detection rules, which hold
+  # the shapes they look for.
   [[ "$file" == .githooks/pre-commit ]] && continue
   [[ "$file" == packages/engine/src/checks/secrets.ts ]] && continue
   [[ "$file" == packages/engine/src/checks/secrets.test.ts ]] && continue
-  [[ "$file" == samples/* ]] && continue
   if git show ":$file" | LC_ALL=C grep -qP '[\x00]' 2>/dev/null; then
     continue
   fi

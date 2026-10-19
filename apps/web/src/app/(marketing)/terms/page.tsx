@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalList, LegalP, LegalPage, LegalSection } from "@/components/marketing/Legal";
-import { GITHUB_REPO_URL } from "@/components/marketing/SiteChrome";
 
 /** Who runs this instance of birdsI. A self-hosted copy names its own operator here. */
 const OPERATOR_NAME = "yasmeen-khalil";
-const EFFECTIVE_DATE = "28 September 2026";
-const SECURITY_POLICY_URL = `${GITHUB_REPO_URL}/security/policy`;
+const OPERATOR_URL = "https://github.com/yasmeen-khalil";
+const EFFECTIVE_DATE = "18 October 2026";
 
 export const metadata: Metadata = { title: "Terms" };
 
@@ -27,9 +26,9 @@ export default function TermsPage() {
 
       <LegalSection title="What birdsI does">
         <LegalP>
-          birdsI reads the code in repositories you connect, finds the outside services (vendors) it runs on, checks the code against current documentation and vulnerability databases, and reports what it finds. With accounts you connect, it reads plans, usage, limits and spend. For some findings it writes a fix and opens a pull request, tested on a separate copy first when sandbox testing is set up. Otherwise the pull request says the change was not run. For others it gives you steps to follow.
+          birdsI maps the code of the apps you connect: the outside services (vendors) each one runs on, its deployments, crons, webhooks, store apps, migrations and the names of the settings it needs. It checks the code against vulnerability databases and, when set up, against each main package&apos;s own current documentation. With keys you give it for your vendor accounts, it reads status, plans and usage, and turns what goes wrong into alerts. It writes no code and opens no pull requests.
         </LegalP>
-        <LegalP>Every finding says how sure birdsI is: Proven, Doc-verified, or Judgment. Judgment findings are an AI model’s reading of your code and may be wrong.</LegalP>
+        <LegalP>Every finding says how sure birdsI is: Proven, Doc-verified, or Judgment. Judgment findings were an AI model&apos;s reading of your code, kept from before birdsI stopped reading code with a model, and may be wrong.</LegalP>
       </LegalSection>
 
       <LegalSection title="Your code stays yours">
@@ -42,9 +41,9 @@ export default function TermsPage() {
         />
       </LegalSection>
 
-      <LegalSection title="Fixes and pull requests">
+      <LegalSection title="Keys and approvals">
         <LegalP>
-          A fix is a proposal. birdsI opens it as a pull request on a new branch and never merges it or pushes to your main branch. You decide whether to merge, and you are responsible for reviewing the change first. A passing test lowers the risk of a broken change but does not remove it. Nothing a coding agent or birdsI proposes runs until it is approved, by you or by the rule you set. Commands run on your own computer, and you are responsible for what they do, including plan changes and charges.
+          Give birdsI keys that only read wherever the vendor offers them. Some vendors offer no key that only reads, and birdsI uses those keys for reads alone. Nothing a coding agent or birdsI proposes runs until it is approved, by you or by the rule you set. Commands run on your own computer, and you are responsible for what they do, including plan changes and charges.
         </LegalP>
       </LegalSection>
 
@@ -52,7 +51,7 @@ export default function TermsPage() {
         <LegalList
           items={[
             "Do not use birdsI to attack, probe or scan systems or code you do not own or have permission to test.",
-            "Do not try to get around scan limits, share accounts to avoid them, or overload the sample scan.",
+            "Do not try to get around the limits on maps, or share accounts to avoid them.",
             "Do not use the service to build a competing dataset of other people’s findings.",
           ]}
         />
@@ -90,9 +89,9 @@ export default function TermsPage() {
 
       <LegalSection title="Contact">
         <LegalP>
-          Reach the operator through the{" "}
-          <a href={SECURITY_POLICY_URL} style={{ color: "var(--text)" }}>
-            security policy of the birdsI repository on GitHub
+          Reach the operator on GitHub,{" "}
+          <a href={OPERATOR_URL} style={{ color: "var(--text)" }}>
+            @{OPERATOR_NAME}
           </a>
           .
         </LegalP>

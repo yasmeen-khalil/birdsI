@@ -52,7 +52,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
             2. Add a repository
           </li>
           <li className="inline-flex items-center gap-2" style={{ color: "var(--text-3)" }}>
-            3. First scan
+            3. First map
           </li>
         </ol>
         <span className="t-small c2 min-[901px]:hidden" style={{ marginLeft: "auto" }}>
@@ -66,7 +66,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
       <main className="grid flex-grow grid-cols-1 gap-y-10 px-16 pt-[72px] pb-12 max-[900px]:px-5 max-[900px]:pt-8 min-[901px]:grid-cols-12 min-[901px]:gap-x-6">
         <section className="flex flex-col gap-5 min-[901px]:col-span-5">
           <h1 className="t-h1">Add a repository</h1>
-          <p className="t-body-l c2">Run birdsI in the project folder on your computer. It uploads the code (everything your .gitignore leaves out stays with you), runs a quick check, and opens the repository here.</p>
+          <p className="t-body-l c2">Run birdsI in the app&apos;s folder on your computer. It uploads the code (env files, keys and everything your .gitignore leaves out stay with you), maps it, and opens the app here.</p>
           <div className="panel flex flex-col gap-3.5" style={{ padding: "22px 24px" }}>
             <h2 className="t-h3">From your terminal</h2>
             <div className="code">
@@ -79,7 +79,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
                 <div>npx birdsi</div>
               </div>
             </div>
-            <p className="t-small c2">Sign in once with a code shown in your terminal. After that, npx birdsi in any project folder is all it takes. Add --full for the full scan.</p>
+            <p className="t-small c2">Sign in once with a code shown in your terminal. After that, npx birdsi in any app folder is all it takes.</p>
             <p className="t-small c3">
               Until the package is on npm, run it from a clone: <span className="t-mono">npm install</span>, then <span className="t-mono">npx tsx packages/cli/src/birdsi.ts</span>.
             </p>
@@ -87,7 +87,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
 
           {status === "connected" && (
             <Banner tone="ok" title={Number.isFinite(connectedCount) && connectedCount > 0 ? `${plural(connectedCount, "repository", "repositories")} connected` : "The GitHub App is installed"}>
-              {Number.isFinite(connectedCount) && connectedCount > 0 ? "Choose one and start its first scan." : "No repositories are shared with it yet. Choose some on GitHub."}
+              {Number.isFinite(connectedCount) && connectedCount > 0 ? "Choose one and map it." : "No repositories are shared with it yet. Choose some on GitHub."}
             </Banner>
           )}
           {status === "requested" && (
@@ -118,7 +118,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
 
           {!install ? (
             <p className="t-small c3" style={{ marginTop: 8 }}>
-              Connecting through a GitHub App, so birdsI can open pull requests itself, is not switched on for this copy of birdsI yet. The terminal gives you everything else.
+              Connecting through a GitHub App, so birdsI reads a repository without the terminal, is not switched on for this copy of birdsI yet. The terminal gives you everything else.
             </p>
           ) : active.length > 0 ? (
             active.map((inst) => {
@@ -144,7 +144,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
               <h2 className="t-h2" style={{ fontSize: 23 }}>
                 Or connect through GitHub
               </h2>
-              <p className="t-small c2">With the GitHub App, birdsI reads the repositories you choose and can open pull requests for its fixes. It takes about a minute.</p>
+              <p className="t-small c2">With the GitHub App, birdsI reads the repositories you choose, and nothing else. It never writes to them. It takes about a minute.</p>
               <div className="flex justify-end">
                 <a className="btn btn-primary btn-sm" href={install}>
                   Install on GitHub
@@ -170,13 +170,6 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
               <h2 className="t-h3">Your repositories</h2>
               <p className="t-body c2" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
                 None yet. Run npx birdsi in a project folder and it appears here within a minute.
-              </p>
-              <p className="t-small c3">
-                Want a look first?{" "}
-                <Link href="/" style={{ color: "var(--text-2)" }}>
-                  Try the sample
-                </Link>
-                .
               </p>
             </div>
           )}

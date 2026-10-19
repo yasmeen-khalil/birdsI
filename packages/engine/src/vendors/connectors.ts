@@ -130,7 +130,8 @@ const vercel: Connector = {
     } else {
       const me = await getJson<{ user?: { username?: string; email?: string } }>("https://api.vercel.com/v2/user", auth, signal);
       if (me.status >= 400) unauthorized(me.status, "Vercel");
-      facts.push(fact("plan", "plan", "Plan", "Hobby", null, null, null, { note: "Personal accounts are on the Hobby plan. Add the team id to read a team's plan and spend." }));
+      // The plan is read from a team. Without a team id it is not known, and birdsI does not guess it.
+      facts.push(fact("status", "plan_access", "Plan", "Not read. Add the team id to read the team's plan and spend.", null, null, null, { url: "https://vercel.com/docs/rest-api/teams/get-a-team" }));
       if (me.body?.user?.username) facts.push(fact("status", "account", "Account", me.body.user.username));
     }
     const projects = await getJson<{ projects?: Array<{ name: string }> }>(`https://api.vercel.com/v9/projects?limit=100${teamId ? `&teamId=${encodeURIComponent(teamId)}` : ""}`, auth, signal);
@@ -307,12 +308,33 @@ const stripe: Connector = {
     facts.push(fact("billing", "balance_pending", "Pending balance", `${sum(balance.body?.pending).toFixed(2)} ${currency}`, sum(balance.body?.pending), currency));
     facts.push(fact("status", "mode", "Mode", balance.body?.livemode ? "Live" : "Test"));
     const since = Math.floor(new Date(monthRange().from).getTime() / 1000);
-    const charges = await getJson<{ data?: Array<{ amount: number; currency: string; paid: boolean; refunded: boolean }> }>(`https://api.stripe.com/v1/charges?limit=100&created[gte]=${since}`, auth, signal);
-    if (charges.status < 400 && charges.body?.data) {
-      const paid = charges.body.data.filter((c) => c.paid && !c.refunded);
-      const revenue = paid.reduce((n, c) => n + c.amount, 0) / 100;
-      facts.push(fact("billing", "revenue_month", "Revenue this month", `${revenue.toFixed(2)} ${currency}${charges.body.data.length === 100 ? " (first 100 charges)" : ""}`, revenue, currency, null, { note: "Paid, unrefunded charges created this month." }));
-      facts.push(fact("usage", "charges_month", "Charges this month", String(paid.length), paid.length, "charges"));
+    // Every charge this month, page by page, up to 1,000. Refunds come off; Stripe's fees are not read.
+    let gross = 0;
+    let refunded = 0;
+    let count = 0;
+    let after: string | null = null;
+    let complete = false;
+    for (let page = 0; page < 10; page++) {
+      const url: string = `https://api.stripe.com/v1/charges?limit=100&created[gte]=${since}${after ? `&starting_after=${encodeURIComponent(after)}` : ""}`;
+      const charges: { status: number; body: { data?: Array<{ id: string; amount: number; amount_refunded?: number; paid: boolean }>; has_more?: boolean } | null; headers: Headers } = await getJson(url, auth, signal);
+      if (charges.status >= 400 || !charges.body?.data) break;
+      for (const c of charges.body.data) {
+        if (!c.paid) continue;
+        gross += c.amount;
+        refunded += c.amount_refunded ?? 0;
+        count += 1;
+      }
+      const last = charges.body.data[charges.body.data.length - 1];
+      if (!charges.body.has_more || !last) {
+        complete = true;
+        break;
+      }
+      after = last.id;
+    }
+    if (count > 0 || complete) {
+      const net = (gross - refunded) / 100;
+      facts.push(fact("billing", "revenue_month", "Revenue this month, after refunds", `${net.toFixed(2)} ${currency}${complete ? "" : " (the first 1,000 charges)"}`, net, currency, null, { note: "Paid charges created this month, minus what was refunded. Stripe's fees are not taken off." }));
+      facts.push(fact("usage", "charges_month", "Paid charges this month", String(count), count, "charges"));
     }
     return facts;
   },

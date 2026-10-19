@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useSyncExternalStore, useTransition, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import type { ScanKind, Step } from "@birdsi/shared";
+import type { Step } from "@birdsi/shared";
 import { dismissFindingAction, reopenFindingAction } from "@/lib/actions";
 import { ButtonArc } from "./Arc";
 import { CopyButton } from "./CopyButton";
@@ -61,12 +61,12 @@ export function DismissControl({ findingId, repoId, dismissed }: { findingId: st
   );
 }
 
-/** "Check again": runs the same kind of scan so the check that found this runs again. */
-export function CheckAgainButton({ repoId, kind }: { repoId: string; kind: ScanKind }) {
+/** "Check again": maps the code again, so the rule that found this runs again. */
+export function CheckAgainButton({ repoId }: { repoId: string }) {
   const { run, pending, error, clearError } = useStartScan(repoId);
   return (
     <>
-      <button type="button" className="btn btn-primary" disabled={pending} onClick={() => run(kind)}>
+      <button type="button" className="btn btn-primary" disabled={pending} onClick={run}>
         {pending ? <ButtonArc /> : <RefreshCw {...icon} />}
         Check again
       </button>

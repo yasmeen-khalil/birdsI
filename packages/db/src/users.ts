@@ -58,10 +58,11 @@ export async function updateUserPreferences(userId: string, prefs: { emailUpdate
 export async function deleteUser(userId: string): Promise<void> {
   const db = getDb();
   const steps: Array<[string, () => PromiseLike<{ error: { message: string } | null }>]> = [
-    // Repositories cascade to their scans, findings, vendors, questions, approvals, record and chat.
+    // Repositories cascade to their scans, findings, vendors, questions, approvals and record.
     ["repos", () => db.from("repos").delete().eq("owner_user_id", userId)],
     ["scans", () => db.from("scans").delete().eq("owner_user_id", userId)],
     ["snapshots", () => db.from("snapshots").delete().eq("owner_user_id", userId)],
+    // Chat and fixes were removed in v3; their tables keep rows from before, which still go with the account.
     ["chat_messages", () => db.from("chat_messages").delete().eq("owner_user_id", userId)],
     ["api_tokens", () => db.from("api_tokens").delete().eq("owner_user_id", userId)],
     ["device_logins", () => db.from("device_logins").delete().eq("approved_by", userId)],

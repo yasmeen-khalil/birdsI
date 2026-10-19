@@ -12,7 +12,6 @@ import {
   supportsUnicode,
   type Style,
 } from "./format";
-import { patchedFiles, stripLevel } from "./patch";
 import { stepDoneLine, truncateVisible } from "./progress";
 import { isYes } from "./prompt";
 
@@ -88,7 +87,7 @@ describe("findingBlock", () => {
         "  1  ● Your database key is committed in .env.production",
         "       .env.production:3",
         "       Proven. Rule supabase-service-role-key.",
-        "       birdsI can fix this.",
+        "       A code change fixes this.",
       ].join("\n"),
     );
   });
@@ -105,7 +104,7 @@ describe("findingBlock", () => {
       1,
     );
     expect(block).toContain("Doc-verified. Supabase, Row Level Security, supabase.com/docs/guides/rls.");
-    expect(block).toContain("You need to do this. Steps: birdsi explain 4");
+    expect(block).toContain("Needs you outside the code. Steps: birdsi explain 4");
   });
 });
 
@@ -121,10 +120,10 @@ describe("summary helpers", () => {
   });
 
   it("writes the counts line like the design", () => {
-    expect(countsLine(12, 7, 5)).toBe("12 findings. birdsI can fix 7 of them. 5 need you.");
+    expect(countsLine(12, 7, 5)).toBe("12 findings. A code change fixes 7 of them. 5 need you outside the code.");
     expect(countsLine(0, 0, 0)).toBe("No findings.");
-    expect(countsLine(1, 1, 0)).toBe("1 finding. birdsI can fix it.");
-    expect(countsLine(3, 0, 3)).toBe("3 findings. They need you.");
+    expect(countsLine(1, 1, 0)).toBe("1 finding. A code change fixes it.");
+    expect(countsLine(3, 0, 3)).toBe("3 findings. They need you outside the code.");
   });
 
   it("formats durations", () => {
@@ -164,32 +163,12 @@ describe("terminal detection", () => {
   });
 });
 
-describe("prompt and patch helpers", () => {
+describe("prompt helpers", () => {
   it("treats only y and yes as yes; Enter means no", () => {
     expect(isYes("y")).toBe(true);
     expect(isYes(" YES ")).toBe(true);
     expect(isYes("")).toBe(false);
     expect(isYes("n")).toBe(false);
     expect(isYes("yep")).toBe(false);
-  });
-
-  it("lists the files a patch touches, including deletions", () => {
-    const patch = [
-      "diff --git a/.gitignore b/.gitignore",
-      "--- a/.gitignore",
-      "+++ b/.gitignore",
-      "@@ -1 +1,2 @@",
-      " node_modules",
-      "+.env*",
-      "diff --git a/.env.production b/.env.production",
-      "deleted file mode 100644",
-      "--- a/.env.production",
-      "+++ /dev/null",
-      "@@ -1 +0,0 @@",
-      "-KEY=1",
-    ].join("\n");
-    expect(patchedFiles(patch)).toEqual([".gitignore", ".env.production"]);
-    expect(stripLevel(patch)).toBe(1);
-    expect(stripLevel(patch.replaceAll("a/", "a/snapshot/").replaceAll("b/", "b/snapshot/"))).toBe(2);
   });
 });

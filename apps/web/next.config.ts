@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@birdsi/shared", "@birdsi/engine", "@birdsi/db"],
-  serverExternalPackages: ["tar", "@octokit/app", "@octokit/rest", "langsmith", "openai"],
+  serverExternalPackages: ["tar", "@octokit/app", "@octokit/rest"],
   poweredByHeader: false,
   async headers() {
     return [

@@ -1,5 +1,5 @@
-import type { Alert, Runway, StageId, StageState, Vendor, VendorKnowledge, Watch } from "@birdsi/shared";
-import { STAGE_FRESH_HOURS, STAGE_LABEL, bestFacts } from "@birdsi/shared";
+import type { Alert, Runway, StageId, StageState, Vendor, Watch } from "@birdsi/shared";
+import { LIMITS_BY_SLUG, STAGE_FRESH_HOURS, STAGE_LABEL, bestFacts, checkedLimit, tierFor } from "@birdsi/shared";
 
 export interface Observation {
   metric: string;
@@ -15,7 +15,7 @@ export interface Observation {
  * that might happen (a free plan that pauses, a trial that ends) are
  * watches, not alerts, until the evidence says they are happening.
  */
-export function computeAlerts(vendors: Vendor[], _knowledge: Map<string, VendorKnowledge>, connectionErrors: Map<string, string>, runways: Map<string, Runway[]> = new Map()): Alert[] {
+export function computeAlerts(vendors: Vendor[], connectionErrors: Map<string, string>, runways: Map<string, Runway[]> = new Map()): Alert[] {
   const alerts: Alert[] = [];
   for (const v of vendors) {
     const error = connectionErrors.get(v.slug);
@@ -28,7 +28,12 @@ export function computeAlerts(vendors: Vendor[], _knowledge: Map<string, VendorK
     if (paused) {
       alerts.push({ id: `${v.id}:paused`, vendorId: v.id, vendorName: v.name, level: "critical", title: `${v.name}: ${paused.numeric === 1 ? "a project is" : `${paused.numeric} projects are`} paused`, detail: `${paused.value}. The app cannot reach a paused project. Restore it in the ${v.name} dashboard, or move to a plan that does not pause.`, suggestedCommand: upgradeCommand(v), runsOutAt: null });
     }
-    const usage = facts.filter((f) => f.kind === "usage" && f.numeric !== null && f.limitNumeric !== null && f.limitNumeric > 0);
+    // A usage number counts against the limit the account reported, or else the checked limit of the plan it is on.
+    const plan = facts.find((f) => f.kind === "plan")?.value ?? null;
+    const usage = facts
+      .filter((f) => f.kind === "usage" && f.numeric !== null)
+      .map((f) => (f.limitNumeric !== null ? f : { ...f, limitNumeric: checkedLimit(v.slug, plan, f.metric)?.amount ?? null }))
+      .filter((f) => f.limitNumeric !== null && f.limitNumeric > 0);
     const vendorRunways = runways.get(v.id) ?? [];
     for (const f of usage) {
       const remainingMetric = /remaining/i.test(f.metric);
@@ -52,40 +57,32 @@ export function computeAlerts(vendors: Vendor[], _knowledge: Map<string, VendorK
   return alerts.sort((a, b) => order[a.level] - order[b.level] || a.title.localeCompare(b.title));
 }
 
-const CONDITION = /(pause|paused|inactiv|sleep|trial|expire|suspend|archiv|idle|spin.?down|cold start|after \d+ days)/i;
-
 /**
- * Conditions to track per vendor, from the plan's own terms. A watch never
- * warns; it tells the owner what the plan does and what birdsI would need to
- * see to know it is happening.
+ * Conditions to track per vendor, from birdsI's checked limits list: what the
+ * plan the account is on does on its own (a free project that pauses, a plan
+ * that is for personal use only). A watch never warns; it says what the plan
+ * does and what birdsI would need to see to know it is happening.
  */
-export function computeWatches(vendors: Vendor[], knowledge: Map<string, VendorKnowledge>): Watch[] {
+export function computeWatches(vendors: Vendor[]): Watch[] {
   const watches: Watch[] = [];
   for (const v of vendors) {
-    const plan = v.facts.find((f) => f.kind === "plan");
-    const k = knowledge.get(v.slug);
-    const tier = plan && k ? k.tiers.find((t) => t.name.toLowerCase() === plan.value.toLowerCase() || plan.value.toLowerCase().includes(t.name.toLowerCase())) : null;
-    const seen = new Set<string>();
-    const add = (title: string, detail: string, needs: string | null, dueAt: string | null = null) => {
-      const id = `${v.id}:${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-      if (seen.has(id)) return;
-      seen.add(id);
-      watches.push({ id, vendorId: v.id, vendorName: v.name, title, detail, dueAt, needs });
-    };
-    if (tier) {
-      for (const l of tier.limits) {
-        const text = `${l.label} ${l.note ?? ""}`;
-        if (CONDITION.test(text)) add(`${tier.name} plan: ${l.label.toLowerCase()}`, l.note ?? l.label, v.connected ? null : `Connect ${v.name} so birdsI can see whether this is happening.`);
-      }
-      if (tier.priceNote && CONDITION.test(tier.priceNote)) add(`${tier.name} plan terms`, tier.priceNote, null);
-    }
-    if (plan && /trial/i.test(plan.value)) {
-      const ends = v.facts.find((f) => /trial_end|ends_at|expires/i.test(f.metric));
-      add("Trial", ends ? `The trial ends ${ends.value}.` : "The account is on a trial. birdsI does not know when it ends.", ends ? null : "The trial end date, from the account or from you.", ends?.value && !Number.isNaN(Date.parse(ends.value)) ? new Date(ends.value).toISOString() : null);
-    }
-    if (v.slug === "supabase" && plan && /free/i.test(plan.value)) {
-      const pausedFact = v.facts.find((f) => f.metric === "paused_projects");
-      add("Free plan: projects pause after a week without traffic", pausedFact ? `Last check: ${pausedFact.numeric === 0 ? "nothing paused" : pausedFact.value}.` : "Supabase pauses free projects after about seven days with no requests. Live traffic keeps it awake.", pausedFact ? null : "Connect Supabase so birdsI can see whether a project is paused.");
+    const limits = LIMITS_BY_SLUG.get(v.slug);
+    if (!limits) continue;
+    const plan = bestFacts(v.facts).find((f) => f.kind === "plan");
+    const tier = plan ? tierFor(limits, plan.value) : null;
+    if (!tier) continue;
+    for (const condition of tier.conditions) {
+      const id = `${v.id}:${condition.id}`;
+      const paused = condition.id === "pauses" ? v.facts.find((f) => f.metric === "paused_projects") : undefined;
+      watches.push({
+        id,
+        vendorId: v.id,
+        vendorName: v.name,
+        title: `${tier.name} plan: ${condition.text}`,
+        detail: paused ? `Last read: ${paused.numeric === 0 ? "nothing paused" : paused.value}.` : condition.text,
+        dueAt: null,
+        needs: v.connected ? null : `Connect ${v.name} so birdsI can see whether this is happening.`,
+      });
     }
   }
   return watches;
@@ -124,31 +121,23 @@ function upgradeCommand(v: Vendor): string | null {
   return v.detectedBy.includes("projects") ? `stripe projects upgrade ${v.slug}` : null;
 }
 
-/** Monthly spend across vendors where a plan price or a spend fact is known. */
-export function monthlySpend(vendors: Vendor[], knowledge: Map<string, VendorKnowledge>): number | null {
+/**
+ * Monthly spend read from the accounts, and only that. A plan's list price is
+ * not money spent, so it is never added in (birdsI did that before v3).
+ */
+export function monthlySpend(vendors: Vendor[]): { totalUsd: number; vendors: string[] } | null {
   let total = 0;
-  let any = false;
+  const read: string[] = [];
   for (const v of vendors) {
-    const spend = v.facts.find((f) => f.kind === "cost" && f.metric === "spend_month" && f.numeric !== null);
-    if (spend) {
-      total += spend.numeric!;
-      any = true;
-      continue;
-    }
-    const plan = v.facts.find((f) => f.kind === "plan");
-    const k = knowledge.get(v.slug);
-    if (plan && k) {
-      const tier = k.tiers.find((t) => t.name.toLowerCase() === plan.value.toLowerCase());
-      if (tier && tier.priceUsd !== null) {
-        total += tier.priceUsd;
-        any = true;
-      }
-    }
+    const spend = bestFacts(v.facts).find((f) => f.kind === "cost" && f.metric === "spend_month" && f.numeric !== null && f.source === "connector");
+    if (!spend) continue;
+    total += spend.numeric!;
+    read.push(v.name);
   }
-  return any ? Math.round(total * 100) / 100 : null;
+  return read.length > 0 ? { totalUsd: Math.round(total * 100) / 100, vendors: read } : null;
 }
 
-export function stageStates(input: { lastScanAt: string | null; lastScanRunning: boolean; lastDocsAt: string | null; lastAuditAt: string | null; lastOpsAt: string | null; opsRunning: boolean }): StageState[] {
+export function stageStates(input: { lastMapAt: string | null; mapRunning: boolean; lastReadAt: string | null; readRunning: boolean }): StageState[] {
   const state = (id: StageId, at: string | null, running: boolean, detail: string): StageState => {
     let freshness: StageState["freshness"] = "never";
     if (running) freshness = "running";
@@ -156,9 +145,7 @@ export function stageStates(input: { lastScanAt: string | null; lastScanRunning:
     return { id, label: STAGE_LABEL[id], lastRunAt: at, freshness, detail };
   };
   return [
-    state("inventory", input.lastScanAt, input.lastScanRunning, "Every file, dependency and vendor, mapped from the code."),
-    state("docs", input.lastDocsAt, input.lastScanRunning, "Dependencies checked against their current documentation."),
-    state("audit", input.lastAuditAt, input.lastScanRunning, "The code read for security holes, gaps and contradictions."),
-    state("ops", input.lastOpsAt, input.opsRunning, "Plans, usage and limits read from connected accounts and current pricing pages."),
+    state("map", input.lastMapAt, input.mapRunning, "Every file, package, service, deployment, cron, webhook and migration, read from the code without a model."),
+    state("reads", input.lastReadAt, input.readRunning, "Status, plan and usage read from each connected account, every hour."),
   ];
 }

@@ -74,6 +74,20 @@ export async function deleteSnapshotFile(row: SnapshotRow): Promise<void> {
   await db.storage.from(BUCKET).remove([row.storage_path]);
 }
 
+/**
+ * Deletes an uploaded snapshot as soon as its map has run. Since v3 nothing
+ * needs the code after the map (fixes were removed), so it is not kept.
+ */
+export async function releaseSnapshot(snapshotId: string): Promise<void> {
+  const row = await snapshotById(snapshotId);
+  if (!row || !row.storage_path) return;
+  const db = getDb();
+  const { error } = await db.storage.from(BUCKET).remove([row.storage_path]);
+  if (error) throw new Error(`releaseSnapshot: ${error.message}`);
+  const { error: rowError } = await db.from("snapshots").update({ storage_path: "" }).eq("id", snapshotId);
+  if (rowError) throw new Error(`releaseSnapshot row: ${rowError.message}`);
+}
+
 /** Removes every stored snapshot file of a user; the rows keep an empty path. Used when the account is deleted. */
 export async function purgeSnapshotsForUser(userId: string): Promise<number> {
   const db = getDb();

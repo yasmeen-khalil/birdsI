@@ -5,6 +5,10 @@ import { z } from "zod";
  * words live in the copy dictionary and may differ.
  */
 
+/**
+ * Since v3 every scan is a map of the code and is stored as "light". The
+ * older kinds stay in the enum because earlier scans in the database carry them.
+ */
 export const ScanKind = z.enum(["light", "deep", "audit"]);
 export type ScanKind = z.infer<typeof ScanKind>;
 
@@ -22,7 +26,8 @@ export const SEVERITY_ORDER: readonly Severity[] = ["critical", "high", "medium"
  * How sure birdsI is. Drawn as line in the UI, never as colour.
  * proven: a deterministic tool or rule established it.
  * doc_verified: checked against a current official document, which is cited.
- * judgment: the model's reading of the code. Worth checking.
+ * judgment: the model's reading of the code. No check produces it since v3,
+ * when the model review was removed; older findings in the database carry it.
  */
 export const Confidence = z.enum(["proven", "doc_verified", "judgment"]);
 export type Confidence = z.infer<typeof Confidence>;
@@ -39,7 +44,7 @@ export const FindingCategory = z.enum([
 ]);
 export type FindingCategory = z.infer<typeof FindingCategory>;
 
-/** Who acts on a finding: birdsI opens a pull request, or the developer follows steps. */
+/** What resolves a finding: a change in the code (any coding agent can make it), or steps outside the code. */
 export const ActionKind = z.enum(["fix", "steps"]);
 export type ActionKind = z.infer<typeof ActionKind>;
 
@@ -196,43 +201,6 @@ export const ScanSummary = z.object({
 });
 export type ScanSummary = z.infer<typeof ScanSummary>;
 
-export const AuditVerdict = z.enum(["ready", "not_ready", "not_run"]);
-export type AuditVerdict = z.infer<typeof AuditVerdict>;
-
-export const AUDIT_AREAS = [
-  "auth",
-  "secrets",
-  "data",
-  "dependencies",
-  "errors",
-  "config",
-  "legal",
-  "tests",
-  "operations",
-] as const;
-export const AuditArea = z.enum(AUDIT_AREAS);
-/** The areas the model judges from findings; operations is judged deterministically from vendor facts. */
-export const MODEL_AUDIT_AREAS = AUDIT_AREAS.filter((a) => a !== "operations") as Exclude<AuditArea, "operations">[];
-export type AuditArea = z.infer<typeof AuditArea>;
-
-export const AuditAreaResult = z.object({
-  area: AuditArea,
-  verdict: z.enum(["pass", "attention", "blocker"]),
-  note: z.string(),
-  findingIds: z.array(z.string()),
-});
-export type AuditAreaResult = z.infer<typeof AuditAreaResult>;
-
-export const AuditReport = z.object({
-  verdict: AuditVerdict,
-  headline: z.string(),
-  areas: z.array(AuditAreaResult),
-  blockers: z.array(z.string()),
-  fixBeforeLaunch: z.array(z.string()),
-  canWait: z.array(z.string()),
-});
-export type AuditReport = z.infer<typeof AuditReport>;
-
 export const Scan = z.object({
   id: z.string(),
   repoId: z.string().nullable(),
@@ -245,7 +213,6 @@ export const Scan = z.object({
   finishedAt: z.string().nullable(),
   error: z.string().nullable(),
   summary: ScanSummary.nullable(),
-  audit: AuditReport.nullable(),
   stats: ScanStats.nullable(),
   createdAt: z.string(),
 });
@@ -265,20 +232,3 @@ export const Repo = z.object({
   createdAt: z.string(),
 });
 export type Repo = z.infer<typeof Repo>;
-
-export const FixStatus = z.enum(["proposed", "testing", "tested", "pr_open", "failed"]);
-export type FixStatus = z.infer<typeof FixStatus>;
-
-export const Fix = z.object({
-  id: z.string(),
-  findingId: z.string(),
-  status: FixStatus,
-  patch: z.string().nullable(),
-  testLog: z.string().nullable(),
-  prNumber: z.number().int().nullable(),
-  prUrl: z.url().nullable(),
-  error: z.string().nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-export type Fix = z.infer<typeof Fix>;

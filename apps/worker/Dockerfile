@@ -18,5 +18,4 @@ FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/apps/worker/dist ./dist
-COPY --from=build /app/samples ./samples
 CMD ["node", "dist/main.js"]

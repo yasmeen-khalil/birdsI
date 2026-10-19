@@ -1,43 +1,21 @@
-import { getDb, totalSpend, usageForUser } from "@birdsi/db";
-import type { ScanKind } from "@birdsi/shared";
+import { getDb } from "@birdsi/db";
 import { ApiError } from "./api";
 import { envInt } from "./env";
 
 /**
- * Spending and fairness limits. They protect the hackathon credits through
- * judging and stop one user from consuming everything. All enforced on the
- * server before a job is queued.
+ * Fairness limits, enforced on the server before a job is queued. Model spend
+ * is capped in the worker, before every call of the docs check, the only
+ * thing that still calls a model; a map itself costs nothing.
  */
-export async function assertSpendCap(): Promise<void> {
-  const capUsd = envInt("BIRDSI_DAILY_SPEND_CAP_USD", 50);
-  const spent = await totalSpend(new Date(Date.now() - 86_400_000));
-  if (spent >= capUsd * 1_000_000) {
-    throw new ApiError(402, "capacity", "birdsI has reached its daily scan budget. Scans open again within 24 hours.");
-  }
-}
-
-/** One user's model spend per rolling day. Protects everyone else's day from one heavy user. */
-export async function assertUserSpendCap(userId: string): Promise<void> {
-  const capUsd = envInt("BIRDSI_USER_DAILY_SPEND_CAP_USD", 5);
-  const usage = await usageForUser(userId, new Date(Date.now() - 86_400_000));
-  if (usage.costMicrodollars >= capUsd * 1_000_000) {
-    throw new ApiError(402, "user_capacity", `You have used today's scan budget ($${capUsd}). It opens again within 24 hours.`);
-  }
-}
-
-/** Deep scans count three times and audits five, against one daily allowance. */
-const WEIGHT: Record<ScanKind, number> = { light: 1, deep: 3, audit: 5 };
-
-export async function assertUserScanQuota(userId: string, kind: ScanKind): Promise<void> {
-  const perDay = envInt("BIRDSI_USER_SCANS_PER_DAY", 20);
+export async function assertUserScanQuota(userId: string): Promise<void> {
+  const perDay = envInt("BIRDSI_USER_SCANS_PER_DAY", 40);
   const db = getDb();
   const since = new Date(Date.now() - 86_400_000).toISOString();
-  // Scans still waiting or running count too, however long ago they were queued.
-  const { data, error } = await db.from("scans").select("kind").eq("owner_user_id", userId).or(`created_at.gte."${since}",status.in.(queued,running)`);
+  // Maps still waiting or running count too, however long ago they were queued.
+  const { count, error } = await db.from("scans").select("id", { count: "exact", head: true }).eq("owner_user_id", userId).or(`created_at.gte."${since}",status.in.(queued,running)`);
   if (error) throw new Error(`quota: ${error.message}`);
-  const used = ((data ?? []) as Array<{ kind: ScanKind }>).reduce((n, row) => n + (WEIGHT[row.kind] ?? 1), 0);
-  if (used + WEIGHT[kind] > perDay) {
-    throw new ApiError(429, "quota", "You have used today's scan allowance. More opens up within 24 hours.");
+  if ((count ?? 0) + 1 > perDay) {
+    throw new ApiError(429, "quota", "You have used today's allowance of maps. More opens up within 24 hours.");
   }
 }
 

@@ -17,9 +17,9 @@ export interface RepoRef {
 }
 
 /**
- * Everything birdsI does on GitHub goes through the GitHub App: reading a
- * repository, and opening a pull request with a fix. The app never pushes to
- * a branch the user did not create through birdsI.
+ * Everything birdsI does on GitHub goes through the GitHub App, and since v3
+ * it only reads: the repository list and a tarball of a branch head. The App
+ * needs Contents read and Metadata read, nothing that writes.
  */
 export class GitHubSource {
   private readonly app: App;
@@ -86,56 +86,5 @@ export class GitHubSource {
       await rm(dir, { recursive: true, force: true });
     };
     return snap;
-  }
-
-  /**
-   * Opens a pull request from a new branch holding the given file changes.
-   * Files are committed through the Git Data API in a single commit so the
-   * PR is one reviewable unit.
-   */
-  async openPullRequest(
-    ref: RepoRef,
-    input: {
-      baseBranch: string;
-      baseSha: string;
-      branchName: string;
-      title: string;
-      body: string;
-      commitMessage: string;
-      files: Array<{ path: string; content: string | null }>;
-    },
-  ): Promise<{ number: number; url: string }> {
-    const octokit = await this.installationClient(ref.installationId);
-    const { owner, name: repo } = ref;
-
-    const baseCommit = await octokit.rest.git.getCommit({ owner, repo, commit_sha: input.baseSha });
-    const tree = await octokit.rest.git.createTree({
-      owner,
-      repo,
-      base_tree: baseCommit.data.tree.sha,
-      tree: input.files.map((file) =>
-        file.content === null
-          ? { path: file.path, mode: "100644" as const, type: "blob" as const, sha: null }
-          : { path: file.path, mode: "100644" as const, type: "blob" as const, content: file.content },
-      ),
-    });
-    const commit = await octokit.rest.git.createCommit({
-      owner,
-      repo,
-      message: input.commitMessage,
-      tree: tree.data.sha,
-      parents: [input.baseSha],
-    });
-    await octokit.rest.git.createRef({ owner, repo, ref: `refs/heads/${input.branchName}`, sha: commit.data.sha });
-    const pr = await octokit.rest.pulls.create({
-      owner,
-      repo,
-      title: input.title,
-      body: input.body,
-      head: input.branchName,
-      base: input.baseBranch,
-      maintainer_can_modify: true,
-    });
-    return { number: pr.data.number, url: pr.data.html_url };
   }
 }

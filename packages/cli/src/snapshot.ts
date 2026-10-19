@@ -242,16 +242,16 @@ async function walkDir(
     out.totalBytes += info.size;
     if (out.files.length > limits.maxFiles) {
       throw new CliError(
-        `This folder has more than ${limits.maxFiles.toLocaleString("en-US")} files to send, which is more than birdsI accepts in one scan.`,
+        `This folder has more than ${limits.maxFiles.toLocaleString("en-US")} files to send, which is more than birdsI accepts in one map.`,
         EXIT.usage,
-        "Scan a smaller folder, or add large generated folders to .gitignore.",
+        "Map a smaller folder, or add large generated folders to .gitignore.",
       );
     }
     if (out.totalBytes > limits.maxTotalBytes) {
       throw new CliError(
-        `This folder has more than ${formatBytes(limits.maxTotalBytes)} of files to send, which is more than birdsI accepts in one scan.`,
+        `This folder has more than ${formatBytes(limits.maxTotalBytes)} of files to send, which is more than birdsI accepts in one map.`,
         EXIT.usage,
-        "Scan a smaller folder, or add large generated folders and data files to .gitignore.",
+        "Map a smaller folder, or add large generated folders and data files to .gitignore.",
       );
     }
   }
@@ -303,7 +303,7 @@ export async function buildSnapshot(root: string, options: WalkOptions = {}): Pr
   const walk = await walkSnapshot(root, options);
   if (walk.files.length === 0) {
     throw new CliError(
-      "There are no files to scan in this folder after ignoring build output and .gitignore entries.",
+      "There are no files to map in this folder after ignoring build output and .gitignore entries.",
       EXIT.usage,
     );
   }

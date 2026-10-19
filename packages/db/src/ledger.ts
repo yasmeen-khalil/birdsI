@@ -2,12 +2,11 @@ import { getDb } from "./client";
 import { pageAll } from "./paging";
 
 /** Append-only. Rows are priced when written and never changed. */
-export async function recordUsage(input: { ownerUserId: string | null; scanId: string | null; fixId: string | null; purpose: string; model: string; inputTokens: number; outputTokens: number; costMicrodollars: number }): Promise<void> {
+export async function recordUsage(input: { ownerUserId: string | null; scanId: string | null; purpose: string; model: string; inputTokens: number; outputTokens: number; costMicrodollars: number }): Promise<void> {
   const db = getDb();
   const { error } = await db.from("usage_ledger").insert({
     owner_user_id: input.ownerUserId,
     scan_id: input.scanId,
-    fix_id: input.fixId,
     purpose: input.purpose,
     model: input.model,
     input_tokens: input.inputTokens,

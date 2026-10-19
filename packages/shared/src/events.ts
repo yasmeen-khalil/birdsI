@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FindingDraft, AuditArea } from "./domain";
+import { FindingDraft } from "./domain";
 
 /**
  * Append-only progress events written by the scan runner and replayed by every
@@ -7,11 +7,13 @@ import { FindingDraft, AuditArea } from "./domain";
  * what happened, in order.
  */
 
+/** "review", "crosscheck" and "audit" only appear in event logs written before v3. */
 export const ScanStep = z.enum([
   "fetch",
   "inventory",
   "dependencies",
   "vendors",
+  "map",
   "secrets",
   "vulnerabilities",
   "docs",
@@ -54,7 +56,7 @@ export const ScanEvent = z.discriminatedUnion("type", [
     filesSeen: z.number().int().nonnegative(),
     filesToRead: z.number().int().nonnegative(),
     languages: z.array(z.object({ name: z.string(), files: z.number().int().nonnegative() })),
-    /** Folder map for the bird's-eye view: top folder and file count. */
+    /** Folders and their files, top level first. */
     folders: z.array(
       z.object({
         name: z.string(),
@@ -80,13 +82,14 @@ export const ScanEvent = z.discriminatedUnion("type", [
     durationMs: z.number().int().nonnegative(),
   }),
   z.object({
+    /** Written by the pre-launch audit before v3. */
     type: z.literal("audit_area"),
-    area: AuditArea,
+    area: z.string(),
     verdict: z.enum(["pass", "attention", "blocker"]),
     note: z.string(),
   }),
   z.object({
-    /** What the review step read, with content hashes, so the next scan can skip unchanged files. */
+    /** What the model review read before v3, with content hashes. */
     type: z.literal("review_index"),
     files: z.array(z.object({ path: z.string(), hash: z.string() })),
   }),

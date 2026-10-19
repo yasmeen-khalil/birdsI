@@ -1,8 +1,6 @@
 import { hostname } from "node:os";
-import { claimJob, completeJob, enqueueJob, failExhaustedStaleJobs, failJob, heartbeat, JobLostError, jobActive, purgeOldSnapshots, purgeStaleWorkers, reposDueForSync, sweepDeviceLogins, updateFix, updateScan, userIdsWithConnections, workerSeen, type JobRow } from "@birdsi/db";
+import { claimJob, completeJob, enqueueJob, failExhaustedStaleJobs, failJob, heartbeat, JobLostError, jobActive, purgeOldSnapshots, purgeStaleWorkers, reposDueForSync, sweepDeviceLogins, updateScan, userIdsWithConnections, workerSeen, type JobRow } from "@birdsi/db";
 import { loadEngineConfig } from "@birdsi/engine";
-import { runEmbedJob } from "./embed-job";
-import { runFixJob } from "./fix-job";
 import { runScanJob } from "./scan-job";
 import { runVendorSyncJob } from "./vendor-sync-job";
 
@@ -24,8 +22,6 @@ async function handle(job: JobRow): Promise<void> {
     await present(job.id);
   };
   if (job.kind === "scan") return runScanJob(config, job, beat);
-  if (job.kind === "fix") return runFixJob(config, job, beat);
-  if (job.kind === "embed") return runEmbedJob(config, job, beat);
   if (job.kind === "vendor_sync") return runVendorSyncJob(config, job, beat);
   throw new Error(`unknown job kind ${job.kind}`);
 }
@@ -72,12 +68,12 @@ async function scheduleVendorSyncs(): Promise<number> {
   return queued;
 }
 
-/** Once an hour: snapshot files past retention go, stale worker rows go, old sign-in codes expire, due vendor syncs are queued. */
+/** Once an hour: uploads whose map never ran go after a day, stale worker rows go, old sign-in codes expire, due account reads are queued. */
 async function sweep(): Promise<void> {
   if (Date.now() - lastSweep < SWEEP_MS) return;
   lastSweep = Date.now();
   try {
-    const removed = await purgeOldSnapshots(7);
+    const removed = await purgeOldSnapshots(1);
     if (removed > 0) console.log(`[worker] removed ${removed} snapshot file(s) past retention`);
   } catch (error) {
     console.error(`[worker] snapshot sweep failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -104,7 +100,7 @@ async function sweep(): Promise<void> {
 const STALE_SWEEP_MS = 30_000;
 let lastStaleSweep = 0;
 
-/** Jobs whose worker died with no attempts left are failed, and the scan or fix they were running says so. */
+/** Jobs whose worker died with no attempts left are failed, and the map they were running says so. */
 async function failExhausted(): Promise<void> {
   if (Date.now() - lastStaleSweep < STALE_SWEEP_MS) return;
   lastStaleSweep = Date.now();
@@ -112,8 +108,7 @@ async function failExhausted(): Promise<void> {
     for (const job of await failExhaustedStaleJobs()) {
       console.error(`[worker] ${job.kind} ${job.id} failed: its worker stopped and no attempts are left`);
       const finished_at = new Date().toISOString();
-      if (job.kind === "scan") await updateScan(String(job.payload["scanId"]), { status: "failed", finished_at, error: "The scanner stopped while working on this scan. Run it again." });
-      if (job.kind === "fix") await updateFix(String(job.payload["fixId"]), { status: "failed", error: "The scanner stopped while working on this fix. Try it again." });
+      if (job.kind === "scan") await updateScan(String(job.payload["scanId"]), { status: "failed", finished_at, error: "The worker stopped while working on this map. Run it again." });
     }
   } catch (error) {
     console.error(`[worker] stale job sweep failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -128,7 +123,7 @@ async function loop(): Promise<void> {
     await failExhausted();
     let job: JobRow | null = null;
     try {
-      job = await claimJob(workerId, ["scan", "fix", "embed", "vendor_sync"]);
+      job = await claimJob(workerId, ["scan", "vendor_sync"]);
     } catch (error) {
       console.error(`[worker] claim failed: ${error instanceof Error ? error.message : String(error)}`);
       await sleep(IDLE_MS * 3);

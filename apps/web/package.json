@@ -2,7 +2,7 @@
   "name": "@birdsi/web",
   "version": "0.1.0",
   "private": true,
-  "description": "The birdsI web app: landing page, demo scan, dashboard, findings, fixes, chat, API.",
+  "description": "The birdsI web app: the cockpit for each app, the account pages and the /api/v1 API.",
   "license": "MPL-2.0",
   "scripts": {
     "dev": "next dev",

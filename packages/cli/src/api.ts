@@ -7,7 +7,6 @@ import {
   RecordEntryEnvelope,
   RecordResponse,
   type WriteRecordRequest,
-  ChatMessage,
   CreateScanResponse,
   InventoryResponse,
   Question,
@@ -18,13 +17,11 @@ import {
   type RequestActionRequest,
   DeviceLoginPoll,
   DeviceLoginStart,
-  Fix,
   FindingResponse,
   ReposResponse,
   ScanEventsResponse,
   ScanResponse,
   SnapshotUploadResponse,
-  StartFixResponse,
   type CreateScanRequest,
 } from "@birdsi/shared";
 import { z } from "zod";
@@ -61,8 +58,6 @@ export interface Result<T> {
 const MeResponse = z.object({ userId: z.string(), login: z.string() });
 export type MeResponse = z.infer<typeof MeResponse>;
 const OkResponse = z.object({ ok: z.literal(true) });
-const FixEnvelope = z.object({ fix: Fix });
-const ChatResponse = z.object({ message: ChatMessage });
 const QuestionEnvelope = z.object({ question: Question });
 const ActionEnvelope = z.object({ action: ActionRequest });
 
@@ -178,14 +173,6 @@ export class ApiClient {
     return this.request("GET", `/repos/${enc(repoId)}/latest`, { schema: ScanResponse });
   }
 
-  ask(repoId: string, question: string): Promise<Result<z.infer<typeof ChatResponse>>> {
-    return this.request("POST", `/repos/${enc(repoId)}/chat`, {
-      schema: ChatResponse,
-      body: { question },
-      timeoutMs: 120_000,
-    });
-  }
-
   // Snapshots
 
   createSnapshot(body: { fullName?: string; branch?: string; commitSha?: string }): Promise<Result<SnapshotUploadResponse>> {
@@ -295,18 +282,10 @@ export class ApiClient {
     return this.request("POST", `/scans/${enc(scanId)}/stop`, { schema: OkResponse, body: {} });
   }
 
-  // Findings and fixes
+  // Findings
 
   finding(findingId: string): Promise<Result<FindingResponse>> {
     return this.request("GET", `/findings/${enc(findingId)}`, { schema: FindingResponse });
-  }
-
-  startFix(findingId: string): Promise<Result<StartFixResponse>> {
-    return this.request("POST", `/findings/${enc(findingId)}/fix`, { schema: StartFixResponse, body: {} });
-  }
-
-  fix(fixId: string): Promise<Result<z.infer<typeof FixEnvelope>>> {
-    return this.request("GET", `/fixes/${enc(fixId)}`, { schema: FixEnvelope });
   }
 
   dismiss(findingId: string): Promise<Result<z.infer<typeof OkResponse>>> {
@@ -367,7 +346,7 @@ export function toCliError(error: unknown, what?: string): CliError {
         return new CliError(
           `birdsI did not start this because it would go over your budget.${detail ? ` ${sentence(detail)}` : ""}`,
           EXIT.failed,
-          "Try a quick check, or see your usage in Settings on the birdsI website.",
+          "See your usage in Settings on the birdsI website.",
         );
       case 429:
         return new CliError("birdsI is getting too many requests from you right now.", EXIT.failed, "Wait a minute, then try again.");

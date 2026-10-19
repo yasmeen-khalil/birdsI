@@ -43,17 +43,17 @@ export function FreshnessGlyph({ freshness, size = 12 }: { freshness: StageState
   );
 }
 
-/** The four stages in order, each with its freshness, last run and what it does. */
+/** The map and the account reads, each with its freshness, last run and what it does. */
 export function PipelineStrip({ stages }: { stages: StageState[] }) {
   return (
     <section className="flex flex-col gap-3" aria-labelledby="pipeline-title">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 id="pipeline-title" className="t-label c2">
-          Pipeline
+          Freshness
         </h2>
-        <p className="t-small c3">Stages run in this order. A full scan runs all four. Refresh vendors runs the last stage alone.</p>
+        <p className="t-small c3">A map reads the code. The worker reads the accounts every hour, and after every map.</p>
       </div>
-      <ol className="pipe m-0 grid list-none grid-cols-1 p-0 min-[901px]:grid-cols-4">
+      <ol className="pipe m-0 grid list-none grid-cols-1 p-0 min-[901px]:grid-cols-2">
         {stages.map((s, i) => {
           const running = s.freshness === "running";
           return (

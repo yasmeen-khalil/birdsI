@@ -10,7 +10,6 @@ export const configCheck: Check = {
   id: "config",
   step: "secrets",
   label: "Checking repository settings and ignored files",
-  tiers: ["light", "deep", "audit"],
   available: () => true,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     const findings: FindingDraft[] = [];

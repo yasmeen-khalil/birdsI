@@ -1,36 +1,17 @@
-import {
-  askQuestion,
-  connectionsForUser,
-  decryptSecret,
-  expireAskedFacts,
-  factsForVendors,
-  knowledgeFor,
-  markConnectionProbed,
-  recordUsage,
-  replaceFacts,
-  resolveQuestionsByMetric,
-  saveKnowledge,
-  setVendorsSyncedAt,
-  upsertFact,
-  vendorsForRepo,
-  type FactInput,
-  type JobRow,
-  type VendorRow,
-} from "@birdsi/db";
-import { CATALOG_BY_SLUG, CONNECTOR_BY_SLUG, knowledgeIsFresh, learnVendor, MAX_VENDORS_PER_SCAN, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
-import type { ProjectHints } from "@birdsi/shared";
-import { assertWithinSpendCaps, SpendCapError, spendHook } from "./spend";
+import { connectionsForUser, decryptSecret, expireAskedFacts, factsForVendors, markConnectionProbed, replaceFacts, setVendorsSyncedAt, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
+import { CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
+import { bestFacts, LIMITS_BY_SLUG, tierFor, type FactSource, type ProjectHints } from "@birdsi/shared";
 
 /** One sync holds the only worker while it runs, so it stops starting new vendors after this long. */
 const SYNC_BUDGET_MS = 10 * 60_000;
 
 /**
- * The ops stage. For every vendor of a repository: probe the connected
- * account, refresh the shared knowledge (what it is, its tiers) when stale,
- * read Stripe Projects data the CLI collected, and queue a question for the
- * owner wherever birdsI still cannot know the plan or the usage.
+ * The read of the accounts. For every vendor of a repository: read the
+ * connected account, and read the Stripe Projects data the CLI collected.
+ * No model is called and nothing is asked: what birdsI cannot read, it says
+ * it could not read.
  */
-export async function runVendorSyncJob(config: EngineConfig, job: JobRow, heartbeat: () => Promise<void>): Promise<void> {
+export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heartbeat: () => Promise<void>): Promise<void> {
   const repoId = String(job.payload["repoId"]);
   const ownerUserId = String(job.payload["ownerUserId"]);
   const hints = (job.payload["hints"] as ProjectHints | null | undefined) ?? null;
@@ -45,38 +26,11 @@ export async function runVendorSyncJob(config: EngineConfig, job: JobRow, heartb
     }
     const connections = await connectionsForUser(ownerUserId);
     const bySlug = new Map(connections.map((c) => [c.vendor_slug, c]));
-    const onUsage = (u: { purpose: string; model: string; inputTokens: number; outputTokens: number; costMicrodollars: number }) =>
-      recordUsage({ ownerUserId, scanId: null, fixId: null, purpose: u.purpose, model: u.model, inputTokens: u.inputTokens, outputTokens: u.outputTokens, costMicrodollars: u.costMicrodollars });
 
-    // 1. Shared knowledge: what each vendor is and its tiers, from current pricing pages.
-    const knowledge = await knowledgeFor(vendors.map((v) => v.slug));
-    const spend = spendHook(ownerUserId);
-    for (const v of vendors) {
-      if (Date.now() > deadline) break;
-      const existing = knowledge.get(v.slug);
-      if (knowledgeIsFresh(existing)) continue;
-      // Each lookup costs web searches and a model call, so the daily limits are checked first.
-      try {
-        await assertWithinSpendCaps(ownerUserId, { fresh: true });
-      } catch (error) {
-        if (error instanceof SpendCapError) break;
-        throw error;
-      }
-      try {
-        const learned = await learnVendor(config, v.slug, v.name, [], { onUsage, beforeCall: spend.beforeCall });
-        if (learned) {
-          await saveKnowledge(learned);
-          knowledge.set(v.slug, learned);
-        }
-      } catch {
-        // The pricing page may be unreachable today; the next sync tries again.
-      }
-    }
-
-    // 2. Stripe Projects: plan and spend per provider, collected on the owner's machine.
+    // Stripe Projects: plan and spend per provider, collected on the owner's machine.
     const projectFacts = stripeProjectFacts(hints);
 
-    // 3. Connected accounts.
+    // Connected accounts.
     for (const v of vendors) {
       if (Date.now() > deadline) break;
       const connector = CONNECTOR_BY_SLUG.get(v.slug);
@@ -95,14 +49,10 @@ export async function runVendorSyncJob(config: EngineConfig, job: JobRow, heartb
         }
       }
       await replaceFacts(v.id, "connector", facts.map((f) => ({ kind: f.kind, metric: f.metric, label: f.label, value: f.value, numeric: f.numeric, unit: f.unit, limitNumeric: f.limitNumeric, source: "connector", evidence: f.evidence ?? {} })));
-      for (const f of facts) if (f.kind === "plan" || f.kind === "usage") await resolveQuestionsByMetric(repoId, v.id, f.metric);
-
-      // 4. Docs facts: the limits of the plan the owner is on, from the tiers.
-      await writeTierLimits(v, knowledge.get(v.slug));
-
-      // 5. Typed usage older than a month is forgotten, then questions where birdsI still cannot know.
+      // Usage the owner typed before v3 goes stale after a month; nothing asks for it again.
       await expireAskedFacts(v.id, 30);
-      await queueQuestions(repoId, v, knowledge.get(v.slug), Boolean(connector), Boolean(connection));
+      // The plan's limits from the checked list. This also replaces the tiers a model read from pricing pages before v3.
+      await replaceFacts(v.id, "docs", await checkedLimitFacts(v.id, v.slug));
     }
     await setVendorsSyncedAt(repoId, new Date());
   } finally {
@@ -150,69 +100,24 @@ function stripeProjectFacts(hints: ProjectHints | null): Map<string, ConnectorFa
   return out;
 }
 
-/** The limits of the plan the owner is on, as docs facts citing the pricing page. */
-async function writeTierLimits(v: VendorRow, knowledge: Awaited<ReturnType<typeof knowledgeFor>> extends Map<string, infer K> ? K | undefined : never): Promise<void> {
-  if (!knowledge || knowledge.tiers.length === 0) {
-    await replaceFacts(v.id, "docs", []);
-    return;
-  }
-  const facts = await factsForVendors([v.id]);
-  const plan = facts.filter((f) => f.kind === "plan").sort((a, b) => sourceRank(a.source) - sourceRank(b.source))[0];
-  const tier = plan ? knowledge.tiers.find((t) => t.name.toLowerCase() === plan.value.toLowerCase() || plan.value.toLowerCase().includes(t.name.toLowerCase())) : null;
-  const source = knowledge.sources[0];
-  if (!tier) {
-    await replaceFacts(v.id, "docs", [{ kind: "status", metric: "tiers_known", label: "Plans", value: knowledge.tiers.map((t) => `${t.name}${t.priceUsd !== null ? ` ($${t.priceUsd}/mo)` : ""}`).join(", "), numeric: null, unit: null, limitNumeric: null, source: "docs", evidence: source ? { url: source.url } : {} }]);
-    return;
-  }
-  const out: FactInput[] = tier.limits.map((l) => ({ kind: "limit" as const, metric: l.metric, label: l.label, value: l.amount !== null ? `${l.amount}${l.unit ? ` ${l.unit}` : ""}` : (l.note ?? "Included"), numeric: l.amount, unit: l.unit, limitNumeric: null, source: "docs" as const, evidence: source ? { url: source.url, ...(l.note ? { note: l.note } : {}) } : {} }));
-  if (tier.priceUsd !== null) out.push({ kind: "cost", metric: "plan_price", label: "Plan price", value: `$${tier.priceUsd}/month`, numeric: tier.priceUsd, unit: "USD", limitNumeric: null, source: "docs", evidence: source ? { url: source.url } : {} });
-  await replaceFacts(v.id, "docs", out);
-  // Pair usage facts with their limits so alerts can compute a ratio.
-  const usage = facts.filter((f) => f.kind === "usage" && f.numeric !== null && f.limit_numeric === null);
-  for (const u of usage) {
-    const match = tier.limits.find((l) => l.amount !== null && (l.metric === u.metric || l.metric.replace(/_month$|monthly_/g, "") === u.metric.replace(/_month$|monthly_/g, "")));
-    if (match) await upsertFact(v.id, { kind: u.kind, metric: u.metric, label: u.label, value: `${u.value} of ${match.amount}${match.unit ? ` ${match.unit}` : ""}`, numeric: u.numeric, unit: u.unit, limitNumeric: match.amount, source: u.source, evidence: u.evidence });
-  }
-}
-
-function sourceRank(source: string): number {
-  return { connector: 0, asked: 1, docs: 2, static: 3, estimate: 4 }[source] ?? 5;
-}
-
-async function queueQuestions(repoId: string, v: VendorRow, knowledge: { tiers: Array<{ name: string; limits: Array<{ metric: string; label: string; amount: number | null; unit: string | null }> }> } | undefined, hasConnector: boolean, isConnected: boolean): Promise<void> {
-  const facts = await factsForVendors([v.id]);
-  const hasPlan = facts.some((f) => f.kind === "plan");
-  const entry = CATALOG_BY_SLUG.get(v.slug);
-  if (entry?.planless) return;
-  if (!hasPlan && knowledge && knowledge.tiers.length > 0) {
-    await askQuestion(repoId, {
-      vendorId: v.id,
-      askedBy: "birdsi",
-      question: `Which ${v.name} plan is this app on?`,
-      why: hasConnector && !isConnected ? `birdsI can read this itself once ${v.name} is connected in Settings. Until then it needs your answer to watch the plan's limits.` : `${v.name} does not report the plan through its API, and the plan decides which limits birdsI watches for you.`,
-      options: knowledge.tiers.map((t) => t.name),
-      lookupUrl: entry?.dashboardUrl ?? null,
-      updates: { kind: "plan", metric: "plan", label: "Plan", unit: null },
-      key: `plan:${v.slug}`,
-    });
-  }
-  // Usage: when no connector can read it and the plan has a counted limit, ask for the number.
-  const plan = facts.filter((f) => f.kind === "plan").sort((a, b) => sourceRank(a.source) - sourceRank(b.source))[0];
-  const tier = plan && knowledge ? knowledge.tiers.find((t) => t.name.toLowerCase() === plan.value.toLowerCase() || plan.value.toLowerCase().includes(t.name.toLowerCase())) : null;
-  const hasUsage = facts.some((f) => f.kind === "usage" && f.source === "connector");
-  if (tier && !hasUsage && !(hasConnector && isConnected)) {
-    const primary = tier.limits.find((l) => l.amount !== null && /request|credit|email|message|user|token|build|minute|gb|storage|band/i.test(`${l.metric} ${l.label}`));
-    if (primary) {
-      await askQuestion(repoId, {
-        vendorId: v.id,
-        askedBy: "birdsi",
-        question: `How much of the ${v.name} ${primary.label.toLowerCase()} limit has the app used this month?`,
-        why: hasConnector ? `Connect ${v.name} in Settings and birdsI reads this itself. Until then, the number from the dashboard keeps the limit alert honest.` : `${v.name} has no API for usage, so the number from its dashboard is the only way birdsI can warn you before the limit of ${primary.amount}${primary.unit ? ` ${primary.unit}` : ""} is reached.`,
-        options: [],
-        lookupUrl: entry?.dashboardUrl ?? null,
-        updates: { kind: "usage", metric: primary.metric, label: primary.label, unit: primary.unit },
-        key: `usage:${v.slug}:${primary.metric}`,
-      });
-    }
-  }
+/** The checked limits of the plan the account is on, as facts citing the vendor's own page and the date it was read. */
+async function checkedLimitFacts(vendorId: string, slug: string): Promise<FactInput[]> {
+  const limits = LIMITS_BY_SLUG.get(slug);
+  if (!limits) return [];
+  const facts = (await factsForVendors([vendorId])).filter((f) => f.source !== "docs").map((f) => ({ metric: f.metric, kind: f.kind, value: f.value, source: f.source as FactSource }));
+  const plan = bestFacts(facts).find((f) => f.kind === "plan");
+  const tier = plan ? tierFor(limits, plan.value) : null;
+  if (!tier) return [];
+  const checked = `Checked against ${limits.name}'s page on ${limits.verifiedOn}.`;
+  return tier.limits.map((l) => ({
+    kind: "limit" as const,
+    metric: `limit_${l.metric}`,
+    label: `${l.label}, ${tier.name} plan`,
+    value: `${l.amount.toLocaleString("en-US")} ${l.unit}`,
+    numeric: l.amount,
+    unit: l.unit,
+    limitNumeric: null,
+    source: "docs" as const,
+    evidence: { url: l.source.url, excerpt: l.source.quote, note: checked },
+  }));
 }

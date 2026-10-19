@@ -3,7 +3,6 @@ import {
   STEP_LABEL,
   STEP_UNIT,
   findingRow,
-  formatAuditArea,
   formatClock,
   formatDuration,
   glyphs,
@@ -84,7 +83,7 @@ export class ScanProgress {
     this.live = Boolean(out.isTTY);
   }
 
-  /** A status line shown under the steps (e.g. "Stopping the scan."). */
+  /** A status line shown under the steps (e.g. "Stopping the map."). */
   setStatus(text: string | null): void {
     this.status = text;
     this.redraw();
@@ -181,7 +180,7 @@ export class ScanProgress {
         return;
       }
       case "audit_area":
-        this.print(formatAuditArea(event.area, event.verdict, event.note, this.style));
+        // Written only by the pre-launch audit, removed in v3.
         return;
       case "note":
         this.print(paint.dim(this.style, `  ${event.text}`));
@@ -228,10 +227,10 @@ export class ScanProgress {
 
   private regionLines(): string[] {
     const lines = this.stepLines(true);
-    if (lines.length === 0) lines.push(paint.dim(this.style, "  Waiting for birdsI to start the scan."));
+    if (lines.length === 0) lines.push(paint.dim(this.style, "  Waiting for birdsI to start the map."));
     lines.push("");
     const elapsed = formatClock(Date.now() - this.startedAt);
-    lines.push(paint.dim(this.style, `  ${elapsed}. ${this.status ?? "Ctrl+C stops the scan."}`));
+    lines.push(paint.dim(this.style, `  ${elapsed}. ${this.status ?? "Ctrl+C stops the map."}`));
     return lines;
   }
 

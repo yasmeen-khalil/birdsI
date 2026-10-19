@@ -66,16 +66,6 @@ export function assertSameOrigin(request: Request): void {
   if (!origin || !allowed.has(origin)) throw new ApiError(403, "origin", "This request did not come from a birdsI page. Open the Agent page in birdsI and decide there.");
 }
 
-/** The caller when present; null for anonymous access to public resources like demo scans. */
-export async function optionalCaller(request: Request): Promise<UserRow | null> {
-  try {
-    return await requireCaller(request);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return null;
-    throw error;
-  }
-}
-
 export async function parseBody<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
   let raw: unknown;
   try {

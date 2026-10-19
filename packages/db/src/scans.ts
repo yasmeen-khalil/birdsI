@@ -1,4 +1,4 @@
-import type { AuditReport, Dependency, Finding, FindingDraft, FindingStatus, Scan, ScanEvent, ScanEventRecord, ScanKind, ScanSource, ScanStats, ScanSummary } from "@birdsi/shared";
+import type { Dependency, Finding, FindingDraft, FindingStatus, Scan, ScanEvent, ScanEventRecord, ScanKind, ScanSource, ScanStats, ScanSummary } from "@birdsi/shared";
 import { ForbiddenError, getDb, NotFoundError, unwrap } from "./client";
 
 export interface ScanRow {
@@ -16,7 +16,8 @@ export interface ScanRow {
   finished_at: string | null;
   error: string | null;
   summary: ScanSummary | null;
-  audit: AuditReport | null;
+  /** The pre-launch audit's report, on audit scans from before v3. */
+  audit: unknown;
   stats: ScanStats | null;
   stop_requested_at: string | null;
   created_at: string;
@@ -35,17 +36,17 @@ export function toScan(row: ScanRow): Scan {
     finishedAt: row.finished_at,
     error: row.error,
     summary: row.summary,
-    audit: row.audit,
     stats: row.stats,
     createdAt: row.created_at,
   };
 }
 
-export async function createScan(input: { repoId: string | null; snapshotId: string | null; ownerUserId: string | null; kind: ScanKind; source: ScanSource; branch: string | null; appDescription: string | null }): Promise<ScanRow> {
+export async function createScan(input: { repoId: string | null; snapshotId: string | null; ownerUserId: string | null; source: ScanSource; branch: string | null }): Promise<ScanRow> {
   const db = getDb();
+  // Every scan since v3 is a map of the code, stored under the first kind.
   const result = await db
     .from("scans")
-    .insert({ repo_id: input.repoId, snapshot_id: input.snapshotId, owner_user_id: input.ownerUserId, kind: input.kind, source: input.source, branch: input.branch, app_description: input.appDescription })
+    .insert({ repo_id: input.repoId, snapshot_id: input.snapshotId, owner_user_id: input.ownerUserId, kind: "light", source: input.source, branch: input.branch })
     .select()
     .single();
   return unwrap(result, "createScan") as ScanRow;
@@ -65,11 +66,10 @@ export async function scanById(scanId: string): Promise<ScanRow | null> {
   return (data as ScanRow | null) ?? null;
 }
 
-/** A scan the caller may read: their own, or a demo scan (which anyone with the id may watch). */
+/** A scan the caller may read: only their own. Sample scans from the removed demo have no owner and are read by no one. */
 export async function scanForViewer(scanId: string, userId: string | null): Promise<ScanRow> {
   const row = await scanById(scanId);
   if (!row) throw new NotFoundError("scan");
-  if (row.source === "demo") return row;
   if (!userId || row.owner_user_id !== userId) throw new ForbiddenError("scan");
   return row;
 }
@@ -90,7 +90,7 @@ export async function latestDoneScan(repoId: string, kind?: ScanKind): Promise<S
   return (data as ScanRow | null) ?? null;
 }
 
-export async function updateScan(scanId: string, patch: Partial<Pick<ScanRow, "status" | "started_at" | "finished_at" | "error" | "summary" | "audit" | "stats" | "commit_sha" | "branch" | "stop_requested_at">>): Promise<void> {
+export async function updateScan(scanId: string, patch: Partial<Pick<ScanRow, "status" | "started_at" | "finished_at" | "error" | "summary" | "stats" | "commit_sha" | "branch" | "stop_requested_at">>): Promise<void> {
   const db = getDb();
   const { error } = await db.from("scans").update(patch).eq("id", scanId);
   if (error) throw new Error(`updateScan: ${error.message}`);

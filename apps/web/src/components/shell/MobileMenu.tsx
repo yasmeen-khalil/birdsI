@@ -48,11 +48,6 @@ export function MobileMenu({ repoId }: { repoId: string | null }) {
                     {item.label}
                   </Link>
                 ))}
-              {repoId && (
-                <Link href={`/app/${repoId}/chat`} className="flex items-center" style={{ minHeight: 48, padding: "0 8px", textDecoration: "none", color: "var(--text-2)", fontWeight: 500, borderBottom: "1px solid var(--line)" }}>
-                  Ask birdsI
-                </Link>
-              )}
               <Link href="/settings" className="flex items-center" style={{ minHeight: 48, padding: "0 8px", textDecoration: "none", color: pathname.startsWith("/settings") ? "var(--text)" : "var(--text-2)", fontWeight: 500 }}>
                 Settings
               </Link>

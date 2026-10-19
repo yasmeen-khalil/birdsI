@@ -2,7 +2,7 @@
   "name": "birdsi-monorepo",
   "private": true,
   "version": "0.1.0",
-  "description": "birdsI: the operations record for an app, built for coding agents. Monorepo for the web app, worker, CLI and shared engine.",
+  "description": "birdsI: the cockpit for your apps. Monorepo for the web app, worker, CLI and shared engine.",
   "license": "MPL-2.0",
   "author": "yasmeen-khalil",
   "engines": {
@@ -21,7 +21,8 @@
     "lint": "npm run lint --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^22",

@@ -1,12 +1,5 @@
 import { z } from "zod";
-import {
-  Dependency,
-  Finding,
-  Fix,
-  Repo,
-  Scan,
-  ScanKind,
-} from "./domain";
+import { Dependency, Finding, Repo, Scan, ScanKind } from "./domain";
 import { ScanEventRecord } from "./events";
 import { ProjectHints } from "./ops";
 
@@ -23,16 +16,16 @@ export const ApiError = z.object({
 });
 export type ApiError = z.infer<typeof ApiError>;
 
+/**
+ * Starts a map of the code. The kind is accepted from older terminal tools
+ * and ignored: since v3 every scan is the same map.
+ */
 export const CreateScanRequest = z.object({
-  kind: ScanKind,
+  kind: ScanKind.optional(),
   /** Either a connected repo, or an uploaded snapshot from the CLI. */
   repoId: z.string().optional(),
   snapshotId: z.string().optional(),
   branch: z.string().optional(),
-  /** Optional description of what the app does; sharpens the audit. */
-  appDescription: z.string().max(2000).optional(),
-  /** Sent by the bare command's --full. The kind decides what runs, so a full scan is a deep scan. */
-  full: z.boolean().optional(),
 });
 export type CreateScanRequest = z.infer<typeof CreateScanRequest>;
 
@@ -59,11 +52,8 @@ export type ScanEventsResponse = z.infer<typeof ScanEventsResponse>;
 export const ReposResponse = z.object({ repos: z.array(Repo) });
 export type ReposResponse = z.infer<typeof ReposResponse>;
 
-export const FindingResponse = z.object({ finding: Finding, fix: Fix.nullable() });
+export const FindingResponse = z.object({ finding: Finding });
 export type FindingResponse = z.infer<typeof FindingResponse>;
-
-export const StartFixResponse = z.object({ fix: Fix });
-export type StartFixResponse = z.infer<typeof StartFixResponse>;
 
 export const CompleteSnapshotRequest = z.object({
   bytes: z.number().int().nonnegative().nullable().optional(),
@@ -99,23 +89,3 @@ export const DeviceLoginPoll = z.discriminatedUnion("status", [
   }),
 ]);
 export type DeviceLoginPoll = z.infer<typeof DeviceLoginPoll>;
-
-export const ChatMessage = z.object({
-  id: z.string(),
-  role: z.enum(["user", "assistant"]),
-  content: z.string(),
-  citations: z
-    .array(
-      z.object({
-        path: z.string().optional(),
-        lineStart: z.number().int().optional(),
-        findingId: z.string().optional(),
-        label: z.string(),
-      }),
-    )
-    .default([]),
-  /** True when the reply rests on model reading with no finding behind it. */
-  judgment: z.boolean().default(false),
-  createdAt: z.string(),
-});
-export type ChatMessage = z.infer<typeof ChatMessage>;
