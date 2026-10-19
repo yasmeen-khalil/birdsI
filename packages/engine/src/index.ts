@@ -15,3 +15,4 @@ export { runScan, STEP_LABELS, type ScanInput, type ScanResult } from "./scan/ru
 export { rankFindings, summarise } from "./scan/rank";
 export * from "./vendors/index";
 export { buildServiceMap, describeSchedule, parseMarkers, type MapMeta } from "./map/index";
+export { readProject, markerQuery, fileForLabel, owedFromMarkers, owedFromHistory, describeMarker, MARKER_KINDS, ReadError, reasonForStatus, type ProjectToRead, type ReadContext } from "./reads/index";

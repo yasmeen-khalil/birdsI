@@ -45,7 +45,7 @@ export default function PrivacyPage() {
               <b>The map of each app.</b> The services and packages the code uses, the names of the settings (environment variables) it reads, its crons, webhooks, store apps, migrations and public pages, each with the file and line it came from. Findings from the checks, with short code excerpts as evidence and secrets masked.
             </>,
             <>
-              <b>What the accounts say.</b> With a key you connect: deployments and their state, the names of the settings each project has (never their values), whether a database is paused, its advisor warnings and size, push subscriber and delivery counts. Each reading is dated and kept with the address it came from.
+              <b>What the accounts say.</b> With a key you connect: deployments and their state, the names of the settings each project has (never their values), crons and domains, the error lines of a failed build and of the app&apos;s functions with secrets masked, whether a database is paused, its advisor warnings, its size and which migrations it lacks (read from the database&apos;s structure, never from its rows), push subscriber and delivery counts and the names of push campaigns (never the text of a message sent to one person). Each reading is dated and kept with the address it came from, and the newest 48 readings of each project are kept.
             </>,
             <>
               <b>The record.</b> Decisions, facts, approvals, questions and answers written by you or your coding agent, and the vision you write for an app.
@@ -117,7 +117,7 @@ export default function PrivacyPage() {
       </LegalSection>
 
       <LegalSection title="Security">
-        <LegalP>Data travels encrypted. Tokens are stored as hashes and vendor keys encrypted. Secrets found in your code are masked before any excerpt is saved, and birdsI never asks a vendor for the value of a setting.</LegalP>
+        <LegalP>Data travels encrypted. Tokens are stored as hashes and vendor keys encrypted. Secrets found in your code or in a log line are masked before anything is saved, and birdsI never keeps the value of a setting: from what a vendor sends, it copies only the names.</LegalP>
       </LegalSection>
 
       <LegalSection title="Age">

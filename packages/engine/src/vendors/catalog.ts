@@ -188,6 +188,7 @@ export const CATALOG: readonly CatalogEntry[] = [
     pricingUrl: "https://onesignal.com/pricing",
     docsUrl: "https://documentation.onesignal.com",
     dashboardUrl: "https://dashboard.onesignal.com",
+    connector: "onesignal",
   }),
   e("revenuecat", "RevenueCat", "payments", "In-app subscriptions for iOS and Android.", {
     packages: [/^@revenuecat\//, /^react-native-purchases$/],

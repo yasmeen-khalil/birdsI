@@ -112,7 +112,7 @@ export const PROJECT_VENDORS: readonly ProjectVendor[] = [
       { key: "team", label: "Team id or slug", hint: "The team the project belongs to: team_... from Team Settings, or the slug in its address. Leave empty for a personal account.", required: false },
     ],
     reads: true,
-    keyHint: "An access token scoped to the team, with an expiry. Vercel offers no token that only reads, so birdsI only reads with it.",
+    keyHint: "An access token scoped to the team, with an expiry: it reads the plan and spend as well. A token scoped to this one project also works, without the plan. Vercel offers no token that only reads, so birdsI only reads with it.",
     keyUrl: "https://vercel.com/account/settings/tokens",
     dashboard: (p) => {
       const team = p.settings["team"] ?? "";
@@ -129,7 +129,7 @@ export const PROJECT_VENDORS: readonly ProjectVendor[] = [
     ],
     settings: [],
     reads: true,
-    keyHint: "A scoped personal access token with Read access only (Projects, Project Settings, Organization Settings, Advisors, Migrations, Database).",
+    keyHint: "A scoped personal access token limited to this project, with an expiry, and Read on Project Settings, Advisors, Database and Migrations, plus Organization Settings for the plan. Database: Read lets birdsI run read-only queries, and it reads the catalog and the size with them, never a row.",
     keyUrl: "https://supabase.com/dashboard/account/tokens",
     dashboard: (p) => (p.kind === "project" ? `https://supabase.com/dashboard/project/${encodeURIComponent(p.ref)}` : `https://supabase.com/dashboard/org/${encodeURIComponent(p.ref)}`),
   },
@@ -139,7 +139,7 @@ export const PROJECT_VENDORS: readonly ProjectVendor[] = [
     kinds: [{ kind: "app", refLabel: "App id", refHint: "OneSignal > the app > Settings > Keys & IDs > OneSignal App ID.", refPattern: UUID }],
     settings: [],
     reads: true,
-    keyHint: "An App API key for this app (Settings > Keys & IDs). OneSignal keys cannot be made read only, so birdsI only reads with it.",
+    keyHint: "An App API key for this app (Settings > Keys & IDs > Add Key). OneSignal keys cannot be made read only, so birdsI only reads with it. Leave the IP allowlist off: birdsI's worker has no fixed address.",
     keyUrl: "https://dashboard.onesignal.com",
     dashboard: (p) => `https://dashboard.onesignal.com/apps/${encodeURIComponent(p.ref)}`,
   },

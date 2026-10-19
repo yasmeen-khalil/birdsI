@@ -79,18 +79,64 @@ function monthRange(): { from: string; to: string } {
   return { from: from.toISOString(), to: now.toISOString() };
 }
 
+async function vercelSpend(teamId: string, auth: Record<string, string>, signal?: AbortSignal): Promise<ConnectorFact> {
+  const { from, to } = monthRange();
+  const charges = await fetch(`https://api.vercel.com/v1/billing/charges?teamId=${encodeURIComponent(teamId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers: auth, signal: signal ?? null });
+  if (charges.ok) {
+    const text = await charges.text();
+    let total = 0;
+    let lines = 0;
+    for (const line of text.split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const row = JSON.parse(line) as { BilledCost?: number | string; EffectiveCost?: number | string };
+        const cost = Number(row.BilledCost ?? row.EffectiveCost ?? 0);
+        if (Number.isFinite(cost)) total += cost;
+        lines += 1;
+      } catch {
+        // Not a JSON line.
+      }
+    }
+    if (lines > 0) return fact("cost", "spend_month", "Spend this month", `$${total.toFixed(2)}`, Math.round(total * 100) / 100, "USD", null, { note: "From Vercel's billing charges for the current month." });
+    return fact("status", "billing_access", "Billing data", "Vercel returned no charges for this month.");
+  }
+  if (charges.status === 403 || charges.status === 404) return fact("status", "billing_access", "Billing data", "Spend is available through the API on Pro and Enterprise teams only.");
+  return fact("status", "billing_access", "Billing data", `Vercel answered HTTP ${charges.status} for billing charges.`);
+}
+
 const vercel: Connector = {
   slug: "vercel",
   name: "Vercel",
-  tokenHint: "An access token with read scope on the team.",
+  tokenHint: "An access token scoped to the team (it reads the plan and spend too) or to one project, with an expiry. Vercel offers no token that only reads, so birdsI only reads with it.",
   tokenUrl: "https://vercel.com/account/settings/tokens",
   fields: [{ key: "teamId", label: "Team id", hint: "Settings > General > Team ID. Leave empty for a personal account.", required: false }],
   async probe(token, settings, signal) {
     const auth = { authorization: `Bearer ${token}` };
     const facts: ConnectorFact[] = [];
     const teamId = settings["teamId"]?.trim();
+    const project = settings["project"]?.trim();
+    const teamQuery = teamId ? `?teamId=${encodeURIComponent(teamId)}` : "";
+    if (project) {
+      // One project: the key must read it. A key scoped to the project cannot read the team, so the plan
+      // and spend then say why they were not read instead of failing the key.
+      const found = await getJson<{ id?: string; name?: string }>(`https://api.vercel.com/v9/projects/${encodeURIComponent(project)}${teamQuery}`, auth, signal);
+      if (found.status >= 400) unauthorized(found.status, "Vercel");
+      if (!teamId) {
+        facts.push(fact("status", "plan_access", "Plan", "Not read. Add the team id to the project to read the team's plan and spend.", null, null, null, { url: "https://vercel.com/docs/rest-api/teams/get-a-team" }));
+        return facts;
+      }
+      const team = await getJson<{ billing?: { plan?: string } | null; resourceConfig?: Record<string, unknown> }>(`https://api.vercel.com/v2/teams/${encodeURIComponent(teamId)}`, auth, signal);
+      if (team.status >= 400) {
+        facts.push(fact("status", "plan_access", "Plan", team.status === 403 ? "Not read: the key is scoped to the project. A key scoped to the team reads the plan and this month's spend." : `Not read: Vercel answered HTTP ${team.status} for the team.`, null, null, null, { url: "https://vercel.com/docs/accounts/access-tokens" }));
+        return facts;
+      }
+      const plan = team.body?.billing?.plan ?? null;
+      if (plan) facts.push(fact("plan", "plan", "Plan", plan.charAt(0).toUpperCase() + plan.slice(1), null, null, null, { url: "https://vercel.com/docs/plans" }));
+      facts.push(await vercelSpend(teamId, auth, signal));
+      return facts;
+    }
     if (teamId) {
-      const team = await getJson<{ billing?: { plan?: string }; resourceConfig?: Record<string, unknown>; name?: string }>(`https://api.vercel.com/v2/teams/${encodeURIComponent(teamId)}`, auth, signal);
+      const team = await getJson<{ billing?: { plan?: string } | null; resourceConfig?: Record<string, unknown>; name?: string }>(`https://api.vercel.com/v2/teams/${encodeURIComponent(teamId)}`, auth, signal);
       if (team.status >= 400) unauthorized(team.status, "Vercel");
       const plan = team.body?.billing?.plan ?? null;
       if (plan) facts.push(fact("plan", "plan", "Plan", plan.charAt(0).toUpperCase() + plan.slice(1), null, null, null, { url: "https://vercel.com/docs/plans" }));
@@ -104,29 +150,7 @@ const vercel: Connector = {
         const v = rc[key];
         if (typeof v === "number") facts.push(fact("limit", key, label, String(v), v, unit));
       }
-      const { from, to } = monthRange();
-      const charges = await fetch(`https://api.vercel.com/v1/billing/charges?teamId=${encodeURIComponent(teamId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers: auth, signal: signal ?? null });
-      if (charges.ok) {
-        const text = await charges.text();
-        let total = 0;
-        let lines = 0;
-        for (const line of text.split("\n")) {
-          if (!line.trim()) continue;
-          try {
-            const row = JSON.parse(line) as { BilledCost?: number | string; EffectiveCost?: number | string };
-            const cost = Number(row.BilledCost ?? row.EffectiveCost ?? 0);
-            if (Number.isFinite(cost)) total += cost;
-            lines += 1;
-          } catch {
-            // Not a JSON line.
-          }
-        }
-        if (lines > 0) facts.push(fact("cost", "spend_month", "Spend this month", `$${total.toFixed(2)}`, Math.round(total * 100) / 100, "USD", null, { note: "From Vercel's billing charges for the current month." }));
-      } else if (charges.status !== 403 && charges.status !== 404) {
-        facts.push(fact("status", "billing_access", "Billing data", `Vercel answered HTTP ${charges.status} for billing charges.`));
-      } else {
-        facts.push(fact("status", "billing_access", "Billing data", "Spend is available through the API on Pro and Enterprise teams only."));
-      }
+      facts.push(await vercelSpend(teamId, auth, signal));
     } else {
       const me = await getJson<{ user?: { username?: string; email?: string } }>("https://api.vercel.com/v2/user", auth, signal);
       if (me.status >= 400) unauthorized(me.status, "Vercel");
@@ -140,19 +164,13 @@ const vercel: Connector = {
   },
 };
 
-/** Plan allowances from supabase.com/pricing, read 2026-10. Re-check when Supabase changes its plans. */
-const SUPABASE_ALLOWANCES: Record<string, { dbMb: number; storageGb: number; mau: number; egressGb: number }> = {
-  free: { dbMb: 500, storageGb: 1, mau: 50_000, egressGb: 5 },
-  pro: { dbMb: 8_192, storageGb: 100, mau: 100_000, egressGb: 250 },
-  team: { dbMb: 8_192, storageGb: 100, mau: 100_000, egressGb: 250 },
-};
-
+/** One read-only query through the Management API (run as supabase_read_only_user); the first row, or null. */
 async function supabaseQuery(token: string, ref: string, query: string, signal?: AbortSignal): Promise<Record<string, unknown> | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   signal?.addEventListener("abort", () => controller.abort(), { once: true });
   try {
-    const response = await fetch(`https://api.supabase.com/v1/projects/${encodeURIComponent(ref)}/database/query`, {
+    const response = await fetch(`https://api.supabase.com/v1/projects/${encodeURIComponent(ref)}/database/query/read-only`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({ query }),
@@ -160,7 +178,7 @@ async function supabaseQuery(token: string, ref: string, query: string, signal?:
     });
     if (!response.ok) return null;
     const body = (await response.json()) as unknown;
-    const rows = Array.isArray(body) ? body : body && typeof body === "object" && Array.isArray((body as { data?: unknown }).data) ? (body as { data: unknown[] }).data : [];
+    const rows = Array.isArray(body) ? body : body && typeof body === "object" && Array.isArray((body as { result?: unknown }).result) ? (body as { result: unknown[] }).result : [];
     const first = rows[0];
     return first && typeof first === "object" ? (first as Record<string, unknown>) : null;
   } catch {
@@ -170,10 +188,24 @@ async function supabaseQuery(token: string, ref: string, query: string, signal?:
   }
 }
 
+const SUPABASE_SIZE_QUERY = "select pg_catalog.pg_database_size(pg_catalog.current_database())::bigint as bytes";
+const SUPABASE_SIZE_NOTE = "Read from the project's catalog with a read-only query through Supabase's Management API.";
+
+function supabaseSizeFact(ref: string, row: Record<string, unknown> | null, suffix = "", label = ""): ConnectorFact | null {
+  const bytes = row ? Number(row["bytes"]) : NaN;
+  if (!Number.isFinite(bytes)) return null;
+  const mb = Math.round((bytes / 1_048_576) * 10) / 10;
+  return fact("usage", `db_size_mb${suffix}`, `Database size${label}`, `${mb.toLocaleString("en-US")} MB`, mb, "MB", null, { url: `https://supabase.com/dashboard/project/${encodeURIComponent(ref)}/database/settings`, note: SUPABASE_SIZE_NOTE });
+}
+
+function supabasePlanFact(plan: string | null): ConnectorFact | null {
+  return plan ? fact("plan", "plan", "Plan", plan.charAt(0).toUpperCase() + plan.slice(1), null, null, null, { url: "https://supabase.com/pricing" }) : null;
+}
+
 const supabase: Connector = {
   slug: "supabase",
   name: "Supabase",
-  tokenHint: "A personal access token from your Supabase account. It is used to read the plan and to run three read-only size and count queries on the project.",
+  tokenHint: "A personal access token from your Supabase account, read only. It reads the plan, the project's status, size, advisors and migrations, and never a row of the app's tables.",
   tokenUrl: "https://supabase.com/dashboard/account/tokens",
   fields: [
     { key: "projectRef", label: "Project ref", hint: "The project's reference id, from its URL: supabase.com/dashboard/project/<ref>. Leave empty and birdsI reads up to three active projects.", required: false },
@@ -182,6 +214,33 @@ const supabase: Connector = {
   async probe(token, settings, signal) {
     const auth = { authorization: `Bearer ${token}` };
     const facts: ConnectorFact[] = [];
+    const ref = settings["projectRef"]?.trim();
+    if (ref) {
+      // One project, the way a key scoped to that project reads it: the project, then its organization's plan when the key may read it.
+      const project = await getJson<{ ref?: string; name?: string; status?: string; organization_slug?: string; organization_id?: string }>(`https://api.supabase.com/v1/projects/${encodeURIComponent(ref)}`, auth, signal);
+      if (project.status >= 400) unauthorized(project.status, "Supabase");
+      const status = String(project.body?.status ?? "UNKNOWN").toUpperCase();
+      const slug = project.body?.organization_slug ?? project.body?.organization_id ?? null;
+      if (slug) {
+        const org = await getJson<{ plan?: string; name?: string }>(`https://api.supabase.com/v1/organizations/${encodeURIComponent(slug)}`, auth, signal);
+        const plan = supabasePlanFact(org.status < 400 ? (org.body?.plan ?? null) : null);
+        if (plan) facts.push(plan);
+        else facts.push(fact("status", "plan_access", "Plan", org.status === 403 ? "Not read: the key cannot read the organization's settings. Give it Organization Settings: Read to read the plan." : "Not read: Supabase did not say the organization's plan.", null, null, null, { url: "https://supabase.com/dashboard/account/tokens" }));
+        if (org.status < 400 && org.body?.name) facts.push(fact("status", "organization", "Organization", org.body.name));
+      }
+      facts.push(fact("status", "project_status", "Project status", status === "INACTIVE" ? "Paused" : status === "ACTIVE_HEALTHY" ? "Running" : status.toLowerCase().replace(/_/g, " "), null, null, null, { url: `https://supabase.com/dashboard/project/${encodeURIComponent(ref)}` }));
+      if (status === "INACTIVE") {
+        facts.push(fact("status", "paused_projects", "Paused projects", project.body?.name ?? ref, 1, "projects", null, { note: "Free projects pause after a week without traffic." }));
+        return facts;
+      }
+      // The database size, read from the catalog. Rows of the app's own tables (its users, its files) are never
+      // read: the owner's rule is that an app's data is read only through the app's ops API or exports.
+      const size = supabaseSizeFact(ref, await supabaseQuery(token, ref, SUPABASE_SIZE_QUERY, signal));
+      facts.push(size ?? fact("status", "usage_access", "Database size", "Not read: the key could not run the read-only size query. Give it Database: Read.", null, null, null, { url: `https://supabase.com/dashboard/project/${encodeURIComponent(ref)}/database/settings` }));
+      return facts;
+    }
+
+    // An organization, or a key from before keys belonged to projects: the organization's plan and its projects.
     const orgs = await getJson<Array<{ id: string; slug?: string; name: string; plan?: string }>>("https://api.supabase.com/v1/organizations", auth, signal);
     if (orgs.status >= 400) unauthorized(orgs.status, "Supabase");
     const list = orgs.body ?? [];
@@ -189,57 +248,31 @@ const supabase: Connector = {
     const org = (wanted ? list.find((o) => o.slug === wanted || o.id === wanted) : list[0]) ?? null;
     if (!org) throw new Error(wanted ? `No Supabase organization named ${wanted} is visible to this token.` : "This token sees no Supabase organizations.");
     let plan = org.plan ?? null;
-    if (!plan && org.slug) {
-      const detail = await getJson<{ plan?: string }>(`https://api.supabase.com/v1/organizations/${encodeURIComponent(org.slug)}`, auth, signal);
+    if (!plan && (org.slug ?? org.id)) {
+      const detail = await getJson<{ plan?: string }>(`https://api.supabase.com/v1/organizations/${encodeURIComponent(org.slug ?? org.id)}`, auth, signal);
       plan = detail.body?.plan ?? null;
     }
-    const planKey = (plan ?? "").toLowerCase();
-    const allowance = SUPABASE_ALLOWANCES[planKey] ?? null;
-    if (plan) facts.push(fact("plan", "plan", "Plan", plan.charAt(0).toUpperCase() + plan.slice(1), null, null, null, { url: "https://supabase.com/pricing" }));
+    const planFact = supabasePlanFact(plan);
+    if (planFact) facts.push(planFact);
     facts.push(fact("status", "organization", "Organization", org.name));
 
-    const projects = await getJson<Array<{ id: string; name: string; status?: string; region?: string; organization_id?: string }>>("https://api.supabase.com/v1/projects", auth, signal);
-    const mine = (projects.status < 400 && projects.body ? projects.body : []).filter((p) => !p.organization_id || p.organization_id === org.id);
+    const projects = await getJson<Array<{ id: string; ref?: string; name: string; status?: string; organization_id?: string; organization_slug?: string }>>("https://api.supabase.com/v1/projects", auth, signal);
+    const mine = (projects.status < 400 && projects.body ? projects.body : []).filter((p) => (!p.organization_id && !p.organization_slug) || p.organization_id === org.id || p.organization_slug === org.slug);
     facts.push(fact("usage", "projects", "Projects", String(mine.length), mine.length, "projects"));
-    const paused = mine.filter((p) => /pause|inactive/i.test(p.status ?? ""));
+    const paused = mine.filter((p) => String(p.status ?? "").toUpperCase() === "INACTIVE");
     if (paused.length > 0) facts.push(fact("status", "paused_projects", "Paused projects", paused.map((p) => p.name).join(", "), paused.length, "projects", null, { note: "Free projects pause after a week without traffic." }));
-
-    // Real usage: three read-only queries on the project itself, through the Management API.
-    const wantedRef = settings["projectRef"]?.trim();
-    const targets = (wantedRef ? mine.filter((p) => p.id === wantedRef) : mine.filter((p) => /active|healthy/i.test(p.status ?? "active"))).slice(0, 3);
+    const targets = mine.filter((p) => String(p.status ?? "ACTIVE_HEALTHY").toUpperCase().startsWith("ACTIVE")).slice(0, 3);
     const many = targets.length > 1;
-    const note = "Read from the project with a read-only query through Supabase's Management API.";
     let readAny = false;
-    for (const project of targets) {
-      const suffix = many ? `:${project.id}` : "";
-      const label = many ? ` (${project.name})` : "";
-      const db = await supabaseQuery(token, project.id, "select pg_database_size(current_database())::bigint as bytes", signal);
-      const dbBytes = db ? Number(db["bytes"]) : NaN;
-      if (Number.isFinite(dbBytes)) {
-        const mb = Math.round((dbBytes / 1_048_576) * 10) / 10;
-        facts.push(fact("usage", `db_size_mb${suffix}`, `Database size${label}`, allowance ? `${mb} MB of ${allowance.dbMb} MB` : `${mb} MB`, mb, "MB", allowance?.dbMb ?? null, { note }));
-        readAny = true;
-      }
-      const storage = await supabaseQuery(token, project.id, "select coalesce(sum((metadata->>'size')::bigint), 0)::bigint as bytes from storage.objects", signal);
-      const storageBytes = storage ? Number(storage["bytes"]) : NaN;
-      if (Number.isFinite(storageBytes)) {
-        const gb = Math.round((storageBytes / 1_073_741_824) * 100) / 100;
-        facts.push(fact("usage", `storage_gb${suffix}`, `File storage${label}`, allowance ? `${gb} GB of ${allowance.storageGb} GB` : `${gb} GB`, gb, "GB", allowance?.storageGb ?? null, { note }));
-        readAny = true;
-      }
-      const mau = await supabaseQuery(token, project.id, "select count(*)::bigint as n from auth.users where last_sign_in_at > now() - interval '30 days'", signal);
-      const n = mau ? Number(mau["n"]) : NaN;
-      if (Number.isFinite(n)) {
-        facts.push(fact("usage", `mau${suffix}`, `Active users, 30 days${label}`, allowance ? `${n.toLocaleString("en-US")} of ${allowance.mau.toLocaleString("en-US")}` : n.toLocaleString("en-US"), n, "users", allowance?.mau ?? null, { note }));
+    for (const p of targets) {
+      const r = p.ref ?? p.id;
+      const size = supabaseSizeFact(r, await supabaseQuery(token, r, SUPABASE_SIZE_QUERY, signal), many ? `:${r}` : "", many ? ` (${p.name})` : "");
+      if (size) {
+        facts.push(size);
         readAny = true;
       }
     }
-    if (allowance) {
-      facts.push(fact("limit", "egress_gb", "Egress included", `${allowance.egressGb} GB a month`, allowance.egressGb, "GB", null, { url: "https://supabase.com/pricing", note: "Egress cannot be read by a query. The dashboard's usage page shows it." }));
-    }
-    if (!readAny) {
-      facts.push(fact("status", "usage_access", "Usage data", targets.length === 0 ? "No active project to read. Set the project ref in the connection." : "The token could not run read-only queries on the project. Database size, storage and active users are on the dashboard's usage page.", null, null, null, { url: "https://supabase.com/dashboard/org/_/usage" }));
-    }
+    if (!readAny) facts.push(fact("status", "usage_access", "Database size", targets.length === 0 ? "No active project to read. Add the project on the Projects page." : "Not read: the key could not run the read-only size query. Give it Database: Read.", null, null, null, { url: "https://supabase.com/dashboard/projects" }));
     return facts;
   },
 };
@@ -432,7 +465,29 @@ function numberIn(body: Record<string, unknown>, keys: string[]): number | null 
   return null;
 }
 
-export const CONNECTORS: readonly Connector[] = [vercel, supabase, stripe, anthropic, tavilyConnector, supadata, resend];
+const onesignal: Connector = {
+  slug: "onesignal",
+  name: "OneSignal",
+  tokenHint: "An App API key for this app (Settings > Keys & IDs). OneSignal keys cannot be made read only, so birdsI only reads with it, and an IP allowlist is not needed.",
+  tokenUrl: "https://dashboard.onesignal.com",
+  fields: [{ key: "appId", label: "App id", hint: "OneSignal > the app > Settings > Keys & IDs > OneSignal App ID.", required: true }],
+  async probe(token, settings, signal) {
+    const appId = settings["appId"]?.trim();
+    if (!appId) throw new Error("A OneSignal key reads one app: add the app id.");
+    // The answer carries push credentials; only the counts and the name are read from it.
+    const app = await getJson<{ name?: string; players?: number; messageable_players?: number }>(`https://api.onesignal.com/apps/${encodeURIComponent(appId)}`, { authorization: `Key ${token}`, "content-type": "application/json" }, signal);
+    if (app.status >= 400) unauthorized(app.status, "OneSignal");
+    const facts: ConnectorFact[] = [];
+    const page = `https://dashboard.onesignal.com/apps/${encodeURIComponent(appId)}`;
+    const subscribed = typeof app.body?.messageable_players === "number" ? app.body.messageable_players : null;
+    const total = typeof app.body?.players === "number" ? app.body.players : null;
+    if (subscribed !== null) facts.push(fact("usage", "subscribed", "Subscribed", subscribed.toLocaleString("en-US"), subscribed, "subscriptions", null, { url: page, note: "Subscriptions that can receive a message now, as OneSignal counts them. Not the same as monthly active users, which the free plan's limit counts and the API does not report." }));
+    if (total !== null) facts.push(fact("usage", "subscriptions", "Subscriptions", total.toLocaleString("en-US"), total, "subscriptions", null, { url: page }));
+    return facts;
+  },
+};
+
+export const CONNECTORS: readonly Connector[] = [vercel, supabase, onesignal, stripe, anthropic, tavilyConnector, supadata, resend];
 export const CONNECTOR_BY_SLUG = new Map(CONNECTORS.map((c) => [c.slug, c]));
 
 /** The public shape of a connector, for the UI. */
@@ -450,5 +505,6 @@ export function settingsForProject(project: { vendor: string; kind: string; ref:
     return { ...(team ? { teamId: team } : {}), ...(project.kind === "project" ? { project: project.ref } : {}) };
   }
   if (project.vendor === "supabase") return project.kind === "project" ? { projectRef: project.ref } : { orgSlug: project.ref };
+  if (project.vendor === "onesignal") return { appId: project.ref };
   return { ...project.settings };
 }

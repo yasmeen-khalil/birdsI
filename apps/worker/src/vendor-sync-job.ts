@@ -1,7 +1,7 @@
-import { decryptSecret, expireAskedFacts, factsForVendors, keysForRepo, markConnectionProbed, replaceFacts, repoWithInstallation, setVendorsSyncedAt, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
-import { CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, settingsForProject, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
+import { decryptSecret, expireAskedFacts, factsForVendors, keysForRepo, latestServiceMap, markConnectionProbed, readsAvailable, replaceFacts, repoWithInstallation, saveProjectRead, setVendorsSyncedAt, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
+import { CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, readProject, settingsForProject, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
 import { planReads } from "./read-plan";
-import { bestFacts, LIMITS_BY_SLUG, tierFor, type FactSource, type ProjectHints } from "@birdsi/shared";
+import { bestFacts, LIMITS_BY_SLUG, readParts, readsInDepth, tierFor, type FactSource, type ProjectHints } from "@birdsi/shared";
 
 /** One sync holds the only worker while it runs, so it stops starting new vendors after this long. */
 const SYNC_BUDGET_MS = 10 * 60_000;
@@ -22,10 +22,6 @@ export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heart
   try {
     // Lists stored before the per-scan cap existed can be longer; the sync reads no more than a scan keeps.
     const vendors = (await vendorsForRepo(repoId)).slice(0, MAX_VENDORS_PER_SCAN);
-    if (vendors.length === 0) {
-      await setVendorsSyncedAt(repoId, new Date());
-      return;
-    }
     const { repo } = await repoWithInstallation(repoId);
     const keys = await keysForRepo({ id: repo.id, owner_user_id: ownerUserId, full_name: repo.full_name });
     const allKeys = new Map([...keys.tied, ...keys.untied].map((k) => [k.id, k]));
@@ -62,6 +58,29 @@ export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heart
       await expireAskedFacts(v.id, 30);
       // The plan's limits from the checked list. This also replaces the tiers a model read from pricing pages before v3.
       await replaceFacts(v.id, "docs", await checkedLimitFacts(v.id, v.slug));
+    }
+
+    // In depth: each Vercel project, Supabase project and OneSignal app of the app that has a key,
+    // read part by part and kept dated. The map says which migrations the database should have.
+    if (keys.app && (await readsAvailable())) {
+      const map = (await latestServiceMap(repo.id).catch(() => null))?.map ?? null;
+      for (const project of keys.projects.filter((p) => readsInDepth(p.vendor, p.kind))) {
+        if (Date.now() > deadline) break;
+        const key = keys.tied.find((k) => k.app_project_id === project.id);
+        if (!key) continue;
+        const data = await readProject({ vendor: project.vendor, kind: project.kind, ref: project.ref, label: project.label, settings: project.settings ?? {} }, decryptSecret(key.token_ciphertext), map, { now: new Date() });
+        if (!data) continue;
+        await saveProjectRead({ appId: keys.app.id, projectId: project.id, data });
+        // The key's state follows the read: it failed only when no part of the project could be read.
+        const parts = readParts(data);
+        const failed = parts.filter((p) => !p.reading.ok);
+        if (failed.length === parts.length) {
+          const first = failed[0]!.reading;
+          await markConnectionProbed(key.id, "failed", first.ok ? null : first.reason);
+        } else {
+          await markConnectionProbed(key.id, "ok", null);
+        }
+      }
     }
     await setVendorsSyncedAt(repoId, new Date());
   } finally {

@@ -4,6 +4,18 @@
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.
 
+### Step 4: three read connectors
+
+- Each Vercel project, Supabase project and OneSignal app of an app is read in depth with its own key, every hour and after every map, and each read is kept (`20261018000300_project_reads.sql`, the newest 48 per project). `GET /api/v1/repos/:id/reads` returns the newest read of each project.
+- A read has parts, and each part is dated with the API address it came from and the dashboard page that shows the same thing. A part that could not be read carries the reason in plain words (the key refused, the project not found, the vendor slowing birdsI down, the project paused) and is never a zero. One part failing never hides the others.
+- Vercel: the project and its production address, the last 20 deployments with state, target, age, commit and error message, every env name with the environments it applies to and its type (never its value), the crons Vercel has registered and whether they are on, the domains and whether each is verified, and the error lines of the last failed build and of the live deployment's functions, masked.
+- Supabase: the project's status (paused or not), the database size, the security and performance advisors, and the migrations owed, from the markers in the app's `verify.sql` (read by the map) checked against the database's catalog through Supabase's read-only endpoint, or from the project's migration history for Supabase CLI migrations. The SQL reads the catalog and the size only, never a row of the app's tables.
+- OneSignal (new): the subscriptions and how many can receive a message, the platforms the app sends to, what a send to everyone would reach and whether OneSignal is dropping mobile push for the organization's plan (its estimate, which sends nothing), and the last 10 messages with OneSignal's own counts per platform. A campaign keeps its name. A message sent to one person keeps no text. Connecting a OneSignal key works now: before, the Projects page offered it and refused it.
+- Keys scoped to one project work. A Vercel token scoped to the project is accepted, and the plan says it needs a team token to be read. A Supabase token scoped to the project reads the project, the plan when it may read the organization, and the size.
+- The Supabase connector no longer counts rows of the app's own tables (its users for active users, its files for storage): an app's own data is read only through the app's ops API or exports (the owner's rule). Its hard-coded plan allowances are gone too: the checked limits list is the one source.
+- A key's state on the Projects page follows the deep read: it says the key could not read only when no part of the project could be read.
+- The privacy page and the security policy say exactly what is read and kept.
+
 ### Step 3: the service map
 
 - Every map now reads the app's service map, by rules, with the file and line of every entry. No model reads the code.
@@ -27,7 +39,7 @@ birdsI becomes the cockpit for its owner's apps: one page per app, read from the
 - A project is one place at a vendor: a Vercel project per deployment (the product and the ops one), a Vercel team, a Supabase project ref or organization, a Clerk instance, a OneSignal app id, a RevenueCat project, a Stripe account, an App Store app id, a Resend domain, an Anthropic organization. Each id is checked against the shape that vendor's ids have, and each project links to its own place in the vendor's dashboard.
 - A key belongs to one project of one app, never to a vendor per person. It is checked with the vendor before it is stored, stored encrypted, never shown again, and only reads: the database refuses any other scope. Two projects can share one key without the key ever leaving the server ("Use the key of"), and the page says which projects share a key by a keyed fingerprint, never by the key.
 - The new Projects page on each app: name, environments, projects grouped by vendor, each key's state and the reason when it could not be read, and the record of every change (a new record kind, Projects and keys).
-- Keys connected before v3 move without loss (`20261018000100_apps_projects.sql`): for an owner with one app each becomes a project of it; with several apps they stay as they were, are still read the old way, and the Projects page ties each to its project in one step.
+- Keys connected before v3 move without loss (`20261018000100_apps_projects.sql`): for an owner with one app each becomes a project of it. With several apps they stay as they were, are still read the old way, and the Projects page ties each to its project in one step.
 - The read job reads each project with its own key, and a vendor with several projects (Flowsophy's three Vercel projects) gets each project's facts under its label.
 - Agents see the app's projects and each key's state in `birdsi_inventory`, `birdsi inventory` and `.birdsi/projects.md`.
 - Every migration now runs in the tests, in order, on a real Postgres (PGlite), and `verify.sql` must say OK on every row.

@@ -34,7 +34,8 @@ with markers (migration, kind, name, col) as (
     ('20261018000100 apps',                      'table',    'apps',                null),
     ('20261018000100 app projects',              'table',    'app_projects',        null),
     ('20261018000100 keys per project',          'column',   'connections',         'app_project_id'),
-    ('20261018000200 service maps',              'table',    'service_maps',        null)
+    ('20261018000200 service maps',              'table',    'service_maps',        null),
+    ('20261018000300 project reads',             'table',    'project_reads',       null)
 )
 select
   m.migration,
