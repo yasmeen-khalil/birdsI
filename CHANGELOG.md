@@ -4,6 +4,11 @@
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.
 
+### Step 7: the documents and the owner's clicks
+
+- The owner's steps for v3 in one place (private): the seven migrations in order and `verify.sql`, the keys v3 no longer reads, a key per vendor with the exact clicks (a Vercel token scoped to the team, a Supabase personal access token scoped to the project with Read permissions only, a OneSignal App API key) and where each goes, the alert email key, the dates to watch, and a walk through Flowsophy's cockpit and then Lamp Post's.
+- The security policy says what the alert email holds and what the MCP tools may do. The feature map, the architecture and the security notes describe the cockpit end to end.
+
 ### Step 6: the cockpit
 
 - Each app's page is its cockpit now (the nav's first item, Cockpit). From the top: the open alerts with what to do, then each Vercel project (the deployment its label names, the newest production deployment with its state, age, commit and error and what production still serves, the env names the deployment's code needs against the ones set per environment with the missing ones named, its crons registered or not, its domains, the error lines read, its key's expiry), each Supabase project (running or paused, the size against the plan's limit, the migrations owed, the security and performance advisors), each OneSignal app (subscriptions, the platforms, OneSignal's estimate of a send to everyone and whether mobile push is dropped, recent messages with their counts), then what the map read from the code (services with their plan and key state, crons with their handler and whether it checks the secret, webhooks with the line that checks the sender, store apps, migrations, public pages). The code's findings, the vision and the recent maps follow under The code.
