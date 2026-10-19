@@ -5,12 +5,16 @@ import {
   appendEvent,
   downloadSnapshot,
   enqueueJob,
+  ensureAppForRepo,
   insertDependencies,
   insertFindings,
+  MAPS_MIGRATION,
   recordUsage,
   releaseSnapshot,
   replaceVendors,
+  repoForUser,
   repoWithInstallation,
+  saveServiceMap,
   scanById,
   snapshotById,
   stopRequested,
@@ -19,7 +23,7 @@ import {
   type JobRow,
 } from "@birdsi/db";
 import { GitHubSource, runScan, snapshotFromTarball, type EngineConfig, type Snapshot } from "@birdsi/engine";
-import type { ProjectHints, ScanEvent } from "@birdsi/shared";
+import type { ProjectHints, ScanEvent, ServiceMap } from "@birdsi/shared";
 import { spendHook } from "./spend";
 
 /** An error written for the person who started the map; its message is shown as it is. */
@@ -87,6 +91,12 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
       onVendors: async (vendors) => {
         if (scan.repo_id) await replaceVendors(scan.repo_id, scanId, vendors);
       },
+      onMap: async (map) => {
+        if (!scan.repo_id) return;
+        assertHeld();
+        const note = await keepMap(scan.repo_id, scan.owner_user_id, scanId, map);
+        if (note) await emit({ type: "note", text: note });
+      },
       signal: controller.signal,
       onEvent: emit,
       beforeCall: spend.beforeCall,
@@ -129,6 +139,19 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
     await (snapshot as Snapshot | null)?.cleanup();
     // The uploaded code is deleted as soon as its map has run; nothing needs it afterwards.
     if (scan.snapshot_id && !lost) await releaseSnapshot(scan.snapshot_id).catch((error) => console.error(`[worker] could not delete snapshot ${scan.snapshot_id}: ${error instanceof Error ? error.message : String(error)}`));
+  }
+}
+
+/** Stores the map with its app. Returns a line for the run when it could not be kept; never throws, the map of the code goes on. */
+async function keepMap(repoId: string, ownerUserId: string | null, scanId: string, map: ServiceMap): Promise<string | null> {
+  try {
+    const repo = ownerUserId ? await repoForUser(repoId, ownerUserId) : null;
+    const app = repo ? await ensureAppForRepo(repo) : null;
+    const kept = await saveServiceMap({ repoId, appId: app?.id ?? null, scanId, map });
+    return kept ? null : `The service map was read but not kept: the migration ${MAPS_MIGRATION} has not run on birdsI's database yet.`;
+  } catch (error) {
+    console.error(`[worker] could not keep the service map of scan ${scanId}: ${error instanceof Error ? error.message : String(error)}`);
+    return "The service map was read but could not be saved. The next map tries again.";
   }
 }
 

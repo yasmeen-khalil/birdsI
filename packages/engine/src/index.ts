@@ -14,3 +14,4 @@ export { redact, maskSecrets } from "./checks/secrets";
 export { runScan, STEP_LABELS, type ScanInput, type ScanResult } from "./scan/runner";
 export { rankFindings, summarise } from "./scan/rank";
 export * from "./vendors/index";
+export { buildServiceMap, describeSchedule, parseMarkers, type MapMeta } from "./map/index";

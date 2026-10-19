@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Dependency, FindingDraft, ProjectHints, ScanEvent, ScanStats, ScanStep, ScanSummary, VendorDraft } from "@birdsi/shared";
+import type { Dependency, FindingDraft, ProjectHints, ScanEvent, ScanStats, ScanStep, ScanSummary, ServiceMap, VendorDraft } from "@birdsi/shared";
 import { checksFor } from "../checks/registry";
 import type { Check, CheckContext } from "../checks/types";
 import { toDependency } from "../checks/vulnerabilities";
@@ -9,6 +9,7 @@ import { collectDependencies } from "../inventory/manifests";
 import { prioritise } from "../inventory/priority";
 import { walkInventory, type Inventory } from "../inventory/walk";
 import { ModelClient, type BeforeCall, type Usage } from "../models/client";
+import { buildServiceMap } from "../map/index";
 import type { Snapshot } from "../source/types";
 import { discoverVendors } from "../vendors/discover";
 import { rankFindings, summarise } from "./rank";
@@ -20,6 +21,8 @@ export interface ScanInput {
   projectHints?: ProjectHints | null;
   /** Called as soon as the vendors are known, before the slower steps, so the dashboard can show them at once. */
   onVendors?: (vendors: VendorDraft[]) => Promise<void> | void;
+  /** Called with the service map as soon as it is read, inside the map step, so it is kept even if a later step stops. */
+  onMap?: (map: ServiceMap) => Promise<void> | void;
   signal?: AbortSignal;
   onEvent: (event: ScanEvent) => Promise<void>;
   onUsage?: (usage: Usage) => Promise<void> | void;
@@ -35,6 +38,8 @@ export interface ScanResult {
   inventory: Inventory;
   /** Outside services the code depends on, found deterministically. */
   vendors: VendorDraft[];
+  /** Deployments, env names, crons, webhooks, store apps, migrations and public pages, each with its file and line. Null when it could not be read. */
+  map: ServiceMap | null;
   /** The resolved code, so the caller can clean it up. */
   snapshot: Snapshot;
 }
@@ -56,7 +61,8 @@ const STEP_LABELS: Record<ScanStep, string> = {
 
 /**
  * Maps one snapshot of an app's code: every file, package and outside
- * service, then the rule-based checks. No model reads the code; only the
+ * service, the service map (deployments, env names, crons, webhooks, store
+ * apps, migrations, public pages), then the rule-based checks. No model reads the code; only the
  * official-docs check calls one, to compare a package's own documentation
  * with how the code imports it, and it runs only when its keys are set.
  */
@@ -127,6 +133,30 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   await emit({ type: "step_done", step: "vendors", findings: 0, durationMs: Date.now() - vendorsStart });
   if (vendors.length > 0) await input.onVendors?.(vendors);
 
+  // Map: what each deployment needs, by rules, with the file and line for every entry.
+  let map: ServiceMap | null = null;
+  if (!signal.aborted) {
+    const mapStart = Date.now();
+    await emit({ type: "step_started", step: "map", label: STEP_LABELS.map });
+    try {
+      map = await buildServiceMap(inventory, rawDependencies, vendors, { commit: snapshot.commitSha ?? null, branch: snapshot.branch ?? null });
+      await emit({
+        type: "service_map",
+        services: map.services.length,
+        envNames: map.env.length,
+        crons: map.crons.length,
+        webhooks: map.webhooks.length,
+        storeApps: map.storeApps.length,
+        migrations: map.migrations.files.length,
+        roles: map.roles.names,
+      });
+    } catch (error) {
+      await note(`The service map could not be read (${error instanceof Error ? error.message.slice(0, 160) : String(error)}).`);
+    }
+    if (map) await input.onMap?.(map);
+    await emit({ type: "step_done", step: "map", findings: 0, durationMs: Date.now() - mapStart });
+  }
+
   const readCache = new Map<string, string>();
   const read = async (path: string): Promise<string> => {
     const cached = readCache.get(path);
@@ -187,7 +217,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   const summary = summarise(ranked, ranked.map((f) => f.key));
   if (signal.aborted) {
     stats.durationMs = Date.now() - started;
-    return { findings: ranked, dependencies, summary, stats, inventory, vendors, snapshot };
+    return { findings: ranked, dependencies, summary, stats, inventory, vendors, map, snapshot };
   }
 
   // Rank
@@ -198,12 +228,12 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   stats.throttledCalls = models.throttledCalls;
   if (stats.throttledCalls > 0) await note(`${stats.throttledCalls} docs check calls were slowed by the provider's rate limit and retried.`);
   await emit({ type: "scan_done", findings: ranked.length, durationMs: stats.durationMs });
-  return { findings: ranked, dependencies, summary, stats, inventory, vendors, snapshot };
+  return { findings: ranked, dependencies, summary, stats, inventory, vendors, map, snapshot };
 }
 
 function orderedSteps(active: Check[], fetch: boolean): ScanStep[] {
   const order: ScanStep[] = ["fetch", "inventory", "dependencies", "vendors", "map", "secrets", "vulnerabilities", "docs", "rank"];
-  const present = new Set<ScanStep>(["inventory", "vendors", "rank"]);
+  const present = new Set<ScanStep>(["inventory", "vendors", "map", "rank"]);
   if (fetch) present.add("fetch");
   for (const check of active) present.add(check.step);
   return order.filter((s) => present.has(s));

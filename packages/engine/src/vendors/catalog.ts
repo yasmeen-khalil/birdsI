@@ -439,6 +439,21 @@ export const CATALOG: readonly CatalogEntry[] = [
     docsUrl: "https://openrouter.ai/docs",
     dashboardUrl: "https://openrouter.ai/credits",
   }),
+  e("metalpriceapi", "MetalpriceAPI", "other", "Live and historical prices of gold, silver and other metals through an API.", {
+    envVars: [/^METALPRICE(_API)?_/],
+    domains: ["api.metalpriceapi.com", "metalpriceapi.com"],
+    pricingUrl: "https://metalpriceapi.com/pricing",
+    docsUrl: "https://metalpriceapi.com/documentation",
+    dashboardUrl: "https://metalpriceapi.com/dashboard",
+  }),
+  e("apple", "App Store Connect (Apple)", "hosting", "Publishing the iOS app: the App Store record, TestFlight, the yearly developer membership.", {
+    envVars: [/^(APP_STORE_CONNECT|ASC|APPLE_(TEAM|KEY|ISSUER|APP))_/],
+    domains: ["appstoreconnect.apple.com", "api.appstoreconnect.apple.com"],
+    configFiles: [/(^|\/)ios\/App\/App\.xcodeproj\/project\.pbxproj$/],
+    pricingUrl: "https://developer.apple.com/programs/",
+    docsUrl: "https://developer.apple.com/documentation/appstoreconnectapi",
+    dashboardUrl: "https://appstoreconnect.apple.com/apps",
+  }),
   e("expo", "Expo (EAS)", "hosting", "Builds, updates and submissions for React Native apps.", {
     packages: [/^expo$/, /^eas-cli$/],
     envVars: [/^EXPO_(TOKEN|PUBLIC_PROJECT)/, /^EAS_/],

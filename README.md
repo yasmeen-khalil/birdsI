@@ -8,7 +8,7 @@ birdsI is its owner's cockpit for their own apps first. A product for others com
 
 ## What it does
 
-- **The map, from the code.** Every outside service the app uses, found by rules from packages, imports, env names, web addresses and config files, each with the file and line it came from. Rule-based checks run with it: committed keys, unsafe settings, published vulnerabilities (OSV), packages two or more majors behind. When its keys are set, the docs check compares a main package's own current documentation with how the code imports it, and must cite the page.
+- **The map, from the code.** Every outside service the app uses, found by rules from packages, imports, env names, web addresses and config files, each with the file and line it came from. The service map with it: the env names each deployment needs (by the role names the code compares, such as `APP_ROLE`), the crons and whether their handlers check the secret, the webhooks and the line that verifies each, the store apps, the migrations the repository holds and its public pages. It names env variables and never reads a value. Each map is kept, dated, with its commit. Rule-based checks run with it: committed keys, unsafe settings, published vulnerabilities (OSV), packages two or more majors behind. When its keys are set, the docs check compares a main package's own current documentation with how the code imports it, and must cite the page.
 - **Apps and their projects.** Each app is a record with the vendor projects it has: one Vercel project per deployment, the Supabase project, the OneSignal app, and the rest. A key belongs to one project, only reads, is checked with the vendor before it is stored, and is never shown again.
 - **What the accounts say.** With those keys, birdsI reads each project: plan, usage, status. Every reading is dated. When it cannot read a project, it says so.
 - **The checked limits list.** What each vendor's plans include, what ends them and the next price, read by a person from each vendor's own pricing page, dated and quoted (`packages/shared/src/limits.ts`). A model never reads a pricing page.
@@ -106,10 +106,11 @@ See `packages/cli/README.md` for every command, option and exit code, and the MC
 2. **Inventory**: every file, honouring `.gitignore`.
 3. **Dependencies**: manifests and lockfiles across npm, PyPI, Go, crates.io, RubyGems, Packagist, Maven, NuGet, Hex and Pub.
 4. **Vendors**: every outside service, from packages, env names, addresses, config files and Stripe Projects.
-5. **Checks** (Proven): committed keys, repository hygiene, OSV vulnerabilities, versions behind.
-6. **Docs check** (Doc-verified, optional): a main package's own documentation against how the code imports it, cited.
-7. **Rank**: deterministic ordering and de-duplication.
-8. **Read the accounts**: queued after every map, and every hour by the worker.
+5. **Service map**: the import graph from each route, the deployments and the env names each one reaches, crons from `vercel.json`, webhooks, store apps from Capacitor, Xcode, Gradle and Expo config, migrations with `verify.sql` markers, the sitemap, robots and `llms.txt`. Only example env files are read, for names and comments.
+6. **Checks** (Proven): committed keys, repository hygiene, OSV vulnerabilities, versions behind.
+7. **Docs check** (Doc-verified, optional): a main package's own documentation against how the code imports it, cited.
+8. **Rank**: deterministic ordering and de-duplication.
+9. **Read the accounts**: queued after every map, and every hour by the worker.
 
 The uploaded snapshot is deleted as soon as its map has run. Every step writes to an append-only event log that the web app, the terminal and the MCP server replay live.
 

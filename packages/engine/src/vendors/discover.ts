@@ -134,7 +134,7 @@ function slugFromEnv(name: string): { slug: string; label: string } | null {
   return { slug, label };
 }
 
-function matchEnv(name: string): CatalogEntry | null {
+export function matchEnv(name: string): CatalogEntry | null {
   for (const entry of CATALOG) for (const re of entry.envVars) if (re.test(name)) return entry;
   return null;
 }
@@ -145,7 +145,7 @@ function matchDomain(domain: string): CatalogEntry | null {
   return null;
 }
 
-function matchPackage(name: string): CatalogEntry | null {
+export function matchPackage(name: string): CatalogEntry | null {
   for (const entry of CATALOG) for (const re of entry.packages) if (re.test(name)) return entry;
   return null;
 }

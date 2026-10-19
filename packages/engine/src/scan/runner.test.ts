@@ -82,6 +82,11 @@ describe("runScan over the fixture app", () => {
     const steps = events.filter((e) => e.type === "step_started").map((e) => (e as { step: string }).step);
     expect(steps).toEqual(expect.arrayContaining(["inventory", "vendors", "secrets", "vulnerabilities", "rank"]));
     expect(steps).not.toContain("review");
+    expect(steps.indexOf("map")).toBe(steps.indexOf("vendors") + 1);
+    expect(events.find((e) => e.type === "service_map")).toMatchObject({ crons: 2, webhooks: 3, storeApps: 1, migrations: 2, roles: ["app", "ops"] });
+    // The map names env files and lines, never a value from an env file.
+    expect(result.map?.env.map((e) => e.name)).not.toContain("DATABASE_URL");
+    expect(JSON.stringify(result.map)).not.toContain("hun" + "ter2");
     expect(events.some((e) => e.type === "note" && e.text.includes("skipped"))).toBe(true);
     expect(result.stats.inputTokens).toBe(0);
   });

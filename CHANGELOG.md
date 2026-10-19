@@ -4,6 +4,23 @@
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.
 
+### Step 3: the service map
+
+- Every map now reads the app's service map, by rules, with the file and line of every entry. No model reads the code.
+- Services: each one found, with its SDK imports (the first twelve places), its env names, its dashboard and pricing page, and whether the checked limits list covers it.
+- Env names: every name the code reads (`process.env`, `import.meta.env`, `Deno.env.get`, destructuring) or the example env file declares, the deployment that reaches it, whether it is public, optional and why (the example file says so, or every read has a default), its alternatives (`SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`), and the first eight places it is read. Names a vendor's SDK reads are tied to where the SDK is imported. Platform names (`NODE_ENV`, `VERCEL_*`) are left out.
+- Deployments: one codebase serving several (Flowsophy's product, ops and schools) is read from the code's own comparisons, such as `process.env.APP_ROLE === "ops"`, and each route belongs to the role its path names, to the crons, to the webhooks or to the shared product. What each deployment needs follows: the product needs every name its routes reach and never the role name, another deployment needs its own routes' names and the role name, and shared code's names are listed apart.
+- Crons from every `vercel.json`: the schedule in words, times a day, the handler file and whether the handler (or a helper it imports) checks `CRON_SECRET`.
+- Webhooks: every route with a `webhook` or `webhooks` folder in its path, with the sender, the methods, and the line that checks the signature or the shared secret.
+- Store apps from Capacitor, Xcode, Gradle, Expo and app config: bundle id, name, web address, merged across files.
+- Migrations: Supabase CLI, numbered (`0001_`) or versioned (`supabase-vN.sql`) files, the `verify.sql` markers, and a `schema_migrations` record when the code creates one. Which ran where is read from the database in step 4.
+- The public pages: sitemap, robots and `llms.txt`.
+- The map names env variables and never holds a value: only example env files are read, for names and comments, and every source line is masked.
+- Each map is kept, dated, with its commit and branch, the newest 30 per app (`20261018000200_service_maps.sql`). `GET /api/v1/repos/:id/map` returns the newest with the dates of the ones before.
+- The live map and the terminal show the map's totals. The Projects page names the deployments the code serves and checks a Vercel project labelled with one against that deployment's needs.
+- `scripts/map-app.mts` maps an app on this computer (its last commit) and writes the map as JSON. Flowsophy, Lamp Post and Vaultaire were mapped with it on 2026-10-18.
+- Two services the owner's apps use joined the catalog: MetalpriceAPI (Vaultaire's metal prices) and App Store Connect (any app with an Xcode project).
+
 ### Step 2: apps, and keys tied to projects
 
 - An app is its own record: a name, the repository its code lives in, the environments birdsI checks (production by default), and the vendor projects it has. Every repository is an app from its first map on.

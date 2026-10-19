@@ -72,6 +72,17 @@ export const ScanEvent = z.discriminatedUnion("type", [
     detectedBy: z.array(z.string()),
   }),
   z.object({
+    /** The service map's totals. The map itself is stored with the app, not in the event log. */
+    type: z.literal("service_map"),
+    services: z.number().int().nonnegative(),
+    envNames: z.number().int().nonnegative(),
+    crons: z.number().int().nonnegative(),
+    webhooks: z.number().int().nonnegative(),
+    storeApps: z.number().int().nonnegative(),
+    migrations: z.number().int().nonnegative(),
+    roles: z.array(z.string()),
+  }),
+  z.object({
     type: z.literal("finding"),
     finding: FindingDraft.extend({ id: z.string() }),
   }),

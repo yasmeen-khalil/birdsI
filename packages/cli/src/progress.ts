@@ -1,4 +1,4 @@
-import type { ScanEvent, ScanEventRecord, ScanStep } from "@birdsi/shared";
+import { mapCountsLine, type ScanEvent, type ScanEventRecord, type ScanStep } from "@birdsi/shared";
 import {
   STEP_LABEL,
   STEP_UNIT,
@@ -181,6 +181,9 @@ export class ScanProgress {
       }
       case "audit_area":
         // Written only by the pre-launch audit, removed in v3.
+        return;
+      case "service_map":
+        this.print(paint.dim(this.style, `  Map: ${mapCountsLine(event)}`));
         return;
       case "note":
         this.print(paint.dim(this.style, `  ${event.text}`));

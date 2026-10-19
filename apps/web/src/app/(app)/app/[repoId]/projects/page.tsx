@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ExternalLink } from "lucide-react";
-import { vendorsForRepo } from "@birdsi/db";
+import { latestServiceMap, vendorsForRepo } from "@birdsi/db";
 import { PROJECT_VENDORS, PROJECT_VENDOR_BY_SLUG, type AppProject } from "@birdsi/shared";
 import { AddProjectForm, AppNameForm, EnvironmentsForm, ProjectActions, ProjectDetailsForm, TieKeyControl, type VendorChoice } from "@/components/apps/ProjectControls";
 import { LocalTime } from "@/components/LocalTime";
@@ -65,7 +65,8 @@ function KeyStatus({ project }: { project: AppProject }) {
 export default async function ProjectsPage({ params }: { params: Promise<{ repoId: string }> }) {
   const { repoId } = await params;
   const { user, repo } = await repoContext(repoId);
-  const [{ app, untiedKeys }, vendors] = await Promise.all([loadApp(repo.id, user), vendorsForRepo(repo.id)]);
+  const [{ app, untiedKeys }, vendors, stored] = await Promise.all([loadApp(repo.id, user), vendorsForRepo(repo.id), latestServiceMap(repo.id).catch(() => null)]);
+  const roles = stored?.map.roles ?? null;
 
   if (!app) {
     return (
@@ -146,6 +147,11 @@ export default async function ProjectsPage({ params }: { params: Promise<{ repoI
           {app.projects.length === 0 && (
             <p className="t-body c2" style={{ maxWidth: 720 }}>
               Add each vendor project this app has: one Vercel project per deployment (the product and the ops one), the Supabase project, the OneSignal app, and the rest. {suggested.length > 0 ? `The code uses ${suggested.map(vendorName).join(", ")}, so those come first.` : ""}
+            </p>
+          )}
+          {roles && roles.names.length > 1 && (
+            <p className="t-small c2" style={{ maxWidth: 720 }}>
+              The code serves {roles.names.length} deployments, chosen by <span className="t-mono-s">{roles.envName}</span>: {roles.names.join(", ")}. Label each Vercel project with the deployment it serves, such as {roles.names.filter((n) => n !== roles.defaultRole).join(" or ")}, and the cockpit checks its env names against what that deployment needs. Any other label is checked as {roles.defaultRole ?? "the product"}, the deployment when <span className="t-mono-s">{roles.envName}</span> is unset.
             </p>
           )}
         </div>

@@ -1,4 +1,4 @@
-import type { FindingDraft, ScanEventRecord, ScanKind, ScanStatus, ScanStep } from "@birdsi/shared";
+import { mapCountsLine, type FindingDraft, type ScanEventRecord, type ScanKind, type ScanStatus, type ScanStep } from "@birdsi/shared";
 
 /**
  * Pure reduction of a scan's event log into what the live view shows.
@@ -16,6 +16,8 @@ export interface StepView {
   findings?: number;
   durationMs?: number;
   startedAt?: string;
+  /** What the step found, in one line, when it says more than a count. */
+  detail?: string;
 }
 
 export interface ScanView {
@@ -128,6 +130,9 @@ export function deriveScanView(events: ScanEventRecord[], stepLabels: Record<str
       case "vendor":
         if (!view.vendors.some((v) => v.slug === event.slug)) view.vendors.push({ slug: event.slug, name: event.name, category: event.category, detectedBy: event.detectedBy });
         break;
+      case "service_map":
+        stepAt("map").detail = mapCountsLine(event);
+        break;
       case "note":
         view.notes.push(event.text);
         break;
@@ -178,6 +183,7 @@ export function stepDetail(s: StepView): string {
     return "running";
   }
   if (s.step === "rank") return s.findings !== undefined ? `${s.findings} ${s.findings === 1 ? "finding" : "findings"}` : "";
+  if (s.detail) return s.detail;
   const parts: string[] = [];
   if (s.total !== undefined && UNITS[s.step]) parts.push(`${s.total} ${unitFor(s.step, s.total)}`);
   if (s.findings) parts.push(`${s.findings} found`);
