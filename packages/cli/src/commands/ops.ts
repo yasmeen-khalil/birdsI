@@ -1,3 +1,4 @@
+import { alertsLines, cockpitLines } from "../cockpit";
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -410,6 +411,48 @@ export function formatNeedsYou(openQuestions: number, pendingActions: number, al
 }
 
 /** The whole knowledge base in one read: vision, vendors, alerts, stages, what needs the owner. */
+/** The app's cockpit: alerts, each project's read, and the map, in one screen. */
+export async function cockpitCommand(options: PrintOptions): Promise<number> {
+  const style = styleFor(process.stdout, options);
+  const { api } = await ApiClient.fromEnvironment();
+  api.requireAuth();
+  try {
+    const repo = await resolveRepo(api, options.repo);
+    const result = await api.cockpit(repo.id);
+    if (options.json) {
+      printJson(result.raw);
+      return EXIT.ok;
+    }
+    const [first, ...rest] = cockpitLines(result.data.cockpit);
+    println(paint.bold(style, first ?? repo.fullName));
+    for (const line of rest) println(wrap(line, style, line.startsWith("  ") || line.startsWith("- ") ? "    " : "  "));
+    println(paint.dim(style, `Open it: ${api.baseUrl}/app/${repo.id}`));
+    return EXIT.ok;
+  } catch (error) {
+    throw toCliError(error, "the cockpit");
+  }
+}
+
+/** The alert stream: open alerts, the ones closed in the last two weeks, the dates to watch. */
+export async function alertsCommand(options: PrintOptions): Promise<number> {
+  const style = styleFor(process.stdout, options);
+  const { api } = await ApiClient.fromEnvironment();
+  api.requireAuth();
+  try {
+    const repo = await resolveRepo(api, options.repo);
+    const result = await api.alerts(repo.id);
+    if (options.json) {
+      printJson(result.raw);
+      return EXIT.ok;
+    }
+    for (const line of alertsLines(result.data)) println(wrap(line, style, line.startsWith("- ") ? "    " : ""));
+    println(paint.dim(style, `Open it: ${api.baseUrl}/app/${repo.id}/alerts`));
+    return EXIT.ok;
+  } catch (error) {
+    throw toCliError(error, "the alerts");
+  }
+}
+
 export async function inventoryCommand(options: PrintOptions): Promise<number> {
   const style = styleFor(process.stdout, options);
   const { api } = await ApiClient.fromEnvironment();

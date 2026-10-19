@@ -1,5 +1,7 @@
 import { addDeadline, ALERTS_MIGRATION, alertsAvailable, alertsForApp, appsAvailable, deadlinesForApp, ensureAppForRepo, latestReadsForApp, latestServiceMap, MAPS_MIGRATION, mapsAvailable, projectsForApp, READS_MIGRATION, readsAvailable, removeDeadline, repoForUser, serviceMapHistory, type UserRow } from "@birdsi/db";
-import { AddDeadlineRequest, alertEmailState, readsInDepth, type AlertsResponse, type AppDeadline, type MapResponse, type ReadsResponse } from "@birdsi/shared";
+import { AddDeadlineRequest, alertEmailState, cockpitView, readsInDepth, type AlertsResponse, type AppDeadline, type CockpitView, type MapResponse, type ProjectRead, type ReadsResponse } from "@birdsi/shared";
+import { loadApp } from "./apps";
+import { loadVendors } from "./ops";
 import { ApiError } from "./api";
 import { note, ownerAuthor } from "./record";
 
@@ -13,7 +15,7 @@ export async function loadServiceMap(repoId: string, user: UserRow): Promise<Map
   const repo = await repoForUser(repoId, user.id);
   if (!(await mapsAvailable())) return { map: null, history: [], reason: `Service maps are kept once the migration ${MAPS_MIGRATION} has run in the Supabase SQL editor.` };
   const [map, history] = await Promise.all([latestServiceMap(repo.id), serviceMapHistory(repo.id)]);
-  return { map, history, reason: map ? null : "No service map of this app yet. Run birdsi in the app's folder, or map it from the Overview." };
+  return { map, history, reason: map ? null : "No service map of this app yet. Run birdsi in the app's folder, or map it from the cockpit with Map the code." };
 }
 
 export async function loadReads(repoId: string, user: UserRow): Promise<ReadsResponse> {
@@ -63,4 +65,31 @@ export async function removeAppDeadline(repoId: string, user: UserRow, deadlineI
   const repo = await repoForUser(repoId, user.id);
   const removed = await removeDeadline(deadlineId, user.id);
   await note(repo.id, ownerAuthor(user), { kind: "project", subject: `date:${removed.id}`, text: `No longer watching ${removed.label} on ${removed.dueOn}.` });
+}
+
+/**
+ * The cockpit of one app: its map, the newest read of each project, the
+ * account facts and the alert stream, in the one view every surface shows.
+ * Each source that is not there yet (a migration not run, no map) says why
+ * instead of failing the page.
+ */
+export async function loadCockpit(repoId: string, user: UserRow): Promise<CockpitView> {
+  const repo = await repoForUser(repoId, user.id);
+  const [appData, mapData, readsData, alertData, vendorData] = await Promise.all([loadApp(repo.id, user), loadServiceMap(repo.id, user), loadReads(repo.id, user), loadAlerts(repo.id, user), loadVendors(repo.id, user)]);
+  const reads = new Map<string, ProjectRead>(readsData.reads.map((r) => [r.projectId, r]));
+  const name = appData.app?.name ?? repo.full_name.split("/").pop() ?? repo.full_name;
+  return cockpitView({
+    appName: name,
+    environments: appData.app?.environments ?? ["production"],
+    projects: appData.app?.projects ?? [],
+    map: mapData.map,
+    mapReason: mapData.reason,
+    reads,
+    // Only a reason that holds for every project (a migration not run yet) goes on every card; the rest is per project.
+    readsReason: (await appsAvailable()) && (await readsAvailable()) ? null : readsData.reason,
+    alerts: alertData.alerts,
+    alertsReason: alertData.reason,
+    email: alertData.email,
+    vendors: vendorData.vendors,
+  });
 }

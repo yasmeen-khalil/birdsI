@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export const NAV_ITEMS = [
-  { key: "overview", label: "Overview", path: "" },
+  { key: "overview", label: "Cockpit", path: "" },
   { key: "alerts", label: "Alerts", path: "/alerts" },
   { key: "vendors", label: "Vendors", path: "/vendors" },
   { key: "projects", label: "Projects", path: "/projects" },

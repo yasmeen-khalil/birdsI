@@ -2,7 +2,7 @@ import { Command, CommanderError, Option } from "commander";
 import { toCliError } from "./api";
 import { dismissCommand, explainCommand, findingsCommand, fixedCommand, reposCommand } from "./commands/findings";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth";
-import { approvalsCommand, changesCommand, decideCommand, exportCommand, inventoryCommand, questionsCommand, recordCommand, vendorsCommand, visionCommand } from "./commands/ops";
+import { alertsCommand, approvalsCommand, changesCommand, cockpitCommand, decideCommand, exportCommand, inventoryCommand, questionsCommand, recordCommand, vendorsCommand, visionCommand } from "./commands/ops";
 import { scanCommand } from "./commands/scan";
 import { CliError, EXIT } from "./exit";
 import { installInterruptHandler } from "./interrupt";
@@ -149,6 +149,22 @@ export function buildProgram(): Command {
     .description("list your repositories, from GitHub and from terminal uploads, with their ids")
     .addOption(jsonOption())
     .action(run((options: { json?: boolean }) => reposCommand(options)));
+
+  program
+    .command("cockpit")
+    .description("the app's cockpit: open alerts, each Vercel, Supabase and OneSignal project as last read, and what the map read from the code")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((options: { repo?: string; json?: boolean; ascii?: boolean }) => cockpitCommand(options)));
+
+  program
+    .command("alerts")
+    .description("the alert stream: open alerts with what to do, the ones closed in the last two weeks, and the dates to watch")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((options: { repo?: string; json?: boolean; ascii?: boolean }) => alertsCommand(options)));
 
   program
     .command("inventory")

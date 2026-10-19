@@ -11,14 +11,16 @@ import { ScanAgainButton, ScanControls } from "@/components/ScanActions";
 import { SeverityMeter } from "@/components/Severity";
 import { compareFindings, findingsHeadline, plural, repoName, scanName, shortDuration, shortSha } from "@/components/format";
 import { icon14, icon20 } from "@/components/icon";
-import { AlertList, PipelineStrip } from "@/components/ops/OpsParts";
+import { CockpitSections } from "@/components/cockpit/Cockpit";
+import { PipelineStrip } from "@/components/ops/OpsParts";
 import { VisionEditor } from "@/components/ops/VisionEditor";
 import { ScanProgressCard } from "@/components/scan/ScanProgressCard";
 import { inventoryOf, latestDone, recentScans, repoContext, runningOf } from "@/components/server/data";
+import { loadCockpit } from "@/lib/cockpit";
 import { loadInventory } from "@/lib/ops";
 import { loadScan } from "@/lib/scans";
 
-export const metadata: Metadata = { title: "Overview" };
+export const metadata: Metadata = { title: "Cockpit" };
 
 function languagesLine(languages: Array<{ name: string; files: number }>): string {
   const names = languages.slice(0, 3).map((l) => l.name);
@@ -37,13 +39,14 @@ function scanResult(s: Scan): { text: string; tone?: string } {
   return { text: plural(n, "finding") };
 }
 
-export default async function OverviewPage({ params }: { params: Promise<{ repoId: string }> }) {
+export default async function CockpitPage({ params }: { params: Promise<{ repoId: string }> }) {
   const { repoId } = await params;
   const { user, repo } = await repoContext(repoId);
   const [scans, latest] = await Promise.all([recentScans(repo.id), latestDone(repo.id)]);
   const running = runningOf(scans);
   const name = repoName(repo.full_name);
-  const [result, inventory, runningEvents, ops] = await Promise.all([latest ? loadScan(latest.id, user) : null, latest ? inventoryOf(latest.id) : null, running ? eventsAfter(running.id, 0) : null, loadInventory(repo.id, user)]);
+  const [result, inventory, runningEvents, ops, cockpit] = await Promise.all([latest ? loadScan(latest.id, user) : null, latest ? inventoryOf(latest.id) : null, running ? eventsAfter(running.id, 0) : null, loadInventory(repo.id, user), loadCockpit(repo.id, user)]);
+  const title = cockpit.appName || name;
   const newest = scans[0] ?? null;
   const lastProblem = newest && (newest.status === "failed" || newest.status === "stopped") && (!latest || new Date(newest.createdAt) > new Date(latest.createdAt)) ? newest : null;
 
@@ -72,7 +75,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
     <main className="flex flex-col gap-[72px] px-16 pt-12 pb-16 max-[900px]:gap-12 max-[900px]:px-5 max-[900px]:pt-7 max-[900px]:pb-10">
       <section className="flex flex-col justify-between gap-5 min-[901px]:flex-row min-[901px]:items-end min-[901px]:gap-10">
         <div className="flex min-w-0 flex-col gap-2.5">
-          <h1 className="t-h1 break-words">{name}</h1>
+          <h1 className="t-h1 break-words">{title}</h1>
           <p className="t-body c2">{description}</p>
         </div>
         <ScanControls repoId={repo.id} mapRunning={Boolean(running)} readRunning={readRunning} />
@@ -135,23 +138,19 @@ export default async function OverviewPage({ params }: { params: Promise<{ repoI
         </section>
       )}
 
-      {ops.alerts.length > 0 && (
-        <section className="flex flex-col gap-4" aria-labelledby="alerts-title">
-          <div className="flex flex-col gap-1.5">
-            <h2 id="alerts-title" className="t-h2 max-[900px]:text-[24px]!">
-              Alerts
-            </h2>
-            <p className="t-body c2">Things that are true right now about the services this app runs on.</p>
-          </div>
-          <AlertList alerts={ops.alerts} limit={4} vendorsHref={`${base}/vendors`} />
-        </section>
-      )}
+      <CockpitSections view={cockpit} repoId={repo.id} />
 
-      {ops.alerts.length === 0 && ops.watches.length > 0 && (
+      {ops.watches.length > 0 && (
         <Link href={`${base}/vendors`} className="t-small c2 inline-flex items-center gap-1.5 self-start max-[900px]:-mt-4 min-[901px]:-mt-10" style={{ minHeight: 32 }}>
           Tracking {plural(ops.watches.length, "condition")} that could affect your services
           <ArrowRight {...icon14} />
         </Link>
+      )}
+
+      {latest && result && (
+        <h2 className="t-label c3 max-[900px]:-mb-6 min-[901px]:-mb-10" style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+          The code
+        </h2>
       )}
 
       {latest && result && (

@@ -1,7 +1,9 @@
 import {
   ActionRequest,
   ActionsResponse,
+  AlertsResponse,
   ApiError,
+  CockpitResponse,
   ChangesResponse,
   PolicyResponse,
   RecordEntryEnvelope,
@@ -210,6 +212,14 @@ export class ApiClient {
 
   syncVendors(repoId: string): Promise<Result<z.infer<typeof OkResponse>>> {
     return this.request("POST", `/repos/${enc(repoId)}/vendors/sync`, { schema: OkResponse, body: {} });
+  }
+
+  cockpit(repoId: string): Promise<Result<CockpitResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/cockpit`, { schema: CockpitResponse });
+  }
+
+  alerts(repoId: string): Promise<Result<AlertsResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/alerts`, { schema: AlertsResponse });
   }
 
   inventory(repoId: string): Promise<Result<InventoryResponse>> {

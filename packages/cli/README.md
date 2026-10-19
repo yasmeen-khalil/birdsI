@@ -43,6 +43,14 @@ Read commands take `--json`. Commands about one repository take `--repo owner/na
 
 Maps the app in the current folder, or in the folder you name, the same as `birdsi map`. `--no-open` keeps its page closed. `--json` and `--ascii` work as they do for `birdsi map`.
 
+### `birdsi cockpit`
+
+The app as it stands now, the same view as its page: the open alerts with what to do, each Vercel project (production deployment, the env names its deployment's code needs against the ones set, crons registered, domains, errors), each Supabase project (paused or not, size, advisors, migrations owed), each OneSignal app (subscriptions, recent messages), then what the map read from the code. A part a vendor could not answer says why.
+
+### `birdsi alerts`
+
+The alert stream: the open alerts, newest first, each one sentence with what to do, the alerts closed in the last two weeks, the dates you watch, and whether alerts are emailed.
+
 ### `birdsi inventory`
 
 Everything birdsI knows about the app in one read: the vision, every vendor with what its account says and its plan's limits, the alerts, the trackers, how fresh the map and the account reads are, what needs you, the latest map. Agents start here.
@@ -155,7 +163,9 @@ Every command that prints data accepts `--json`, which prints the API response e
 
 `birdsi mcp` runs the birdsI MCP server over stdio, so coding assistants can read the app's cockpit, ask the owner, propose actions and map the code mid-session. It uses the token from `birdsi login`, or `BIRDSI_TOKEN` in the environment.
 
-Tools: `birdsi_inventory` (call this first: vision, vendors, alerts, freshness, what needs the owner), `birdsi_changes_since` (new and resolved findings by stable key), `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, `birdsi_record` (the record, newest first), `birdsi_record_decision`, `birdsi_record_fact`, `birdsi_mark_fixed` (writes, within the owner's policy, each logged with its author), `birdsi_sync_vendors` (reads the accounts now), `birdsi_scan` (maps a folder, and returns after four minutes if the map is still running), `birdsi_scan_status`, `birdsi_findings`, `birdsi_finding`, `birdsi_repos`. The inventory, vendor, changes and record tools return structured content as well as text. Text read from a repository or the web is marked between `«` and `»` in the inventory, vendor, questions, changes, record and finding results.
+Tools: `birdsi_inventory` (call this first: vision, vendors, alerts, freshness, what needs the owner), `birdsi_cockpit` (the app as it stands now: alerts, each project's read, the map), `birdsi_alerts` (the alert stream and the dates to watch), `birdsi_changes_since` (new and resolved findings by stable key), `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, `birdsi_record` (the record, newest first), `birdsi_record_decision`, `birdsi_record_fact`, `birdsi_mark_fixed` (writes, within the owner's policy, each logged with its author), `birdsi_sync_vendors` (reads the accounts now), `birdsi_scan` (maps a folder, and returns after four minutes if the map is still running), `birdsi_scan_status`, `birdsi_findings`, `birdsi_finding`, `birdsi_repos`. The inventory, cockpit, alerts, vendor, changes and record tools return structured content as well as text. Text read from a repository, a vendor or the web is marked between `«` and `»` in the inventory, cockpit, alerts, vendor, questions, changes, record and finding results.
+
+What each tool may do: the reads (`birdsi_inventory`, `birdsi_cockpit`, `birdsi_alerts`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_record`, `birdsi_action_status`, `birdsi_changes_since`, `birdsi_findings`, `birdsi_finding`, `birdsi_scan_status`, `birdsi_repos`) change nothing. `birdsi_scan` uploads the folder you name, inside the project's own folder, and maps it. `birdsi_sync_vendors` makes birdsI read the connected accounts now, with keys that only read. `birdsi_ask_owner` and `birdsi_request_action` add a question or a proposal the owner answers in the browser. A proposal never runs until the owner approves it, and then only on the owner's computer. `birdsi_record_decision`, `birdsi_record_fact` and `birdsi_mark_fixed` write to the append-only record, only while the owner's policy allows agents to write, each with its author. No tool changes a vendor account.
 
 `birdsi mcp --install-hint` prints these snippets with the current version pinned, so a release never changes what your agent runs until you choose it. No token goes in any file: the server reads the one `birdsi login` saved. In CI or a sandbox, set `BIRDSI_TOKEN` in the environment.
 

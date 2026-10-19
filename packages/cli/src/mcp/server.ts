@@ -16,6 +16,7 @@ import { VERSION } from "../version";
 import { followScan, sendSnapshot, startScan } from "../workflow";
 import { LEGEND, q } from "../quote";
 import { allowedScanRoot } from "./scope";
+import { alertsLines, cockpitLines } from "../cockpit";
 
 type ToolResult = { content: Array<{ type: "text"; text: string }>; structuredContent?: Record<string, unknown>; isError?: boolean };
 
@@ -240,6 +241,33 @@ export function createServer(): McpServer {
       if (inv.decisions.length > 0) lines.push("", "Decisions on record, newest first. Do not ask about these again:", ...inv.decisions.map((d) => `- ${d.createdAt.slice(0, 10)} ${q(d.text)}${d.why ? ` (why: ${q(d.why)})` : ""} [by ${d.authorKind}]`));
       lines.push("", "Facts carry a source: found in the code, read from the account, from birdsI's checked limits list, told by the owner, or told by a coding agent. Call birdsi_vendor for one vendor's full facts with sources.", LEGEND);
       return text(lines.join("\n"), inv as unknown as Record<string, unknown>);
+    }),
+  );
+
+  server.registerTool(
+    "birdsi_cockpit",
+    {
+      title: "The app's cockpit",
+      description:
+        "Read only. The app as it stands now: open alerts (each one sentence with what to do), each Vercel project (production deployment, env names the code needs against the ones set, crons registered, domains, errors), each Supabase project (paused or not, size, advisors, migrations owed) and each OneSignal app (subscriptions, recent messages), then what the map read from the code (services, crons, webhooks, store apps, migrations). Every part a vendor could not answer says why.",
+      inputSchema: repoArg,
+    },
+    tool("that repository", async (api, args: { repoId?: string | undefined }) => {
+      const { cockpit } = (await api.cockpit(await repoIdFrom(api, args.repoId))).data;
+      return text([...cockpitLines(cockpit, q), "", LEGEND].join("\n"), cockpit as unknown as Record<string, unknown>);
+    }),
+  );
+
+  server.registerTool(
+    "birdsi_alerts",
+    {
+      title: "The alert stream",
+      description: "Read only. The app's open alerts, newest first, each one sentence (the object, who or what acted, the rule with its numbers, the result) with what to do, then the alerts closed in the last two weeks, the dates the owner watches, and whether alerts are emailed. Alerts close by themselves when a later read no longer finds the cause.",
+      inputSchema: repoArg,
+    },
+    tool("that repository", async (api, args: { repoId?: string | undefined }) => {
+      const data = (await api.alerts(await repoIdFrom(api, args.repoId))).data;
+      return text([...alertsLines(data, q), "", LEGEND].join("\n"), data as unknown as Record<string, unknown>);
     }),
   );
 

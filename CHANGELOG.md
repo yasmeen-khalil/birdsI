@@ -4,6 +4,14 @@
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.
 
+### Step 6: the cockpit
+
+- Each app's page is its cockpit now (the nav's first item, Cockpit). From the top: the open alerts with what to do, then each Vercel project (the deployment its label names, the newest production deployment with its state, age, commit and error and what production still serves, the env names the deployment's code needs against the ones set per environment with the missing ones named, its crons registered or not, its domains, the error lines read, its key's expiry), each Supabase project (running or paused, the size against the plan's limit, the migrations owed, the security and performance advisors), each OneSignal app (subscriptions, the platforms, OneSignal's estimate of a send to everyone and whether mobile push is dropped, recent messages with their counts), then what the map read from the code (services with their plan and key state, crons with their handler and whether it checks the secret, webhooks with the line that checks the sender, store apps, migrations, public pages). The code's findings, the vision and the recent maps follow under The code.
+- Every part says where it came from, and a part birdsI could not read says why. A project with no key, no read yet or a migration still to run says so on its card.
+- Nothing on it is written per app: Lamp Post's cockpit renders from its map alone, and names the vendors whose projects are still to declare.
+- The same view for agents and the terminal: `birdsi cockpit` and `birdsi alerts` (both with `--json`), the `birdsi_cockpit` and `birdsi_alerts` MCP tools (read only, with the data marked as data), and `GET /api/v1/repos/:id/cockpit`. The MCP section of the terminal tool's README says what every tool may do.
+- `scripts/cockpit-from-map.mts` renders a cockpit in the terminal from a stored map, for checking an app before any key is connected.
+
 ### Step 5: the alert stream
 
 - Alerts are stored now, one row per cause (`20261018000400_alerts.sql`). Every read of an app (hourly, and after every map) checks it from its service map, its project reads, its account facts and its dates to watch: a new cause opens an alert, a cause still there refreshes it, and a cause a read checked and no longer found closes it. A cause a read could not check (a paused database, a key refused) is left as it was, never closed on no evidence.
