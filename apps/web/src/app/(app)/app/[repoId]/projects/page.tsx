@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ExternalLink } from "lucide-react";
 import { latestServiceMap, vendorsForRepo } from "@birdsi/db";
+import { DeadlineControls } from "@/components/alerts/DeadlineControls";
 import { PROJECT_VENDORS, PROJECT_VENDOR_BY_SLUG, type AppProject } from "@birdsi/shared";
 import { AddProjectForm, AppNameForm, EnvironmentsForm, ProjectActions, ProjectDetailsForm, TieKeyControl, type VendorChoice } from "@/components/apps/ProjectControls";
 import { LocalTime } from "@/components/LocalTime";
@@ -9,6 +10,7 @@ import { safeUrl } from "@/components/format";
 import { icon14 } from "@/components/icon";
 import { repoContext } from "@/components/server/data";
 import { loadApp } from "@/lib/apps";
+import { loadAlerts } from "@/lib/cockpit";
 
 export const metadata: Metadata = { title: "Projects and keys" };
 
@@ -65,7 +67,7 @@ function KeyStatus({ project }: { project: AppProject }) {
 export default async function ProjectsPage({ params }: { params: Promise<{ repoId: string }> }) {
   const { repoId } = await params;
   const { user, repo } = await repoContext(repoId);
-  const [{ app, untiedKeys }, vendors, stored] = await Promise.all([loadApp(repo.id, user), vendorsForRepo(repo.id), latestServiceMap(repo.id).catch(() => null)]);
+  const [{ app, untiedKeys }, vendors, stored, alertData] = await Promise.all([loadApp(repo.id, user), vendorsForRepo(repo.id), latestServiceMap(repo.id).catch(() => null), loadAlerts(repo.id, user)]);
   const roles = stored?.map.roles ?? null;
 
   if (!app) {
@@ -199,6 +201,22 @@ export default async function ProjectsPage({ params }: { params: Promise<{ repoI
           );
         })}
         <AddProjectForm repoId={repo.id} vendors={VENDOR_CHOICES} suggested={suggested} />
+      </section>
+
+      <section className="flex flex-col gap-4" aria-labelledby="dates-title" style={{ maxWidth: 820 }}>
+        <div className="flex flex-col gap-1.5">
+          <h2 id="dates-title" className="t-h2 max-[900px]:text-[24px]!">
+            Dates to watch
+          </h2>
+          <p className="t-body c2" style={{ maxWidth: 720 }}>
+            Dates no vendor reports through its API: a trial that ends, a credit that runs out. The alerts warn from 30 days before, and the alert stays until two weeks after.
+          </p>
+        </div>
+        {alertData.reason ? (
+          <p className="t-small c3">{alertData.reason}</p>
+        ) : (
+          <DeadlineControls repoId={repo.id} deadlines={alertData.deadlines} vendors={vendors.map((v) => ({ slug: v.slug, name: v.name })).sort((a, b) => a.name.localeCompare(b.name))} />
+        )}
       </section>
     </main>
   );

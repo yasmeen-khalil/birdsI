@@ -1,7 +1,8 @@
-import { decryptSecret, expireAskedFacts, factsForVendors, keysForRepo, latestServiceMap, markConnectionProbed, readsAvailable, replaceFacts, repoWithInstallation, saveProjectRead, setVendorsSyncedAt, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
-import { CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, readProject, settingsForProject, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
+import { alertsAvailable, decryptSecret, deadlinesForApp, expireAskedFacts, factsForVendors, keysForRepo, latestServiceMap, markConnectionProbed, readsAvailable, replaceFacts, repoWithInstallation, saveProjectRead, setAlertEmail, setVendorsSyncedAt, syncAlerts, toVendor, userById, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
+import { appAlerts, CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, readProject, settingsForProject, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
+import { emailEnv, sendAlertEmail } from "./alert-email";
 import { planReads } from "./read-plan";
-import { bestFacts, LIMITS_BY_SLUG, readParts, readsInDepth, tierFor, type FactSource, type ProjectHints } from "@birdsi/shared";
+import { bestFacts, LIMITS_BY_SLUG, projectDashboardUrl, readParts, readsInDepth, tierFor, type FactSource, type ProjectHints, type ProjectReadData } from "@birdsi/shared";
 
 /** One sync holds the only worker while it runs, so it stops starting new vendors after this long. */
 const SYNC_BUDGET_MS = 10 * 60_000;
@@ -62,8 +63,9 @@ export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heart
 
     // In depth: each Vercel project, Supabase project and OneSignal app of the app that has a key,
     // read part by part and kept dated. The map says which migrations the database should have.
+    const map = keys.app ? ((await latestServiceMap(repo.id).catch(() => null))?.map ?? null) : null;
+    const readsNow = new Map<string, ProjectReadData>();
     if (keys.app && (await readsAvailable())) {
-      const map = (await latestServiceMap(repo.id).catch(() => null))?.map ?? null;
       for (const project of keys.projects.filter((p) => readsInDepth(p.vendor, p.kind))) {
         if (Date.now() > deadline) break;
         const key = keys.tied.find((k) => k.app_project_id === project.id);
@@ -71,6 +73,7 @@ export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heart
         const data = await readProject({ vendor: project.vendor, kind: project.kind, ref: project.ref, label: project.label, settings: project.settings ?? {} }, decryptSecret(key.token_ciphertext), map, { now: new Date() });
         if (!data) continue;
         await saveProjectRead({ appId: keys.app.id, projectId: project.id, data });
+        readsNow.set(project.id, data);
         // The key's state follows the read: it failed only when no part of the project could be read.
         const parts = readParts(data);
         const failed = parts.filter((p) => !p.reading.ok);
@@ -80,6 +83,28 @@ export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heart
         } else {
           await markConnectionProbed(key.id, "ok", null);
         }
+      }
+    }
+
+    // The alert stream: what this read found, opened, refreshed or closed, and emailed when it is new.
+    if (keys.app && (await alertsAvailable())) {
+      const app = keys.app;
+      const facts = await factsForVendors(vendors.map((v) => v.id));
+      const withFacts = vendors.map((v) => toVendor(v, facts.filter((f) => f.vendor_id === v.id), true));
+      const { drafts, checked } = appAlerts({
+        app: { name: app.name, environments: app.environments },
+        projects: keys.projects.map((p) => ({ id: p.id, vendor: p.vendor, kind: p.kind, ref: p.ref, label: p.label, plan: p.plan, dashboardUrl: projectDashboardUrl({ vendor: p.vendor, kind: p.kind, ref: p.ref, settings: p.settings ?? {} }) })),
+        map,
+        reads: readsNow,
+        vendors: withFacts,
+        deadlines: await deadlinesForApp(app.id),
+        now: new Date(),
+      });
+      const opened = await syncAlerts(app.id, drafts, checked);
+      if (opened.length > 0) {
+        const owner = await userById(ownerUserId);
+        const { status, sentAt } = await sendAlertEmail(emailEnv(), { email: owner?.email ?? null, email_updates: owner?.email_updates ?? false }, { name: app.name, repoId: repo.id }, opened);
+        await setAlertEmail(opened.map((a) => a.id), status, sentAt);
       }
     }
     await setVendorsSyncedAt(repoId, new Date());

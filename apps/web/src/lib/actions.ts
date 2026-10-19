@@ -10,6 +10,7 @@ import { requireUser } from "./auth";
 import { answerQuestion, changePolicy, connectVendor, decideActionRequest, disconnectVendor, dismissQuestion, requestAction, resyncAllRepos, saveVision, startVendorSync } from "./ops";
 import { dismissFinding, reopenFinding, startScan, stopScan } from "./scans";
 import { addAppProject, connectProjectKey, disconnectProjectKey, editAppProject, removeAppProject, renameApp, reuseKeyForProject, setEnvironments, tieKey, type ProjectInput } from "./apps";
+import { addAppDeadline, removeAppDeadline } from "./cockpit";
 
 /**
  * Server actions used by the web pages. Each one resolves the signed-in
@@ -305,6 +306,26 @@ export async function tieKeyAction(repoId: string, connectionId: string, project
     await startVendorSync(repoId, user).catch(() => undefined);
     revalidatePath(`/app/${repoId}/projects`);
     revalidatePath("/settings");
+    return undefined;
+  });
+}
+
+export async function addDeadlineAction(repoId: string, input: { label: string; dueOn: string; vendor: string | null; note: string | null }): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await addAppDeadline(repoId, user, input);
+    revalidatePath(`/app/${repoId}/projects`);
+    revalidatePath(`/app/${repoId}/alerts`);
+    return undefined;
+  });
+}
+
+export async function removeDeadlineAction(repoId: string, deadlineId: string): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await removeAppDeadline(repoId, user, deadlineId);
+    revalidatePath(`/app/${repoId}/projects`);
+    revalidatePath(`/app/${repoId}/alerts`);
     return undefined;
   });
 }

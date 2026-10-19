@@ -27,6 +27,7 @@ function vercelApi(overrides: Record<string, () => Response> = {}) {
         id: "prj_ops",
         name: "flowsophy-ops",
         framework: "nextjs",
+        rootDirectory: "app",
         createdAt: 1_760_000_000_000,
         targets: { production: { alias: ["flowsophy-ops.vercel.app", "ops.flowsophyapp.com"] } },
         crons: { enabledAt: 1_760_000_000_000, disabledAt: null, updatedAt: 1_760_100_000_000, deploymentId: "dpl_ready", definitions: [{ host: "ops.flowsophyapp.com", path: "/api/cron/purge-deleted", schedule: "0 4 * * *" }] },
@@ -34,6 +35,7 @@ function vercelApi(overrides: Record<string, () => Response> = {}) {
       });
     }
     if (url.includes("/v2/teams/team_abc")) return Response.json({ slug: "flowsophy", name: "Flowsophy" });
+    if (url.includes("/v5/user/tokens/current")) return Response.json({ token: { id: "tok", name: "birdsI", expiresAt: 1_768_000_000_000, scopes: [{ type: "team", teamId: "team_abc", expiresAt: 1_768_000_000_000 }] } });
     if (url.includes("/v7/deployments")) {
       return Response.json({
         deployments: [
@@ -92,6 +94,8 @@ describe("reading a Vercel project", () => {
     expect(read.crons).toMatchObject({ ok: true, value: { enabled: true, definitions: [{ path: "/api/cron/purge-deleted", schedule: "0 4 * * *" }] } });
     expect(read.domains).toMatchObject({ ok: true, value: [{ name: "ops.flowsophyapp.com", verified: true }] });
     expect(read.errors.ok && read.errors.value.map((e) => e.from)).toEqual(["build", "build", "runtime"]);
+    expect(read.project.ok && read.project.value.rootDirectory).toBe("app");
+    expect(read.keyExpiry).toMatchObject({ ok: true, value: { expiresAt: "2026-01-09T23:06:40.000Z" } });
     const text = JSON.stringify(read);
     expect(text).not.toContain(SECRET_VALUE);
     expect(text).not.toContain('"value":"ops"');

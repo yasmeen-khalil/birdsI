@@ -4,6 +4,16 @@
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.
 
+### Step 5: the alert stream
+
+- Alerts are stored now, one row per cause (`20261018000400_alerts.sql`). Every read of an app (hourly, and after every map) checks it from its service map, its project reads, its account facts and its dates to watch: a new cause opens an alert, a cause still there refreshes it, and a cause a read checked and no longer found closes it. A cause a read could not check (a paused database, a key refused) is left as it was, never closed on no evidence.
+- The kinds: a paused Supabase project, a failed newest production deployment, a cron from `vercel.json` that the Vercel project has not registered or has switched off, an env name a deployment's code reads without a default that its Vercel project does not set (per environment the app checks, the deployment chosen by the project's label), a migration the database still owes, a plan limit (usage at 80 or 95 percent of the checked limit, a cron more frequent than the Vercel plan allows, mobile push dropped by OneSignal for the plan), a date (a Vercel key's expiry, or a date to watch), and a project no part of which could be read.
+- Every alert is one sentence with the object, who or what acted on it, the rule with its numbers, and the result, plus what to do and where the evidence is (the vendor's page, the file and line). For example: "The cron /api/cron/digest runs 96 times a day (every 15 minutes, vercel.json:5), and Vercel's Hobby plan allows 1 run a day" with the page's own words.
+- The Alerts page on each app: open alerts first, newest first, with closed ones for two weeks, filtered by open, closed or all and by kind. `GET /api/v1/repos/:id/alerts`.
+- Dates to watch on the Projects page: a trial that ends, a credit that runs out. The alerts warn from 30 days before.
+- New alerts are emailed through Resend, one email per read, when `RESEND_API_KEY` is set on birdsI and email alerts are on in Settings. Each alert says whether it was emailed or why not (no key, no address, email off, or Resend's own answer), and Settings and the Alerts page say whether email is on.
+- The privacy page names Resend and what alerts keep.
+
 ### Step 4: three read connectors
 
 - Each Vercel project, Supabase project and OneSignal app of an app is read in depth with its own key, every hour and after every map, and each read is kept (`20261018000300_project_reads.sql`, the newest 48 per project). `GET /api/v1/repos/:id/reads` returns the newest read of each project.

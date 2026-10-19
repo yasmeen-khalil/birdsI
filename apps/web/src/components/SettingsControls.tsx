@@ -12,7 +12,7 @@ import { safeUrl } from "./format";
 import { icon, icon14 } from "./icon";
 
 /** The email switch. Optimistic; on failure it flips back and says so. */
-export function EmailToggle({ initial }: { initial: boolean }) {
+export function EmailToggle({ initial, keySet, address }: { initial: boolean; keySet: boolean; address: string | null }) {
   const [on, setOn] = useState(initial);
   const [error, setError] = useState<boolean>(false);
   const [pending, start] = useTransition();
@@ -33,7 +33,13 @@ export function EmailToggle({ initial }: { initial: boolean }) {
           <span id="email-label" className="t-body">
             Email me the alerts
           </span>
-          <span className="t-small c3">Not sent yet. Your choice is saved for when birdsI has a sending key, to the address on your GitHub account.</span>
+          <span className="t-small c3">
+            {!keySet
+              ? "Not sent yet: RESEND_API_KEY is not set on birdsI. Your choice is kept for when it is."
+              : !address
+                ? "Not sent: your account has no email address. Sign in again with a GitHub account that has one."
+                : `Each new critical or warning alert, one email per read, to ${address}. Every alert says whether it was emailed.`}
+          </span>
         </span>
         <span className="inline-flex items-center justify-center" style={{ minWidth: 44, minHeight: 44 }}>
           <button type="button" className="switch" role="switch" aria-checked={on} aria-labelledby="email-label" disabled={pending} onClick={() => save(!on)} />

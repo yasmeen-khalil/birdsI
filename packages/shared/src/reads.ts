@@ -93,9 +93,15 @@ export const VercelProjectInfo = z.object({
   productionUrl: z.string().nullable(),
   /** True when Vercel says the project is paused, null when the answer does not say. */
   paused: z.boolean().nullable(),
+  /** The folder of the repository the project builds: "" for the root, null when Vercel's answer does not say. */
+  rootDirectory: z.string().nullable(),
   createdAt: z.string().nullable(),
 });
 export type VercelProjectInfo = z.infer<typeof VercelProjectInfo>;
+
+/** When the key birdsI reads the project with stops working, as Vercel says. */
+export const VercelKeyExpiry = z.object({ expiresAt: z.string().nullable() });
+export type VercelKeyExpiry = z.infer<typeof VercelKeyExpiry>;
 
 export const VercelRead = z.object({
   vendor: z.literal("vercel"),
@@ -105,6 +111,7 @@ export const VercelRead = z.object({
   crons: readingOf(VercelCrons.nullable()),
   domains: readingOf(z.array(VercelDomain)),
   errors: readingOf(z.array(VercelLogLine)),
+  keyExpiry: readingOf(VercelKeyExpiry),
 });
 export type VercelRead = z.infer<typeof VercelRead>;
 

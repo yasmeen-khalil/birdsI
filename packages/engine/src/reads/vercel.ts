@@ -1,4 +1,4 @@
-import type { ReadSource, VercelCrons, VercelDeployment, VercelDeploymentState, VercelDomain, VercelEnvName, VercelLogLine, VercelProjectInfo, VercelRead } from "@birdsi/shared";
+import type { ReadSource, VercelCrons, VercelDeployment, VercelDeploymentState, VercelDomain, VercelEnvName, VercelKeyExpiry, VercelLogLine, VercelProjectInfo, VercelRead } from "@birdsi/shared";
 import { maskSecrets } from "../checks/secrets";
 import { callJson, iso, notRead, ReadError, reading, str, type ReadContext } from "./http";
 
@@ -72,7 +72,8 @@ export async function readVercelProject(token: string, target: Target, ctx: Read
     const aliases = [...fromTarget, ...fromAlias];
     const productionUrl = aliases.find((a) => !a.endsWith(".vercel.app")) ?? aliases[0] ?? str(production?.["url"]) ?? null;
     const paused = typeof raw["paused"] === "boolean" ? (raw["paused"] as boolean) : null;
-    return { id: pid, name, framework: str(raw["framework"]), productionUrl: productionUrl ? (productionUrl.startsWith("http") ? productionUrl : `https://${productionUrl}`) : null, paused, createdAt: iso(raw["createdAt"]) };
+    const rootDirectory = !("rootDirectory" in raw) ? null : typeof raw["rootDirectory"] === "string" ? (raw["rootDirectory"] as string).replace(/^\.?\/+|\/+$/g, "") : "";
+    return { id: pid, name, framework: str(raw["framework"]), productionUrl: productionUrl ? (productionUrl.startsWith("http") ? productionUrl : `https://${productionUrl}`) : null, paused, rootDirectory, createdAt: iso(raw["createdAt"]) };
   });
   if (target.team) {
     // The team's slug only makes dashboard links. A key scoped to the project cannot read the team; the
@@ -94,6 +95,7 @@ export async function readVercelProject(token: string, target: Target, ctx: Read
       crons: notRead(projectSource("/settings/cron-jobs", projectApi.replace(/\?.*$/, "")), reason),
       domains: notRead(projectSource("/settings/domains", `${API}/v9/projects/${id}/domains`), reason),
       errors: notRead(projectSource("/logs", `${API}/v3/deployments`), reason),
+      keyExpiry: await readKeyExpiry(auth, ctx),
     };
   }
   const projectId = project.value.id;
@@ -189,7 +191,22 @@ export async function readVercelProject(token: string, target: Target, ctx: Read
     return lines.slice(0, LOG_LINES * 2);
   });
 
-  return { vendor: "vercel", project, deployments, env, crons, domains, errors };
+  const keyExpiry = await readKeyExpiry(auth, ctx);
+  return { vendor: "vercel", project, deployments, env, crons, domains, errors, keyExpiry };
+}
+
+/** The key's own expiry. A key scoped to one project cannot read user-level details, and says so. */
+async function readKeyExpiry(auth: Record<string, string>, ctx: ReadContext) {
+  const api = `${API}/v5/user/tokens/current`;
+  return reading<VercelKeyExpiry>({ api, page: "https://vercel.com/account/settings/tokens" }, ctx, async () => {
+    const res = await callJson<{ token?: { expiresAt?: unknown; scopes?: Array<{ expiresAt?: unknown }> } }>("Vercel", api, auth, ctx).catch((error: unknown) => {
+      if (error instanceof ReadError && /HTTP 403/.test(error.message)) throw new ReadError("Not read: a key scoped to one project cannot read its own expiry. Vercel's token page shows it.");
+      throw error;
+    });
+    const token = res.body?.token ?? {};
+    const dates = [iso(token.expiresAt), ...(token.scopes ?? []).map((s) => iso(s.expiresAt))].filter((d): d is string => Boolean(d)).sort();
+    return { expiresAt: dates[0] ?? null };
+  });
 }
 
 /** The team's slug from an inspector link: https://vercel.com/<team>/<project>/<deployment>. */

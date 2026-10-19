@@ -16,3 +16,4 @@ export { rankFindings, summarise } from "./scan/rank";
 export * from "./vendors/index";
 export { buildServiceMap, describeSchedule, parseMarkers, type MapMeta } from "./map/index";
 export { readProject, markerQuery, fileForLabel, owedFromMarkers, owedFromHistory, describeMarker, MARKER_KINDS, ReadError, reasonForStatus, type ProjectToRead, type ReadContext } from "./reads/index";
+export { appAlerts, ageWords, dateWords, daysUntil, type AlertInput, type AlertProject, type AlertResult } from "./cockpit/alerts";

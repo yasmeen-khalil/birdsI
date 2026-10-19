@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { SignOutButton } from "@clerk/nextjs";
 import { ExternalLink, LogOut, Plus } from "lucide-react";
 import { appsAvailable, appsForUser, connectionsForApp, latestDoneScan, projectsForApp, tokensForUser, toScan, untiedConnections, usageForUser } from "@birdsi/db";
-import { PROJECT_VENDOR_BY_SLUG } from "@birdsi/shared";
+import { PROJECT_VENDOR_BY_SLUG, maskEmail } from "@birdsi/shared";
 import { LocalTime } from "@/components/LocalTime";
 import { ConnectAccount, DeleteAccount, DisconnectAccount, DisconnectRepo, EmailToggle, RevokeToken } from "@/components/SettingsControls";
 import { TopBar } from "@/components/shell/TopBar";
@@ -67,7 +67,7 @@ export default async function SettingsPage() {
               <span className="t-small c2">{user.github_login ? `Signed in with GitHub as ${user.github_login}` : "Signed in with GitHub"}</span>
             </span>
           </div>
-          <EmailToggle initial={user.email_updates} />
+          <EmailToggle initial={user.email_updates} keySet={Boolean(process.env["RESEND_API_KEY"]?.trim())} address={user.email ? maskEmail(user.email) : null} />
         </Section>
 
         <Section title="Repositories">

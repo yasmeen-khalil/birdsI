@@ -36,13 +36,16 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             <>
-              <b>Your account.</b> Your GitHub username and user id, the email address on your GitHub account, and whether you want alerts by email. birdsI sends no email yet. Sign-in itself is handled by Clerk.
+              <b>Your account.</b> Your GitHub username and user id, the email address on your GitHub account, and whether you want alerts by email. With email on and a sending key on birdsI, each read that opens alerts sends you one email. Sign-in itself is handled by Clerk.
             </>,
             <>
               <b>Apps and repositories you connect.</b> Their names, default branches, and the GitHub App installation that grants read access.
             </>,
             <>
               <b>The map of each app.</b> The services and packages the code uses, the names of the settings (environment variables) it reads, its crons, webhooks, store apps, migrations and public pages, each with the file and line it came from. Findings from the checks, with short code excerpts as evidence and secrets masked.
+            </>,
+            <>
+              <b>Alerts.</b> Each alert birdsI finds for an app, with the sentence it shows, where the evidence is, when it opened and closed, and whether it was emailed, and the dates you ask to be warned about. Closed alerts are listed for two weeks and kept with the app.
             </>,
             <>
               <b>What the accounts say.</b> With a key you connect: deployments and their state, the names of the settings each project has (never their values), crons and domains, the error lines of a failed build and of the app&apos;s functions with secrets masked, whether a database is paused, its advisor warnings, its size and which migrations it lacks (read from the database&apos;s structure, never from its rows), push subscriber and delivery counts and the names of push campaigns (never the text of a message sent to one person). Each reading is dated and kept with the address it came from, and the newest 48 readings of each project are kept.
@@ -95,6 +98,9 @@ export default function PrivacyPage() {
             </>,
             <>
               <b>Clerk</b> handles sign-in. <b>Supabase</b> hosts the database and the short-lived uploads. <b>Vercel</b> hosts the website and <b>Railway</b> runs the worker.
+            </>,
+            <>
+              <b>Resend</b> sends the alert emails when you turn them on in Settings. It receives your email address and the sentences of the new alerts.
             </>,
           ]}
         />
