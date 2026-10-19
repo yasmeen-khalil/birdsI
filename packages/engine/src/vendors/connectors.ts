@@ -439,3 +439,16 @@ export const CONNECTOR_BY_SLUG = new Map(CONNECTORS.map((c) => [c.slug, c]));
 export function connectorInfo(): Array<Pick<Connector, "slug" | "name" | "tokenHint" | "tokenUrl" | "fields">> {
   return CONNECTORS.map((c) => ({ slug: c.slug, name: c.name, tokenHint: c.tokenHint, tokenUrl: c.tokenUrl, fields: c.fields }));
 }
+
+/**
+ * The settings a connector reads a project with, from the project's own
+ * identifiers: a Vercel team, a Supabase project ref or organization.
+ */
+export function settingsForProject(project: { vendor: string; kind: string; ref: string; settings: Record<string, string> }): Record<string, string> {
+  if (project.vendor === "vercel") {
+    const team = project.settings["team"]?.trim() ?? (project.kind === "team" ? project.ref : "");
+    return { ...(team ? { teamId: team } : {}), ...(project.kind === "project" ? { project: project.ref } : {}) };
+  }
+  if (project.vendor === "supabase") return project.kind === "project" ? { projectRef: project.ref } : { orgSlug: project.ref };
+  return { ...project.settings };
+}

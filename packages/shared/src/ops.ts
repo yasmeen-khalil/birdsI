@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { App } from "./apps";
 import { Severity } from "./domain";
 
 /**
@@ -378,6 +379,7 @@ export const RecordKind = z.enum([
   "question_dismissed",
   "action_decided",
   "action_run",
+  "project",
 ]);
 export type RecordKind = z.infer<typeof RecordKind>;
 
@@ -394,6 +396,7 @@ export const RECORD_KIND_LABEL: Record<RecordKind, string> = {
   question_dismissed: "Question dismissed",
   action_decided: "Approval",
   action_run: "Ran",
+  project: "Projects and keys",
 };
 
 export const RecordAuthorKind = z.enum(["owner", "agent", "birdsi"]);
@@ -464,6 +467,8 @@ export const InventoryResponse = z.object({
     .nullable(),
   /** The latest decisions on record, newest first, so an agent never asks what was already decided. */
   decisions: z.array(RecordEntry).default([]),
+  /** The app: its name, environments and vendor projects with each key's state (never a key). Null before the apps migration. */
+  app: App.nullable().default(null),
 });
 export type InventoryResponse = z.infer<typeof InventoryResponse>;
 

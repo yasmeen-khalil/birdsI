@@ -1,5 +1,6 @@
-import { connectionsForUser, decryptSecret, expireAskedFacts, factsForVendors, markConnectionProbed, replaceFacts, setVendorsSyncedAt, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
-import { CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
+import { decryptSecret, expireAskedFacts, factsForVendors, keysForRepo, markConnectionProbed, replaceFacts, repoWithInstallation, setVendorsSyncedAt, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
+import { CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, settingsForProject, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
+import { planReads } from "./read-plan";
 import { bestFacts, LIMITS_BY_SLUG, tierFor, type FactSource, type ProjectHints } from "@birdsi/shared";
 
 /** One sync holds the only worker while it runs, so it stops starting new vendors after this long. */
@@ -12,6 +13,7 @@ const SYNC_BUDGET_MS = 10 * 60_000;
  * it could not read.
  */
 export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heartbeat: () => Promise<void>): Promise<void> {
+  // Each key reads its own project of this app; a vendor with no tied key is read with the owner's untied key, the old way.
   const repoId = String(job.payload["repoId"]);
   const ownerUserId = String(job.payload["ownerUserId"]);
   const hints = (job.payload["hints"] as ProjectHints | null | undefined) ?? null;
@@ -24,28 +26,35 @@ export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heart
       await setVendorsSyncedAt(repoId, new Date());
       return;
     }
-    const connections = await connectionsForUser(ownerUserId);
-    const bySlug = new Map(connections.map((c) => [c.vendor_slug, c]));
+    const { repo } = await repoWithInstallation(repoId);
+    const keys = await keysForRepo({ id: repo.id, owner_user_id: ownerUserId, full_name: repo.full_name });
+    const allKeys = new Map([...keys.tied, ...keys.untied].map((k) => [k.id, k]));
+    const plan = planReads(
+      vendors.map((v) => ({ id: v.id, slug: v.slug })),
+      keys.projects.map((p) => ({ id: p.id, vendor: p.vendor, kind: p.kind, ref: p.ref, label: p.label, settings: p.settings ?? {} })),
+      keys.tied,
+      keys.untied,
+      (slug) => CONNECTOR_BY_SLUG.has(slug),
+    );
 
     // Stripe Projects: plan and spend per provider, collected on the owner's machine.
     const projectFacts = stripeProjectFacts(hints);
 
-    // Connected accounts.
     for (const v of vendors) {
       if (Date.now() > deadline) break;
       const connector = CONNECTOR_BY_SLUG.get(v.slug);
-      const connection = bySlug.get(v.slug);
-      const fromProjects = projectFacts.get(v.slug) ?? [];
-      let facts: ConnectorFact[] = [...fromProjects];
-      if (connector && connection) {
+      let facts: ConnectorFact[] = [...(projectFacts.get(v.slug) ?? [])];
+      for (const target of plan.filter((t) => t.vendorId === v.id)) {
+        const key = allKeys.get(target.connectionId);
+        if (!connector || !key) continue;
+        const settings = target.project ? settingsForProject(target.project) : ((key.settings ?? {}) as Record<string, string>);
         try {
-          const token = decryptSecret(connection.token_ciphertext);
-          const probed = await connector.probe(token, connection.settings ?? {});
-          facts = mergeFacts(facts, probed);
-          await markConnectionProbed(connection.id, "ok", null);
+          const probed = await connector.probe(decryptSecret(key.token_ciphertext), settings);
+          facts = mergeFacts(facts, target.suffix ? probed.map((f) => ({ ...f, metric: `${f.metric}:${target.suffix}`, label: `${f.label} (${target.suffix})` })) : probed);
+          await markConnectionProbed(key.id, "ok", null);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          await markConnectionProbed(connection.id, "failed", message);
+          await markConnectionProbed(key.id, "failed", message);
         }
       }
       await replaceFacts(v.id, "connector", facts.map((f) => ({ kind: f.kind, metric: f.metric, label: f.label, value: f.value, numeric: f.numeric, unit: f.unit, limitNumeric: f.limitNumeric, source: "connector", evidence: f.evidence ?? {} })));

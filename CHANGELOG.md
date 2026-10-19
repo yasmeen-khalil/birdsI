@@ -4,6 +4,17 @@
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.
 
+### Step 2: apps, and keys tied to projects
+
+- An app is its own record: a name, the repository its code lives in, the environments birdsI checks (production by default), and the vendor projects it has. Every repository is an app from its first map on.
+- A project is one place at a vendor: a Vercel project per deployment (the product and the ops one), a Vercel team, a Supabase project ref or organization, a Clerk instance, a OneSignal app id, a RevenueCat project, a Stripe account, an App Store app id, a Resend domain, an Anthropic organization. Each id is checked against the shape that vendor's ids have, and each project links to its own place in the vendor's dashboard.
+- A key belongs to one project of one app, never to a vendor per person. It is checked with the vendor before it is stored, stored encrypted, never shown again, and only reads: the database refuses any other scope. Two projects can share one key without the key ever leaving the server ("Use the key of"), and the page says which projects share a key by a keyed fingerprint, never by the key.
+- The new Projects page on each app: name, environments, projects grouped by vendor, each key's state and the reason when it could not be read, and the record of every change (a new record kind, Projects and keys).
+- Keys connected before v3 move without loss (`20261018000100_apps_projects.sql`): for an owner with one app each becomes a project of it; with several apps they stay as they were, are still read the old way, and the Projects page ties each to its project in one step.
+- The read job reads each project with its own key, and a vendor with several projects (Flowsophy's three Vercel projects) gets each project's facts under its label.
+- Agents see the app's projects and each key's state in `birdsi_inventory`, `birdsi inventory` and `.birdsi/projects.md`.
+- Every migration now runs in the tests, in order, on a real Postgres (PGlite), and `verify.sql` must say OK on every row.
+
 ### Step 1: the cut
 
 Removed, with their routes, screens, strings, tests and dependencies:

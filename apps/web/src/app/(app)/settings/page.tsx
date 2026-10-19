@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SignOutButton } from "@clerk/nextjs";
 import { ExternalLink, LogOut, Plus } from "lucide-react";
-import { latestDoneScan, tokensForUser, toScan, usageForUser } from "@birdsi/db";
+import { appsAvailable, appsForUser, connectionsForApp, latestDoneScan, projectsForApp, tokensForUser, toScan, untiedConnections, usageForUser } from "@birdsi/db";
+import { PROJECT_VENDOR_BY_SLUG } from "@birdsi/shared";
 import { LocalTime } from "@/components/LocalTime";
 import { ConnectAccount, DeleteAccount, DisconnectAccount, DisconnectRepo, EmailToggle, RevokeToken } from "@/components/SettingsControls";
 import { TopBar } from "@/components/shell/TopBar";
@@ -34,7 +35,10 @@ function amount(n: number): string {
 export default async function SettingsPage() {
   const user = await appUser();
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
-  const [repos, tokens, usage, connections] = await Promise.all([userRepos(user.id), tokensForUser(user.id), usageForUser(user.id, monthStart), listConnections(user)]);
+  const [repos, tokens, usage, connections, perProject] = await Promise.all([userRepos(user.id), tokensForUser(user.id), usageForUser(user.id, monthStart), listConnections(user), appsAvailable()]);
+  const apps = perProject ? await appsForUser(user.id) : [];
+  const appKeys = await Promise.all(apps.map(async (a) => ({ app: a, projects: await projectsForApp(a.id), keys: await connectionsForApp(a.id) })));
+  const untied = perProject ? await untiedConnections(user.id) : [];
   const catalog = connectorCatalog().map((c) => ({ slug: c.slug, name: c.name, tokenHint: c.tokenHint, tokenUrl: c.tokenUrl, fields: c.fields.map((f) => ({ key: f.key, label: f.label, hint: f.hint, required: f.required })) }));
   const lastScans = await Promise.all(repos.map(async (r) => {
     const row = await latestDoneScan(r.id);
@@ -115,37 +119,83 @@ export default async function SettingsPage() {
           </a>
         </Section>
 
-        <Section id="connected-accounts" title="Connected accounts">
-          <p className="t-small c2">Connect a vendor account with a token. Use a read-only token, a key that can look but not change, where the service offers one. birdsI reads the plan, usage and spend, and alerts you near a limit.</p>
-          {connections.length === 0 ? (
-            <p className="t-small c3" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
-              No accounts connected yet.
-            </p>
-          ) : (
-            <div className="flex flex-col" style={{ borderTop: "1px solid var(--line)" }}>
-              {connections.map((c) => (
-                <div key={c.id} className="flex flex-col gap-1" style={{ padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
-                  <span className="flex flex-wrap items-center gap-2.5">
-                    <span className="t-body" style={{ fontWeight: 600 }}>
-                      {c.name}
-                    </span>
-                    {c.lastStatus === "failed" ? <span className="tag bad">Could not read</span> : c.lastStatus === "ok" ? <span className="tag ok">Working</span> : <span className="tag">Not checked yet</span>}
-                  </span>
-                  <span className="t-small c2">
-                    Connected <LocalTime iso={c.createdAt} style="relative" />. {c.lastProbedAt ? <>Last checked <LocalTime iso={c.lastProbedAt} style="relative" />.</> : null}
-                  </span>
-                  {c.lastStatus === "failed" && c.lastError && (
-                    <span className="t-small" style={{ color: "var(--critical)" }}>
-                      {c.lastError}
-                    </span>
-                  )}
-                  <DisconnectAccount connectionId={c.id} name={c.name} />
+        <Section id="connected-accounts" title="Keys">
+          {perProject ? (
+            <>
+              <p className="t-small c2">Each key belongs to one project of one app, and only reads. Add projects and keys on each app&apos;s Projects page.</p>
+              {appKeys.length === 0 ? (
+                <p className="t-small c3" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
+                  No apps yet. Map one with npx birdsi in its folder.
+                </p>
+              ) : (
+                <div className="flex flex-col" style={{ borderTop: "1px solid var(--line)" }}>
+                  {appKeys.map(({ app, projects, keys }) => {
+                    const failed = keys.filter((k) => k.last_status === "failed").length;
+                    return (
+                      <div key={app.id} className="flex flex-wrap items-center justify-between gap-3" style={{ padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="t-body" style={{ fontWeight: 600 }}>
+                            {app.name}
+                          </span>
+                          <span className="t-small c2">
+                            {plural(projects.length, "project")}, {plural(keys.length, "key")}
+                            {failed > 0 ? `, ${failed} could not be read` : ""}.
+                          </span>
+                        </span>
+                        <Link className="btn btn-secondary btn-sm" href={`/app/${app.repo_id}/projects`}>
+                          Projects and keys
+                        </Link>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              )}
+              {untied.length > 0 && (
+                <div className="flex flex-col gap-2" style={{ marginTop: 8 }}>
+                  <p className="t-small c2">
+                    {plural(untied.length, "key")} from before keys belonged to a project:{" "}
+                    {untied.map((c) => PROJECT_VENDOR_BY_SLUG.get(c.vendor_slug)?.name ?? c.vendor_slug).join(", ")}. birdsI still reads {untied.length === 1 ? "it" : "them"} the old way. Tie each to its project on the app&apos;s Projects page, or disconnect it here.
+                  </p>
+                  {untied.map((c) => (
+                    <DisconnectAccount key={c.id} connectionId={c.id} name={PROJECT_VENDOR_BY_SLUG.get(c.vendor_slug)?.name ?? c.vendor_slug} />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="t-small c2">Connect a vendor account with a key that only reads, where the service offers one. Keys move to each app&apos;s projects once the migration 20261018000100_apps_projects.sql has run.</p>
+              {connections.length === 0 ? (
+                <p className="t-small c3" style={{ padding: "16px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
+                  No accounts connected yet.
+                </p>
+              ) : (
+                <div className="flex flex-col" style={{ borderTop: "1px solid var(--line)" }}>
+                  {connections.map((c) => (
+                    <div key={c.id} className="flex flex-col gap-1" style={{ padding: "16px 0", borderBottom: "1px solid var(--line)" }}>
+                      <span className="flex flex-wrap items-center gap-2.5">
+                        <span className="t-body" style={{ fontWeight: 600 }}>
+                          {c.name}
+                        </span>
+                        {c.lastStatus === "failed" ? <span className="tag bad">Could not read</span> : c.lastStatus === "ok" ? <span className="tag ok">Working</span> : <span className="tag">Not checked yet</span>}
+                      </span>
+                      <span className="t-small c2">
+                        Connected <LocalTime iso={c.createdAt} style="relative" />. {c.lastProbedAt ? <>Last checked <LocalTime iso={c.lastProbedAt} style="relative" />.</> : null}
+                      </span>
+                      {c.lastStatus === "failed" && c.lastError && (
+                        <span className="t-small" style={{ color: "var(--critical)" }}>
+                          {c.lastError}
+                        </span>
+                      )}
+                      <DisconnectAccount connectionId={c.id} name={c.name} />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <ConnectAccount catalog={catalog} connected={connections.map((c) => c.vendorSlug)} />
+            </>
           )}
-          <ConnectAccount catalog={catalog} connected={connections.map((c) => c.vendorSlug)} />
-          <p className="t-small c3">Tokens are encrypted on birdsI&apos;s servers and used only to read that account. Use read-only tokens where offered.</p>
+          <p className="t-small c3">Keys are encrypted on birdsI&apos;s servers, used only to read, and never shown again.</p>
         </Section>
 
         <Section title="Terminal and MCP">

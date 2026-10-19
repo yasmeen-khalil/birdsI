@@ -228,6 +228,14 @@ export function createServer(): McpServer {
         const cost = v.facts.find((f) => f.kind === "cost");
         lines.push(`- ${q(v.name)} (${v.slug}, ${v.category}): ${q(v.purpose ?? v.what)}${plan ? ` Plan: ${q(plan.value)}.` : " Plan: unknown."}${cost ? ` ${q(cost.label)}: ${q(cost.value)}.` : ""}${usage.length ? ` ${q(usage.join(", "))}.` : ""}${v.connected ? " Connected." : v.connectable ? " Connectable (owner can connect it in Settings)." : ""}`);
       }
+      if (inv.app) {
+        lines.push("", `Projects of ${q(inv.app.name)} (environments: ${inv.app.environments.join(", ")}):`);
+        if (inv.app.projects.length === 0) lines.push("- none declared yet. The owner adds them on the app's Projects page.");
+        for (const p of inv.app.projects) {
+          const key = !p.key ? "no key" : p.key.lastStatus === "failed" ? `could not read: ${q(p.key.lastError ?? "no reason given")}` : p.key.lastStatus === "ok" ? `read ${p.key.lastReadAt ?? ""}`.trim() : "not read yet";
+          lines.push(`- ${p.vendor} ${p.kind} ${q(p.ref)}${p.label ? ` (${q(p.label)})` : ""}${p.environment ? `, ${p.environment}` : ""}: ${key}. ${p.dashboardUrl}`);
+        }
+      }
       lines.push("", `Open questions for the owner: ${inv.openQuestions}. Pending approvals: ${inv.pendingActions}.`);
       if (inv.decisions.length > 0) lines.push("", "Decisions on record, newest first. Do not ask about these again:", ...inv.decisions.map((d) => `- ${d.createdAt.slice(0, 10)} ${q(d.text)}${d.why ? ` (why: ${q(d.why)})` : ""} [by ${d.authorKind}]`));
       lines.push("", "Facts carry a source: found in the code, read from the account, from birdsI's checked limits list, told by the owner, or told by a coding agent. Call birdsi_vendor for one vendor's full facts with sources.", LEGEND);
@@ -359,7 +367,7 @@ export function createServer(): McpServer {
     {
       title: "Read the record",
       description: "The record of this app: decisions, facts stated, findings marked fixed or dismissed, questions answered, commands approved and run. Newest first, with author and reason. Read it before deciding something that may already be decided. Filter with kind.",
-      inputSchema: { ...repoArg, kind: z.enum(["decision", "fact", "finding_fixed", "finding_dismissed", "finding_reopened", "fix_opened", "vision", "policy", "question_answered", "question_dismissed", "action_decided", "action_run"]).optional(), limit: z.number().int().min(1).max(200).optional() },
+      inputSchema: { ...repoArg, kind: z.enum(["decision", "fact", "finding_fixed", "finding_dismissed", "finding_reopened", "fix_opened", "vision", "policy", "question_answered", "question_dismissed", "action_decided", "action_run", "project"]).optional(), limit: z.number().int().min(1).max(200).optional() },
     },
     tool("the record", async (api, args: { repoId?: string | undefined; kind?: string | undefined; limit?: number | undefined }) => {
       const r = (await api.record(await repoIdFrom(api, args.repoId), { ...(args.kind ? { kind: args.kind } : {}), ...(args.limit ? { limit: args.limit } : {}) })).data;

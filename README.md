@@ -9,7 +9,8 @@ birdsI is its owner's cockpit for their own apps first. A product for others com
 ## What it does
 
 - **The map, from the code.** Every outside service the app uses, found by rules from packages, imports, env names, web addresses and config files, each with the file and line it came from. Rule-based checks run with it: committed keys, unsafe settings, published vulnerabilities (OSV), packages two or more majors behind. When its keys are set, the docs check compares a main package's own current documentation with how the code imports it, and must cite the page.
-- **What the accounts say.** With a key you connect, birdsI reads the account behind each service: plan, usage, status. Every reading is dated. When it cannot read an account, it says so.
+- **Apps and their projects.** Each app is a record with the vendor projects it has: one Vercel project per deployment, the Supabase project, the OneSignal app, and the rest. A key belongs to one project, only reads, is checked with the vendor before it is stored, and is never shown again.
+- **What the accounts say.** With those keys, birdsI reads each project: plan, usage, status. Every reading is dated. When it cannot read a project, it says so.
 - **The checked limits list.** What each vendor's plans include, what ends them and the next price, read by a person from each vendor's own pricing page, dated and quoted (`packages/shared/src/limits.ts`). A model never reads a pricing page.
 - **Alerts.** Something true now: a limit at 80 or 95 percent, a paused project, an account that could not be read. A condition that might happen (a free plan that pauses) is a tracker, never an alert.
 - **Approvals and the record.** Your coding agent proposes a command, you approve it in the browser, it runs on your own computer. Every decision, fact, approval and run lands in an append-only record with its author.

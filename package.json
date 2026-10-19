@@ -25,6 +25,7 @@
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@types/node": "^22",
     "typescript": "^5",
     "vitest": "^5"

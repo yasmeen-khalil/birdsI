@@ -348,6 +348,16 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
       ...(record.data.entries.length ? record.data.entries.map((e) => `- ${e.createdAt.slice(0, 16).replace("T", " ")} ${RECORD_KIND_LABEL[e.kind]} by ${e.authorLabel ?? RECORD_AUTHOR_LABEL[e.authorKind]}: ${q(e.text)}${e.why ? ` (why: ${q(e.why)})` : ""}${e.subject ? ` [${q(e.subject)}]` : ""}`) : ["Nothing on record yet."]),
       "",
     ].join("\n");
+    const projectsMd = [
+      `# Projects`,
+      "",
+      inv.app ? `The vendor projects ${q(inv.app.name)} runs on (environments: ${inv.app.environments.join(", ")}), and whether birdsI reads each one. birdsI holds read keys only, never shown.` : "Projects switch on when the owner runs the apps migration.",
+      "",
+      ...(inv.app && inv.app.projects.length > 0
+        ? inv.app.projects.map((p) => `- ${p.vendor} ${p.kind} ${q(p.ref)}${p.label ? ` (${q(p.label)})` : ""}${p.environment ? `, ${p.environment}` : ""}: ${!p.key ? "no key" : p.key.lastStatus === "failed" ? `could not read: ${q(p.key.lastError ?? "no reason given")}` : p.key.lastStatus === "ok" ? "read" : "not read yet"}. ${p.dashboardUrl}`)
+        : ["None declared yet."]),
+      "",
+    ].join("\n");
     const readme = [
       `# birdsI knowledge base`,
       "",
@@ -355,11 +365,12 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
       "",
       `- vision.md: what the app is for and where it is going, in the owner's words`,
       `- vendors.md: every outside service, its plan, limits, usage and where the code uses it`,
+      `- projects.md: the vendor projects the app runs on, and whether birdsI reads each one`,
       `- alerts.md: what is true now and needs attention, like a limit at 80% or an account that could not be read`,
       `- questions.md: what only the owner can answer, and commands waiting for approval`,
       `- record.md: decisions, facts, fixed marks, answers, approvals and runs, with who and why`,
       "",
-      `Pipeline stages: ${inv.stages.map((s) => `${s.label} (${s.freshness})`).join(", ")}.`,
+      `Freshness: ${inv.stages.map((s) => `${s.label} (${s.freshness})`).join(", ")}.`,
       "",
       `For live data, run the birdsI MCP server: \`npx birdsi mcp\`.`,
       "",
@@ -374,12 +385,13 @@ export async function exportCommand(options: PrintOptions & { path?: string }): 
       writeFile(join(dir, "README.md"), readme),
       writeFile(join(dir, "vision.md"), `# Vision\n\n${inv.vision.text || "(not written yet)"}\n`),
       writeFile(join(dir, "vendors.md"), withLegend(vendorsMd)),
+      writeFile(join(dir, "projects.md"), withLegend(projectsMd)),
       writeFile(join(dir, "record.md"), withLegend(recordMd)),
       writeFile(join(dir, "alerts.md"), withLegend(alertsMd)),
       writeFile(join(dir, "questions.md"), withLegend(questionsMd)),
     ]);
-    if (options.json) printJson({ dir, files: ["README.md", "vision.md", "vendors.md", "alerts.md", "questions.md", "record.md"] });
-    else println(`${paint.ok(style, "Wrote")} ${dir} (vision, vendors, alerts, questions, record). Agents can read these files directly.`);
+    if (options.json) printJson({ dir, files: ["README.md", "vision.md", "vendors.md", "projects.md", "alerts.md", "questions.md", "record.md"] });
+    else println(`${paint.ok(style, "Wrote")} ${dir} (vision, vendors, projects, alerts, questions, record). Agents can read these files directly.`);
     return EXIT.ok;
   } catch (error) {
     throw toCliError(error, "the export");
@@ -414,6 +426,14 @@ export async function inventoryCommand(options: PrintOptions): Promise<number> {
     println(wrap(inv.vision.text ? `Vision: ${inv.vision.text}` : "Vision: not written yet (birdsi vision \"...\")", style, ""));
     println(paint.dim(style, `Stages: ${inv.stages.map((s) => `${s.label} ${s.freshness}`).join(", ")}`));
     if (inv.latestScan) println(paint.dim(style, `Latest map: ${kindWord(inv.latestScan.kind)}, ${plural(inv.latestScan.findings, "open finding")}`));
+    if (inv.app && inv.app.projects.length > 0) {
+      println();
+      println(paint.bold(style, `Projects of ${inv.app.name}`));
+      for (const p of inv.app.projects) {
+        const key = !p.key ? "no key" : p.key.lastStatus === "failed" ? `could not read: ${p.key.lastError ?? "no reason given"}` : p.key.lastStatus === "ok" ? "read" : "not read yet";
+        println(wrap(`${p.vendor} ${p.kind} ${p.ref}${p.label ? ` (${p.label})` : ""}${p.environment ? `, ${p.environment}` : ""}: ${key}`, style, "  "));
+      }
+    }
     if (inv.decisions.length > 0) {
       println();
       println(paint.bold(style, "Decisions on record"));

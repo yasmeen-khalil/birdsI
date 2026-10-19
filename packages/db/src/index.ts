@@ -9,6 +9,7 @@ export * from "./ratelimit";
 export * from "./snapshots";
 export * from "./vendors";
 export * from "./connections";
+export * from "./apps";
 export * from "./agent";
 export * from "./record";
 export * from "./schema";

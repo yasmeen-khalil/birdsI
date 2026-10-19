@@ -30,7 +30,10 @@ with markers (migration, kind, name, col) as (
     ('20261006000000 worker presence',           'table',    'workers',             null),
     ('20261006000100 record',                    'table',    'record_entries',      null),
     ('20261006000100 agent writes',              'column',   'agent_policies',      'allow_write'),
-    ('20261018000000 v3 retired tables',         'table_comment', 'chat_messages',  'Retired in birdsI v3')
+    ('20261018000000 v3 retired tables',         'table_comment', 'chat_messages',  'Retired in birdsI v3'),
+    ('20261018000100 apps',                      'table',    'apps',                null),
+    ('20261018000100 app projects',              'table',    'app_projects',        null),
+    ('20261018000100 keys per project',          'column',   'connections',         'app_project_id')
 )
 select
   m.migration,

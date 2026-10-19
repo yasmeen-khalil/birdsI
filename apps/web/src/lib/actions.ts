@@ -9,6 +9,7 @@ import { ApiError } from "./api";
 import { requireUser } from "./auth";
 import { answerQuestion, changePolicy, connectVendor, decideActionRequest, disconnectVendor, dismissQuestion, requestAction, resyncAllRepos, saveVision, startVendorSync } from "./ops";
 import { dismissFinding, reopenFinding, startScan, stopScan } from "./scans";
+import { addAppProject, connectProjectKey, disconnectProjectKey, editAppProject, removeAppProject, renameApp, reuseKeyForProject, setEnvironments, tieKey, type ProjectInput } from "./apps";
 
 /**
  * Server actions used by the web pages. Each one resolves the signed-in
@@ -217,6 +218,93 @@ export async function denyDeviceAction(userCode: string): Promise<ActionResult> 
   return run(async () => {
     await requireUser();
     await denyDeviceLogin(userCode);
+    return undefined;
+  });
+}
+
+// Apps, their projects and keys. Keys are pasted here, in the browser, and nowhere else.
+
+export async function renameAppAction(repoId: string, name: string): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await renameApp(repoId, user, name);
+    revalidatePath(`/app/${repoId}`, "layout");
+    return undefined;
+  });
+}
+
+export async function setEnvironmentsAction(repoId: string, environments: string[]): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await setEnvironments(repoId, user, environments);
+    revalidatePath(`/app/${repoId}/projects`);
+    return undefined;
+  });
+}
+
+export async function addProjectAction(repoId: string, input: ProjectInput): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await addAppProject(repoId, user, input);
+    revalidatePath(`/app/${repoId}/projects`);
+    return undefined;
+  });
+}
+
+export async function editProjectAction(repoId: string, projectId: string, patch: { label?: string; environment?: string; plan?: string }): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await editAppProject(projectId, user, patch);
+    revalidatePath(`/app/${repoId}/projects`);
+    return undefined;
+  });
+}
+
+export async function removeProjectAction(repoId: string, projectId: string): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await removeAppProject(projectId, user);
+    revalidatePath(`/app/${repoId}/projects`);
+    return undefined;
+  });
+}
+
+export async function connectProjectKeyAction(repoId: string, projectId: string, input: { token: string; label?: string }): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await connectProjectKey(projectId, user, input);
+    await startVendorSync(repoId, user).catch(() => undefined);
+    revalidatePath(`/app/${repoId}/projects`);
+    return undefined;
+  });
+}
+
+export async function reuseKeyAction(repoId: string, projectId: string, fromConnectionId: string): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await reuseKeyForProject(projectId, user, fromConnectionId);
+    await startVendorSync(repoId, user).catch(() => undefined);
+    revalidatePath(`/app/${repoId}/projects`);
+    return undefined;
+  });
+}
+
+export async function removeProjectKeyAction(repoId: string, projectId: string): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await disconnectProjectKey(projectId, user);
+    revalidatePath(`/app/${repoId}/projects`);
+    return undefined;
+  });
+}
+
+export async function tieKeyAction(repoId: string, connectionId: string, projectId: string): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await tieKey(connectionId, projectId, user);
+    await startVendorSync(repoId, user).catch(() => undefined);
+    revalidatePath(`/app/${repoId}/projects`);
+    revalidatePath("/settings");
     return undefined;
   });
 }

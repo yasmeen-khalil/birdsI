@@ -1,6 +1,7 @@
 import {
   createScan,
   discardScan,
+  ensureAppForRepo,
   dependenciesForScan,
   enqueueJob,
   JOB_PRIORITY,
@@ -44,7 +45,10 @@ export async function startScan(user: UserRow, input: CreateScanRequest, source:
     // (findings, vendors, questions, the record) accumulates under one place.
     if (!repoId) {
       const name = snap.full_name?.trim() || `local/${input.snapshotId.slice(0, 8)}`;
-      repoId = (await localRepoFor(user.id, name, branch)).id;
+      const repo = await localRepoFor(user.id, name, branch);
+      repoId = repo.id;
+      // Every repository is an app, from its first map on.
+      await ensureAppForRepo(repo);
     }
   }
   if (repoId) {

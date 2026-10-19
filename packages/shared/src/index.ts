@@ -4,5 +4,6 @@ export * from "./api";
 export * from "./ids";
 export * from "./ops";
 export * from "./limits";
+export * from "./apps";
 export * from "./presence";
 export * from "./policy";

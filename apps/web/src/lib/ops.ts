@@ -17,6 +17,8 @@ import {
   schemaHas,
   toRecordEntry,
   isSecretsKeyConfigured,
+  appsAvailable,
+  keysForRepo,
   scanForViewer,
   jobActive,
   latestDoneScan,
@@ -44,6 +46,7 @@ import { note, ownerAuthor, type RecordAuthor } from "./record";
 import type { ActionRequest, ActionsResponse, AgentPolicy, AskOwnerRequest, ChangesResponse, RecordEntry, RecordKind, WriteRecordRequest, InventoryResponse, Question, RequestActionRequest, UpdatePolicyRequest, Vendor, VendorsResponse, Vision } from "@birdsi/shared";
 import { ALLOWED_COMMANDS, isAllowedCommand } from "@birdsi/shared";
 import { ApiError } from "./api";
+import { loadApp } from "./apps";
 
 /**
  * The operations record: vendors and their facts, alerts, the pipeline
@@ -53,8 +56,10 @@ import { ApiError } from "./api";
 
 export async function loadVendors(repoId: string, user: UserRow): Promise<VendorsResponse> {
   const repo = await repoForUser(repoId, user.id);
-  const [rows, connections, scans] = await Promise.all([vendorsForRepo(repo.id), connectionsForUser(user.id), scansForRepo(repo.id, 12)]);
+  const [rows, keys, scans] = await Promise.all([vendorsForRepo(repo.id), keysForRepo(repo), scansForRepo(repo.id, 12)]);
   const facts = await factsForVendors(rows.map((r) => r.id));
+  // This app's keys, and the owner's untied keys from before keys belonged to a project.
+  const connections = [...keys.tied, ...keys.untied];
   const connected = new Set(connections.map((c) => c.vendor_slug));
   const errors = new Map(connections.filter((c) => c.last_status === "failed" && c.last_error).map((c) => [c.vendor_slug, c.last_error!]));
   const vendors: Vendor[] = rows.map((r) => toVendor(r, facts.filter((f) => f.vendor_id === r.id), connected.has(r.slug)));
@@ -282,7 +287,7 @@ export async function writeRecord(repoId: string, user: UserRow, input: WriteRec
 /** Everything an agent needs about a repository in one call. */
 export async function loadInventory(repoId: string, user: UserRow): Promise<InventoryResponse> {
   const repo = await repoForUser(repoId, user.id);
-  const [vendors, vision, questions, actions, latest, decisions] = await Promise.all([loadVendors(repo.id, user), visionForRepo(repo.id), loadQuestions(repo.id, user, "open"), actionsForRepo(repo.id, "pending"), latestDoneScan(repo.id), recordForRepo(repo.id, { kind: "decision", limit: 20 })]);
+  const [vendors, vision, questions, actions, latest, decisions, app] = await Promise.all([loadVendors(repo.id, user), visionForRepo(repo.id), loadQuestions(repo.id, user, "open"), actionsForRepo(repo.id, "pending"), latestDoneScan(repo.id), recordForRepo(repo.id, { kind: "decision", limit: 20 }), loadApp(repo.id, user)]);
   const findings = latest ? await findingsForScan(latest.id) : [];
   return {
     repo: { id: repo.id, fullName: repo.full_name, branch: repo.default_branch },
@@ -294,6 +299,7 @@ export async function loadInventory(repoId: string, user: UserRow): Promise<Inve
     openQuestions: questions.length,
     pendingActions: actions.length,
     decisions: decisions.map(toRecordEntry),
+    app: app.app,
     latestScan: latest ? { id: latest.id, kind: latest.kind, finishedAt: latest.finished_at, findings: findings.filter((f) => f.status !== "dismissed").length, headline: latest.summary?.headline ?? null } : null,
   };
 }
@@ -304,7 +310,9 @@ export function connectorCatalog() {
   return connectorInfo();
 }
 
+/** The per-person form from before v3, used only until the migration that ties keys to projects has run. */
 export async function connectVendor(user: UserRow, input: { vendorSlug: string; token: string; settings: Record<string, string> }): Promise<void> {
+  if (await appsAvailable()) throw new ApiError(409, "per_project", "Keys belong to one project of one app now. Add the project and its key on the app's Projects page.");
   if (!isSecretsKeyConfigured()) throw new ApiError(500, "not_configured", "Connected accounts are not switched on for this copy of birdsI yet.");
   const connector = CONNECTOR_BY_SLUG.get(input.vendorSlug);
   if (!connector) throw new ApiError(400, "bad_request", "birdsI has no connector for that service yet.");
