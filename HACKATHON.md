@@ -29,4 +29,4 @@ Until the package is on npm, run it from a clone: `npm install`, then `npx tsx p
 
 birdsI was prepared for this hackathon's Coding and Agentic Engineering track, with Nemotron models on Nebius Token Factory, Token Factory embeddings and Sandboxes, and LangSmith tracing. On 18 October 2026 the owner chose to stop protecting that entry, and that code was removed in v3 with the model-driven code audit. The history keeps it.
 
-On 27 October 2026 the owner reopened the entry in a separate repository, `birdsi-cockpit`, built from v3: the same cockpit, with Nemotron on Token Factory as the model that reads the code behind a verifier, prepared for the Best Apps and Agents track. This repository stays the development record and is not the submission.
+On 27 October 2026 the owner reopened the entry in this repository, cloned from v3 and renamed `birdsI` (the development record up to v3 is kept at `birdsI-beta`): the same cockpit, with Nemotron on Token Factory as the model that reads the code behind a verifier, prepared for the Best Apps and Agents track. The submission's own section replaces this note when the entry is ready.
