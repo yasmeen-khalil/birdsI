@@ -6,7 +6,7 @@ import { z } from "zod";
  * tied to one of those projects and only reads. Nothing here ever holds a key.
  */
 
-export const ProjectKind = z.enum(["project", "team", "organization", "instance", "app", "account", "domain"]);
+export const ProjectKind = z.enum(["project", "team", "organization", "instance", "app", "account", "domain", "repository"]);
 export type ProjectKind = z.infer<typeof ProjectKind>;
 
 export const Environment = z.enum(["production", "preview", "development"]);
@@ -86,8 +86,8 @@ export interface ProjectVendor {
   vendor: string;
   name: string;
   kinds: ProjectKindSpec[];
-  /** Identifiers besides the ref that reading needs, never secrets. */
-  settings: Array<{ key: string; label: string; hint: string; required: boolean }>;
+  /** Identifiers besides the ref that reading needs, never secrets. One marked forKey is asked for again when the key is connected, when the project lacks it. */
+  settings: Array<{ key: string; label: string; hint: string; required: boolean; forKey?: boolean }>;
   /** True when birdsI can read this vendor with a key in this phase. */
   reads: boolean;
   /** How to make the key, in one line, and where. Empty when there is no reader yet. */
@@ -148,19 +148,19 @@ export const PROJECT_VENDORS: readonly ProjectVendor[] = [
     name: "Clerk",
     kinds: [{ kind: "instance", refLabel: "Instance id", refHint: "Clerk > the application > Configure > the instance id (ins_...).", refPattern: /^ins_[A-Za-z0-9]+$/ }],
     settings: [{ key: "application", label: "Application id", hint: "app_... from the application's address in the Clerk dashboard.", required: false }],
-    reads: false,
-    keyHint: "",
-    keyUrl: null,
+    reads: true,
+    keyHint: "The secret key of this instance (Configure > API keys > Secret keys: sk_live_ for production, sk_test_ for development). Clerk has no read-only key, so birdsI only reads with it: the user and organization counts and the instance's settings, never a user's data.",
+    keyUrl: "https://dashboard.clerk.com",
     dashboard: (p) => (p.settings["application"] ? `https://dashboard.clerk.com/apps/${encodeURIComponent(p.settings["application"])}/instances/${encodeURIComponent(p.ref)}` : "https://dashboard.clerk.com"),
   },
   {
     vendor: "revenuecat",
     name: "RevenueCat",
-    kinds: [{ kind: "project", refLabel: "Project id", refHint: "The id in the project's address on app.revenuecat.com.", refPattern: NAME }],
+    kinds: [{ kind: "project", refLabel: "Project id", refHint: "The id in the project's address on app.revenuecat.com (proj...).", refPattern: NAME }],
     settings: [],
-    reads: false,
-    keyHint: "",
-    keyUrl: null,
+    reads: true,
+    keyHint: "A v2 secret API key made in this project (Project settings > API keys > New, version V2) with read permission on projects, apps and overview metrics, nothing else.",
+    keyUrl: "https://app.revenuecat.com",
     dashboard: (p) => `https://app.revenuecat.com/projects/${encodeURIComponent(p.ref)}`,
   },
   {
@@ -177,11 +177,25 @@ export const PROJECT_VENDORS: readonly ProjectVendor[] = [
     vendor: "apple",
     name: "App Store Connect",
     kinds: [{ kind: "app", refLabel: "Apple ID of the app", refHint: "App Store Connect > the app > App Information > Apple ID (digits).", refPattern: /^\d{6,12}$/ }],
-    settings: [{ key: "bundleId", label: "Bundle id", hint: "The bundle id, for example com.example.app.", required: false }],
-    reads: false,
-    keyHint: "",
-    keyUrl: null,
+    settings: [
+      { key: "bundleId", label: "Bundle id", hint: "The bundle id, for example com.example.app. Checked against the app when a key is connected.", required: false },
+      { key: "keyId", label: "Key ID", hint: "The App Store Connect API key's id, shown next to it under Users and Access > Integrations. Needed to connect the key.", required: false, forKey: true },
+      { key: "issuerId", label: "Issuer ID", hint: "Shown above the team keys on the same page. Leave empty for an individual key.", required: false, forKey: true },
+    ],
+    reads: true,
+    keyHint: "The App Store Connect API key's .p8 file, pasted as text (one line is fine). Role Developer or App Manager, with access to the app. Apple keys cannot be made read only, so birdsI only reads with it: the app, its versions and builds, never sales.",
+    keyUrl: "https://appstoreconnect.apple.com/access/integrations/api",
     dashboard: (p) => `https://appstoreconnect.apple.com/apps/${encodeURIComponent(p.ref)}/distribution`,
+  },
+  {
+    vendor: "github",
+    name: "GitHub",
+    kinds: [{ kind: "repository", refLabel: "Repository", refHint: "owner/name, as in the repository's address on github.com.", refPattern: /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/ }],
+    settings: [],
+    reads: true,
+    keyHint: "A fine-grained personal access token for this repository only, read only: Metadata, Actions, Dependabot alerts, Secret scanning alerts and Code scanning alerts, plus the account permission Plan for the month's usage.",
+    keyUrl: "https://github.com/settings/personal-access-tokens/new",
+    dashboard: (p) => `https://github.com/${p.ref}`,
   },
   {
     vendor: "resend",

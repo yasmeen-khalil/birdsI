@@ -101,7 +101,7 @@ export const Vendor = z.object({
   /** What this app uses it for, in plain words. Judgment unless the owner edits it. */
   purpose: z.string().nullable(),
   /** How birdsI knows the app uses it. */
-  detectedBy: z.array(z.enum(["package", "env", "url", "config", "projects"])),
+  detectedBy: z.array(z.enum(["package", "env", "url", "config", "projects", "declared"])),
   packages: z.array(z.string()),
   envVars: z.array(z.string()),
   callSites: z.array(CallSite),

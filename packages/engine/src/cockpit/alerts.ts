@@ -1,5 +1,5 @@
 import { bestFacts, checkedLimit, envNeededBy, LIMITS_BY_SLUG, missingEnv, roleForLabel, tierFor } from "@birdsi/shared";
-import type { AlertDraft, AppDeadline, LimitsDrift, MapEnv, ProjectReadData, ServiceMap, SupabaseRead, Vendor, VercelRead, OneSignalRead } from "@birdsi/shared";
+import type { AlertDraft, AppAlertKind, AppDeadline, LimitsDrift, MapEnv, ProjectReadData, ServiceMap, SupabaseRead, Vendor, VendorFact, VercelRead, OneSignalRead } from "@birdsi/shared";
 
 /**
  * The alert rules of the cockpit. Each alert is one sentence the owner can
@@ -128,6 +128,7 @@ export function appAlerts(input: AlertInput): AlertResult {
   planLimitAlerts(drafts, checked, input);
   deadlineAlerts(drafts, input);
   driftAlerts(drafts, checked, input);
+  factAlerts(drafts, checked, input);
 
   const order = { critical: 0, warning: 1, notice: 2 } as const;
   drafts.sort((a, b) => order[a.severity] - order[b.severity] || a.kind.localeCompare(b.kind) || a.dedupeKey.localeCompare(b.dedupeKey));
@@ -396,6 +397,61 @@ function planLimitAlerts(drafts: AlertDraft[], checked: Set<string>, input: Aler
 }
 
 /** Dates the owner asked to be warned about, from 30 days before to 14 days after. */
+interface FactRule {
+  metric: string;
+  kind: AppAlertKind;
+  severity: "critical" | "warning";
+  sentence: (f: VendorFact) => string;
+  action: string;
+}
+
+/** What a connector read that needs a person, by vendor: the fact's metric, and the alert it makes while the fact is there with a count above zero. */
+const FACT_RULES: Record<string, FactRule[]> = {
+  github: [
+    { metric: "ci_failed", kind: "ci_failed", severity: "warning", sentence: (f) => `${f.value}, so the default branch no longer passes its own checks.`, action: "Open the run and read the failing step. What is live is whatever the last passing run shipped." },
+    { metric: "secrets_open", kind: "secret_alert", severity: "critical", sentence: (f) => `GitHub's secret scanning found ${f.numeric === 1 ? "a secret" : `${f.numeric} secrets`} in the repository and the ${f.numeric === 1 ? "alert is" : "alerts are"} open (${f.value}). A secret in the code is live until it is rotated.`, action: "Rotate each secret at its vendor first, then remove it from the code and resolve the alert." },
+    { metric: "dependabot_serious", kind: "dependency_alert", severity: "warning", sentence: (f) => `Dependabot has ${f.numeric === 1 ? "an open alert" : `${f.numeric} open alerts`} of critical or high severity on the repository's dependencies (${f.value}).`, action: "Open the alerts and update or replace the packages. Each alert names the fixed version when one exists." },
+    { metric: "code_scanning_serious", kind: "code_alert", severity: "warning", sentence: (f) => `Code scanning has ${f.numeric === 1 ? "an open alert" : `${f.numeric} open alerts`} of critical or high severity on the repository (${f.value}).`, action: "Open the alerts. Each one points at the file and line." },
+  ],
+  apple: [
+    { metric: "version_rejected", kind: "store_rejected", severity: "warning", sentence: (f) => `App Review rejected a version of the app: ${f.value.replace(/\.?$/, "")}.`, action: "Open the version in App Store Connect and read App Review's message in Resolution Center, then fix and resubmit." },
+    { metric: "build_failed", kind: "build_failed", severity: "warning", sentence: (f) => `The newest build uploaded to App Store Connect did not process: ${f.value}.`, action: "Upload a new build. Apple's email names the reason." },
+  ],
+};
+
+/**
+ * Alerts from what a connector read: a failed workflow run, security alerts
+ * GitHub keeps, a version App Review rejected, a build that did not process.
+ * A vendor nothing was read from this time changes nothing: what is open
+ * stays until a read says otherwise.
+ */
+function factAlerts(drafts: AlertDraft[], checked: Set<string>, input: AlertInput): void {
+  for (const v of input.vendors) {
+    const rules = FACT_RULES[v.slug];
+    if (!rules) continue;
+    const facts = v.facts.filter((f) => f.source === "connector");
+    if (facts.length === 0) continue;
+    for (const rule of rules) {
+      checked.add(`${rule.kind}:${v.id}`);
+      // A vendor with several projects suffixes each project's metrics, so one alert per project.
+      for (const f of facts.filter((x) => x.metric === rule.metric || x.metric.startsWith(`${rule.metric}:`))) {
+        if ((f.numeric ?? 0) <= 0) continue;
+        drafts.push({
+          kind: rule.kind,
+          severity: rule.severity,
+          projectId: null,
+          sentence: rule.sentence(f),
+          action: rule.action,
+          details: { vendor: v.slug, metric: f.metric, value: f.value, numeric: f.numeric },
+          source: { label: `${v.name}: ${f.label}`, url: f.evidence?.url ?? null, path: null, line: null },
+          dedupeKey: `${rule.kind}:${v.id}:${f.metric}`,
+          scope: `${rule.kind}:${v.id}`,
+        });
+      }
+    }
+  }
+}
+
 /** A short stable key for a list of words (FNV-1a), so an alert follows the same sentences across weekly checks. */
 function keyOf(words: string[]): string {
   let hash = 0x811c9dc5;

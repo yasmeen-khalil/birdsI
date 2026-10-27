@@ -20,6 +20,8 @@ export interface ScanInput {
   snapshot: Snapshot | (() => Promise<Snapshot>);
   /** Hints the CLI collected on the owner's machine (Stripe Projects state and spend). */
   projectHints?: ProjectHints | null;
+  /** Slugs of the vendors the owner declared projects for, so each has a row even when the code never names it. */
+  declaredVendors?: string[];
   /** Called as soon as the vendors are known, before the slower steps, so the dashboard can show them at once. */
   onVendors?: (vendors: VendorDraft[]) => Promise<void> | void;
   /** Called with the service map once it is complete: the rules' map, with the model's confirmed finds when a model read the code. Called even when a later step stops. */
@@ -137,7 +139,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   // Vendors: every outside service, found from packages, env names, URLs and config files.
   const vendorsStart = Date.now();
   await emit({ type: "step_started", step: "vendors", label: STEP_LABELS.vendors });
-  const vendors = await discoverVendors(inventory, rawDependencies, input.projectHints ?? null);
+  const vendors = await discoverVendors(inventory, rawDependencies, input.projectHints ?? null, input.declaredVendors ?? []);
   for (const v of vendors) await emit({ type: "vendor", slug: v.slug, name: v.name, category: v.category, detectedBy: v.detectedBy });
   await emit({ type: "step_done", step: "vendors", findings: 0, durationMs: Date.now() - vendorsStart });
   if (vendors.length > 0) await input.onVendors?.(vendors);

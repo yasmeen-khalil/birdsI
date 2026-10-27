@@ -9,6 +9,11 @@ describe("projects", () => {
     expect(projectProblem({ vendor: "vercel", kind: "project", ref: "flowsophy-ops", settings: {} })).toBeNull();
     expect(projectProblem({ vendor: "vercel", kind: "team", ref: "flowsophy", settings: {} })).toMatch(/team id/);
     expect(projectProblem({ vendor: "apple", kind: "app", ref: "6745532104", settings: {} })).toBeNull();
+    expect(projectProblem({ vendor: "github", kind: "repository", ref: "yasmeen-khalil/flowsophy", settings: {} })).toBeNull();
+    expect(projectProblem({ vendor: "github", kind: "repository", ref: "flowsophy", settings: {} })).toMatch(/owner\/name/);
+    expect(projectProblem({ vendor: "github", kind: "repository", ref: "https://github.com/yasmeen-khalil/flowsophy", settings: {} })).toMatch(/owner\/name/);
+    expect(projectProblem({ vendor: "clerk", kind: "instance", ref: "ins_2abc", settings: {} })).toBeNull();
+    expect(projectProblem({ vendor: "revenuecat", kind: "project", ref: "proj1ab2c3d4", settings: {} })).toBeNull();
     expect(projectProblem({ vendor: "nope", kind: "app", ref: "x", settings: {} })).toMatch(/does not know/);
     expect(projectProblem({ vendor: "supabase", kind: "app", ref: "x", settings: {} })).toMatch(/has no app/);
   });

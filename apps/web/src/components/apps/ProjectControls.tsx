@@ -19,7 +19,7 @@ export interface VendorChoice {
   keyHint: string;
   keyUrl: string | null;
   kinds: Array<{ kind: string; refLabel: string; refHint: string }>;
-  settings: Array<{ key: string; label: string; hint: string; required: boolean }>;
+  settings: Array<{ key: string; label: string; hint: string; required: boolean; forKey?: boolean }>;
 }
 
 const ENVIRONMENTS: Environment[] = ["production", "preview", "development"];
@@ -112,6 +112,9 @@ export function EnvironmentsForm({ repoId, environments }: { repoId: string; env
 function KeyForm({ repoId, project, vendor, onDone, onCancel }: { repoId: string; project: AppProject; vendor: VendorChoice; onDone: () => void; onCancel: () => void }) {
   const [token, setToken] = useState("");
   const [label, setLabel] = useState("");
+  // Identifiers the key needs that the project may lack yet, such as an App Store Connect Key ID: asked for here, kept with the project.
+  const keyFields = vendor.settings.filter((s) => s.forKey);
+  const [extra, setExtra] = useState<Record<string, string>>(() => Object.fromEntries(keyFields.map((f) => [f.key, project.settings[f.key] ?? ""])));
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const url = safeUrl(vendor.keyUrl);
@@ -125,7 +128,7 @@ function KeyForm({ repoId, project, vendor, onDone, onCancel }: { repoId: string
         if (!token.trim()) return;
         start(async () => {
           setError(null);
-          const r = await connectProjectKeyAction(repoId, project.id, { token, label });
+          const r = await connectProjectKeyAction(repoId, project.id, { token, label, ...(keyFields.length > 0 ? { settings: extra } : {}) });
           if (!r.ok) {
             setError(r.message);
             return;
@@ -147,9 +150,18 @@ function KeyForm({ repoId, project, vendor, onDone, onCancel }: { repoId: string
           </>
         )}
       </p>
+      {keyFields.map((f) => (
+        <div key={f.key} className="field">
+          <label htmlFor={`key-${project.id}-${f.key}`}>{f.label}</label>
+          <input id={`key-${project.id}-${f.key}`} className="input mono" value={extra[f.key] ?? ""} onChange={(e) => setExtra((s) => ({ ...s, [f.key]: e.target.value }))} autoComplete="off" spellCheck={false} disabled={pending} aria-describedby={`key-${project.id}-${f.key}-hint`} />
+          <p id={`key-${project.id}-${f.key}-hint`} className="t-small c3">
+            {f.hint}
+          </p>
+        </div>
+      ))}
       <div className="field">
         <label htmlFor={`key-${project.id}`}>Key</label>
-        <input id={`key-${project.id}`} type="password" className="input mono" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false} autoFocus disabled={pending} />
+        <input id={`key-${project.id}`} type="password" className="input mono" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false} autoFocus={keyFields.length === 0} disabled={pending} />
       </div>
       <div className="field">
         <label htmlFor={`key-label-${project.id}`}>

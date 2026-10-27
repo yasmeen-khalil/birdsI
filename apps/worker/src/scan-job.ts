@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   appendEvent,
+  declaredVendorSlugs,
   downloadSnapshot,
   enqueueJob,
   ensureAppForRepo,
@@ -86,6 +87,8 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
   const previousMap = scan.repo_id ? await latestServiceMap(scan.repo_id).catch(() => null) : null;
   // The owner's additions to the prompts, the newest per section from the record.
   const prompts = scan.repo_id ? await promptsForRepo(scan.repo_id).catch(() => ({})) : {};
+  // Vendors declared on the Projects page get a row in the map even when the code never names them.
+  const declaredVendors = scan.repo_id ? await declaredVendorSlugs(scan.repo_id).catch(() => []) : [];
   try {
     const result = await runScan(config, {
       previousMap: previousMap?.map ?? null,
@@ -96,6 +99,7 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
         return snapshot;
       },
       projectHints: hints,
+      declaredVendors,
       onVendors: async (vendors) => {
         if (scan.repo_id) await replaceVendors(scan.repo_id, scanId, vendors);
       },

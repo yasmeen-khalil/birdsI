@@ -63,6 +63,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   }),
   e("clerk", "Clerk", "auth", "Sign-in, user accounts and session management for web and mobile apps.", {
     packages: [/^@clerk\//],
+    connector: "clerk",
     envVars: [/^(NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_)?CLERK_/],
     domains: ["clerk.com", "clerk.accounts.dev", "clerk.dev"],
     pricingUrl: "https://clerk.com/pricing",
@@ -142,6 +143,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   }),
   e("github", "GitHub", "other", "Code hosting, pull requests and Actions workflows.", {
     packages: [/^@octokit\//, /^octokit$/],
+    connector: "github",
     envVars: [/^GITHUB_(TOKEN|APP|CLIENT|WEBHOOK|PAT)/, /^GH_TOKEN$/],
     domains: ["api.github.com"],
     configFiles: [/^\.github\/workflows\/.+\.ya?ml$/],
@@ -192,6 +194,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   }),
   e("revenuecat", "RevenueCat", "payments", "In-app subscriptions for iOS and Android.", {
     packages: [/^@revenuecat\//, /^react-native-purchases$/],
+    connector: "revenuecat",
     envVars: [/^(NEXT_PUBLIC_|EXPO_PUBLIC_)?REVENUECAT_/],
     domains: ["api.revenuecat.com", "revenuecat.com"],
     pricingUrl: "https://www.revenuecat.com/pricing/",
@@ -448,6 +451,7 @@ export const CATALOG: readonly CatalogEntry[] = [
     dashboardUrl: "https://metalpriceapi.com/dashboard",
   }),
   e("apple", "App Store Connect (Apple)", "hosting", "Publishing the iOS app: the App Store record, TestFlight, the yearly developer membership.", {
+    connector: "apple",
     envVars: [/^(APP_STORE_CONNECT|ASC|APPLE_(TEAM|KEY|ISSUER|APP))_/],
     domains: ["appstoreconnect.apple.com", "api.appstoreconnect.apple.com"],
     configFiles: [/(^|\/)ios\/App\/App\.xcodeproj\/project\.pbxproj$/],

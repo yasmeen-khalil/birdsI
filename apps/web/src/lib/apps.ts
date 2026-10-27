@@ -131,7 +131,7 @@ export async function removeAppProject(projectId: string, user: UserRow): Promis
  * Proves a key reads the project, then stores it encrypted. The key is only
  * ever in this request and the worker's memory; the page never sees it again.
  */
-export async function connectProjectKey(projectId: string, user: UserRow, input: { token: string; label?: string }): Promise<void> {
+export async function connectProjectKey(projectId: string, user: UserRow, input: { token: string; label?: string; settings?: Record<string, string> }): Promise<void> {
   if (!isSecretsKeyConfigured()) throw new ApiError(500, "not_configured", "Keys cannot be stored on this birdsI yet: BIRDSI_SECRETS_KEY is not set.");
   const { project, app } = await projectForUser(projectId, user.id).catch(notReady);
   const vendor = PROJECT_VENDOR_BY_SLUG.get(project.vendor);
@@ -139,8 +139,20 @@ export async function connectProjectKey(projectId: string, user: UserRow, input:
   if (!vendor?.reads || !connector) throw new ApiError(400, "bad_request", `birdsI cannot read ${vendor?.name ?? project.vendor} yet, so it holds no key for it. The project stays listed with its dashboard link.`);
   const token = input.token.trim();
   if (token.length < 8) throw new ApiError(400, "bad_request", "Paste the whole key.");
+  // Identifiers the key needs (an App Store Connect Key ID, say) come with the key when the project lacks them, and stay with the project. Never a secret.
+  let settings = project.settings ?? {};
+  const forKey = vendor.settings.filter((s) => s.forKey);
+  if (input.settings && forKey.length > 0) {
+    const given: Record<string, string> = {};
+    for (const s of forKey) {
+      const value = (input.settings[s.key] ?? "").trim().slice(0, 200);
+      if (value) given[s.key] = value;
+    }
+    settings = { ...settings, ...given };
+    if (Object.keys(given).length > 0) await updateProject(project.id, user.id, { settings });
+  }
   try {
-    await connector.probe(token, settingsForProject({ vendor: project.vendor, kind: project.kind, ref: project.ref, settings: project.settings ?? {} }));
+    await connector.probe(token, settingsForProject({ vendor: project.vendor, kind: project.kind, ref: project.ref, settings }));
   } catch (error) {
     throw new ApiError(400, "key_rejected", error instanceof Error ? error.message : `${vendor.name} did not accept the key.`);
   }

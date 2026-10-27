@@ -95,3 +95,22 @@ describe("cleanSlug", () => {
     expect(cleanSlug('"""')).toBeNull();
   });
 });
+
+describe("declared vendors", () => {
+  it("gives a vendor the owner declared a project for a row even when the code never names it, and does not double one the code names", async () => {
+    const dir = await fixture({
+      "package.json": JSON.stringify({ name: "app", dependencies: { "@clerk/nextjs": "^6" } }),
+      "src/app.ts": "export const ok = true;\n",
+    });
+    const inventory = await walkInventory(dir);
+    const vendors = await discoverVendors(inventory, [{ ecosystem: "npm", name: "@clerk/nextjs", version: "6.0.0", declared: "^6", manifestPath: "package.json", direct: true }], null, ["apple", "clerk", "not-a-vendor"]);
+    const apple = vendors.find((v) => v.slug === "apple");
+    expect(apple?.detectedBy).toEqual(["declared"]);
+    expect(apple?.connectable).toBe(true);
+    const clerk = vendors.filter((v) => v.slug === "clerk");
+    expect(clerk).toHaveLength(1);
+    expect(clerk[0]?.detectedBy).toEqual(expect.arrayContaining(["package", "declared"]));
+    expect(vendors.some((v) => v.slug === "not-a-vendor")).toBe(false);
+  });
+});
+

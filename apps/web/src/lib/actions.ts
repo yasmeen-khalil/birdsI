@@ -281,7 +281,7 @@ export async function removeProjectAction(repoId: string, projectId: string): Pr
   });
 }
 
-export async function connectProjectKeyAction(repoId: string, projectId: string, input: { token: string; label?: string }): Promise<ActionResult> {
+export async function connectProjectKeyAction(repoId: string, projectId: string, input: { token: string; label?: string; settings?: Record<string, string> }): Promise<ActionResult> {
   return run(async () => {
     const user = await requireUser();
     await connectProjectKey(projectId, user, input);

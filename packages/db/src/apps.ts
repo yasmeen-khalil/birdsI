@@ -97,6 +97,17 @@ export async function updateApp(appId: string, userId: string, patch: { name?: s
   return unwrap(result, "updateApp") as AppRow;
 }
 
+/** The vendors the owner declared projects for, by repository, so the map gives each a row even when the code never names it. */
+export async function declaredVendorSlugs(repoId: string): Promise<string[]> {
+  if (!(await appsAvailable())) return [];
+  const db = getDb();
+  const app = await db.from("apps").select("id").eq("repo_id", repoId).maybeSingle();
+  if (app.error || !app.data) return [];
+  const { data, error } = await db.from("app_projects").select("vendor").eq("app_id", (app.data as { id: string }).id);
+  if (error) throw new Error(`declaredVendorSlugs: ${error.message}`);
+  return [...new Set(((data ?? []) as Array<{ vendor: string }>).map((r) => r.vendor))];
+}
+
 export async function projectsForApp(appId: string): Promise<AppProjectRow[]> {
   const db = getDb();
   const { data, error } = await db.from("app_projects").select().eq("app_id", appId).order("vendor").order("created_at");

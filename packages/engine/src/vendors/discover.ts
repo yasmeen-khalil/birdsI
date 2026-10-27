@@ -166,7 +166,11 @@ function isScannableSource(file: { path: string; language: string | null; bytes:
   return isEnvFile(file.path) || /\.(json|toml|ya?ml|env|cfg|ini|conf)$/i.test(file.path);
 }
 
-export async function discoverVendors(inventory: Inventory, rawDependencies: RawDependency[], hints: ProjectHints | null): Promise<VendorDraft[]> {
+/**
+ * @param declared Vendors the owner declared projects for on the Projects page. A vendor the code never
+ * names (an App Store record, say) is still one of the app's, so it gets a row and its account is read.
+ */
+export async function discoverVendors(inventory: Inventory, rawDependencies: RawDependency[], hints: ProjectHints | null, declared: string[] = []): Promise<VendorDraft[]> {
   const hits = new Map<string, Hit>();
 
   // 1. Packages
@@ -244,6 +248,14 @@ export async function discoverVendors(inventory: Inventory, rawDependencies: Raw
     const entry = CATALOG_BY_SLUG.get(service.slug) ?? matchDomain(service.slug) ?? null;
     const hit = hitFor(hits, entry, entry?.slug ?? service.slug, entry?.name ?? service.name);
     hit.detectedBy.add("projects");
+  }
+
+  // 5. Vendors declared on the Projects page that nothing in the code named.
+  for (const slug of new Set(declared)) {
+    const entry = CATALOG_BY_SLUG.get(slug);
+    if (!entry) continue;
+    const hit = hitFor(hits, entry, entry.slug, entry.name);
+    hit.detectedBy.add("declared");
   }
 
   // The app's own hosting shows up only as config; GitHub shows up only as workflows. Both count.

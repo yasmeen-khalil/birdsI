@@ -9,7 +9,7 @@ import { ServiceIcon } from "../Logos";
 
 const FACT_ORDER: FactKind[] = ["plan", "cost", "usage", "limit", "billing", "status"];
 const FACT_HEADING: Record<FactKind, string> = { plan: "Plan", cost: "Cost", usage: "Usage", limit: "Limits", billing: "Billing", status: "Status", purpose: "Purpose" };
-const DETECTED_LABEL: Record<Vendor["detectedBy"][number], string> = { package: "package", env: "env name", url: "URL", config: "config file", projects: "Stripe Projects" };
+const DETECTED_LABEL: Record<Vendor["detectedBy"][number], string> = { package: "package", env: "env name", url: "URL", config: "config file", projects: "Stripe Projects", declared: "the Projects page" };
 const CALL_SITES_SHOWN = 6;
 
 function UsageBar({ fact }: { fact: VendorFact }) {

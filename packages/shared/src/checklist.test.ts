@@ -59,9 +59,12 @@ describe("checklistView", () => {
     expect(vercelKey.steps[0]).toContain("Account Settings > Tokens");
     expect(vercelKey.willDo).toContain("deployments");
     expect(vercelKey.links[0]!.url).toBe("https://vercel.com/account/settings/tokens");
+    // Clerk reads since v4 step 8, so its project and key are required steps with the clicks and what the key lets birdsI read.
     const clerk = view.items.find((i) => i.id === "clerk-project")!;
-    expect(clerk).toMatchObject({ status: "optional", required: false });
-    expect(clerk.state).toContain("cannot read Clerk yet");
+    expect(clerk).toMatchObject({ status: "todo", required: true });
+    const clerkKey = view.items.find((i) => i.id === "clerk-key")!;
+    expect(clerkKey.steps[0]).toContain("Secret keys");
+    expect(clerkKey.willDo).toContain("organizations");
     expect(view.items.find((i) => i.id === "unreadable")!.state).toContain("PostHog");
     expect(view.items.find((i) => i.id === "reader")).toMatchObject({ status: "todo", required: false });
   });

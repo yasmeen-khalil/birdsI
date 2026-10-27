@@ -85,6 +85,26 @@ export const VENDOR_ABILITIES: Record<string, VendorAbility> = {
     alerts: "Mobile push dropped for the plan, a key that stopped working.",
     keySteps: ["dashboard.onesignal.com > the app > Settings > Keys and IDs > Add Key: an App API key.", "Leave the IP allowlist off: birdsI's worker has no fixed address.", "Paste it on Projects > the OneSignal app > Connect key."],
   },
+  clerk: {
+    reads: "Whether the key belongs to the declared instance, the instance's environment, and the users and organizations as Clerk counts them. Never a user's data. The plan and the monthly retained users it is billed on are not in Clerk's API.",
+    alerts: "A key that stopped working.",
+    keySteps: ["dashboard.clerk.com > the application > Configure > API keys > Secret keys: copy this instance's key (sk_live_ for production, sk_test_ for development). Clerk has no read-only key, so birdsI only reads with it.", "Paste it on Projects > the Clerk instance > Connect key."],
+  },
+  revenuecat: {
+    reads: "The project's name and apps, and the overview metrics in US dollars: active subscriptions and trials, monthly recurring revenue, and the revenue, new customers and active users of the last 28 days. The revenue counts against the free plan's monthly tracked revenue in the checked limits list.",
+    alerts: "Revenue near the free plan's cap, a key that stopped working.",
+    keySteps: ["app.revenuecat.com > the project > Project settings > API keys > New: version V2, read permission on projects (project_configuration:projects:read), apps (project_configuration:apps:read) and overview metrics (charts_metrics:overview:read), nothing else.", "Paste it on Projects > the RevenueCat project > Connect key."],
+  },
+  apple: {
+    reads: "The app's name and bundle id, the version live on the App Store, the version in progress and where it stands with App Review, any rejected version, and the newest build and whether it processed. Sales and the membership's renewal date are not read.",
+    alerts: "A version App Review rejected, a build that did not process, a key that stopped working.",
+    keySteps: ["appstoreconnect.apple.com > Users and Access > Integrations > App Store Connect API > Team keys > Generate: role Developer (App Manager also works), with access to the app. Download the .p8 file once and note the Key ID and the Issuer ID.", "Projects > the App Store Connect app > Connect key: enter the Key ID and the Issuer ID, then paste the text of the .p8 file."],
+  },
+  github: {
+    reads: "The repository's visibility, default branch, last push and open issues, the newest workflow run on the default branch, the open Dependabot, secret scanning and code scanning alerts by severity, and the account's usage this month: Actions minutes against the plan and the bill so far.",
+    alerts: "A failed workflow run on the default branch, an open secret scanning alert, an open Dependabot or code scanning alert of critical or high severity, Actions minutes near the plan's limit.",
+    keySteps: ["github.com > Settings > Developer settings > Personal access tokens > Fine-grained tokens > Generate: only this repository. Repository permissions, read: Metadata, Actions, Dependabot alerts, Secret scanning alerts, Code scanning alerts. Account permissions, read: Plan.", "Paste it on Projects > the GitHub repository > Connect key."],
+  },
   stripe: {
     reads: "The available balance and this month's charges, net of refunds, before Stripe's fees.",
     alerts: "None yet. Balance and charges show on the Vendors page and count in the money section.",

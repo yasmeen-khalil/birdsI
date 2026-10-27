@@ -37,7 +37,7 @@ export const MapService = z.object({
   name: z.string(),
   category: z.string(),
   /** How the map knows the app uses it. */
-  how: z.array(z.enum(["package", "import", "env", "url", "config", "projects", "model"])),
+  how: z.array(z.enum(["package", "import", "env", "url", "config", "projects", "model", "declared"])),
   packages: z.array(z.string()),
   /** Where the code imports the vendor's SDK. */
   imports: z.array(SourceLine),
