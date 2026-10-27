@@ -68,6 +68,12 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - The Stripe key (now with Webhook Endpoints: Read) also reads the endpoints registered at Stripe: each shows on the Vendors page with its state and events.
 - Every hour the cockpit compares them with the Stripe webhook routes in the map, on the app's hosts as the Vercel reads know them. A route no enabled endpoint points at opens a warning (Stripe sends it nothing), and so does an enabled endpoint pointing at the app with no route behind it (every delivery fails). A disabled endpoint is said to be disabled. Without a host, paths alone are compared, and an endpoint birdsI cannot place is never flagged. A read that fails leaves the alerts as they were.
 
+### Step 10: the demo page, the sample app and the submission
+
+- A public demo page, `/demo`, shows the cockpit of the app named in `BIRDSI_DEMO_REPO_ID`, as its owner sees it, to anyone, without a key or a control on it. Without the variable it says no sample app is set up.
+- `samples/corner-bakery` is back: a bakery's online ordering app with problems left in on purpose (a webhook that never checks its sender, a cron that skips its secret, env names declared and never read, a package never imported, a secret written in the code as a fallback) and a `verify.sql` with markers, so the demo shows every kind of find and alert.
+- README and HACKATHON.md say where Nemotron on Token Factory and Tavily are called, file by file, what the judges can try, and the honest scope.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

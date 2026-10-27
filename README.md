@@ -6,6 +6,14 @@ Run `npx birdsi` in an app's folder and its cockpit opens: what needs you, the s
 
 birdsI is its owner's cockpit for their own apps first. A product for others comes later.
 
+Built for the Nebius x NVIDIA Global AI Hackathon, Best Apps and Agents track: the model behind birdsI is NVIDIA Nemotron 3 on Nebius Token Factory, reading the code after the rules and behind a verifier, with Tavily finding the current documentation and watching the pricing pages. HACKATHON.md says exactly where each call is made and what the judges can try.
+
+## Try it
+
+- **The demo page**, DEMO_URL/demo: the cockpit of the sample app in `samples/corner-bakery` (a bakery's online ordering with a few problems left in on purpose), readable without signing in.
+- **Your own app**: sign in with GitHub at DEMO_URL, then run `npx birdsi` in the app's folder (from a clone of this repository until the package is on npm: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`). The Set up page lists what to connect and what each key lets birdsI read.
+- **Inside a coding agent**: `claude mcp add birdsi -- npx -y birdsi mcp`, then ask for the cockpit.
+
 ## What it does
 
 - **The map, from the code.** Every outside service the app uses, found by rules from packages, imports, env names, web addresses and config files, each with the file and line it came from. The service map with it: the env names each deployment needs (by the role names the code compares, such as `APP_ROLE`), the crons and whether their handlers check the secret, the webhooks and the line that verifies each, the store apps, the migrations the repository holds and its public pages. It names env variables and never reads a value. Each map is kept, dated, with its commit. Then the model reads the code for what the rules missed, and every find it makes is confirmed at its file and line before it joins the map, marked as the model's. It also writes what the app uses each service for, in one sentence, marked as its reading. On the next map only the files that changed are read again. Rule-based checks run with it: committed keys, unsafe settings, published vulnerabilities (OSV), packages two or more majors behind, and the map against itself (crons without a handler or a secret check, webhooks without a sender check, an SDK with no key named, env names nothing reads, packages nothing imports, files no route reaches, two services for one job). Every map ends with what it checked and what it did not. When its keys are set, the docs check compares a main package's own current documentation with how the code imports it, and must cite the page.
@@ -27,6 +35,8 @@ An agent can ask the owner and propose, and only the owner approves, in the brow
 
 ## Models
 
+Where the model is called, file by file: `packages/engine/src/models/client.ts` is the one door (Token Factory's chat completions with JSON schema output, Anthropic's messages API, retries, the usage ledger). `packages/engine/src/reader/` is the reading of the code after the rules, with its verifier. `packages/engine/src/checks/docs.ts` is the docs check. `packages/engine/src/cockpit/explain.ts` explains a failed deployment. `packages/engine/src/limits/watch.ts` is the weekly watch over the pricing pages. Tavily is called in the docs check and the watch.
+
 Two sizes of model sit behind one door: a small one for reading and the docs check, a large one for verification. On Nebius Token Factory they are NVIDIA Nemotron 3 Nano (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`) and Nemotron 3 Super (`nvidia/nemotron-3-super-120b-a12b`), called through Token Factory's OpenAI-compatible API with its JSON schema output. On Anthropic they are Claude Haiku 4.5 and Claude Opus 5.5. The key you set picks the provider, Nemotron first when both are set, `BIRDSI_PROVIDER` forces one, and `BIRDSI_MODEL_NANO` and `BIRDSI_MODEL_SUPER` override the ids. The small model reads the code after the rules and runs the docs check. Nothing a model says reaches you unverified: a find is confirmed at its line or dropped, and a purpose is marked as the model's reading.
 
 ## Repository layout
@@ -39,6 +49,7 @@ packages/shared  domain types, API schemas, the checked limits list, UI copy
 packages/db      Supabase data access, job queue, usage ledger
 packages/cli     the `birdsi` CLI and MCP server (not on npm yet)
 supabase/        database migrations and verify.sql
+samples/         corner-bakery, the sample app the demo page maps
 ```
 
 ## Setup
