@@ -25,6 +25,10 @@ A coding agent can read the code. It cannot see what the app runs on or what the
 
 An agent can ask the owner and propose, and only the owner approves, in the browser. `npx birdsi policy --hint` prints a Claude Code hook that stops account-changing shell commands and routes them through approvals.
 
+## Models
+
+Two sizes of model sit behind one door: a small one for reading and the docs check, a large one for verification. On Nebius Token Factory they are NVIDIA Nemotron 3 Nano (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`) and Nemotron 3 Super (`nvidia/nemotron-3-super-120b-a12b`), called through Token Factory's OpenAI-compatible API with its JSON schema output. On Anthropic they are Claude Haiku 4.5 and Claude Opus 5.5. The key you set picks the provider, Nemotron first when both are set, `BIRDSI_PROVIDER` forces one, and `BIRDSI_MODEL_NANO` and `BIRDSI_MODEL_SUPER` override the ids. Today only the docs check calls a model. Nothing a model says reaches you unverified.
+
 ## Repository layout
 
 ```
@@ -39,7 +43,7 @@ supabase/        database migrations and verify.sql
 
 ## Setup
 
-Requirements: Node 22 or newer, a Supabase project, a Clerk application (GitHub sign-in). Anthropic and Tavily keys are optional: they switch on the docs check. A GitHub App is optional.
+Requirements: Node 22 or newer, a Supabase project, a Clerk application (GitHub sign-in). A model key (`NEBIUS_API_KEY` for Nemotron on Nebius Token Factory, or `ANTHROPIC_API_KEY` for Claude) and a Tavily key are optional: together they switch on the docs check. A GitHub App is optional.
 
 The repository is private today. Making it public is the owner's decision. With access:
 
@@ -74,7 +78,7 @@ See `.env.example` for the full list with comments. The essentials:
 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | database, storage, job queue |
 | `BIRDSI_SECRETS_KEY` | encrypts the vendor keys you connect (any long random string) |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | sign-in |
-| `ANTHROPIC_API_KEY`, `TAVILY_API_KEY` | optional: the docs check, skipped without both |
+| `NEBIUS_API_KEY` or `ANTHROPIC_API_KEY`, and `TAVILY_API_KEY` | optional: the docs check, skipped without a model key and Tavily |
 | `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` | optional: reading repositories through the GitHub App |
 
 ### Deploying

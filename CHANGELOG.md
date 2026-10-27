@@ -1,5 +1,16 @@
 # Changelog
 
+## v4 (unreleased): the reader with a model
+
+A model reads the code again, behind a verifier: rules first with the file and line, then Nemotron on Nebius Token Factory or Claude, and nothing a model says reaches a page unverified. Built in steps, each with the full chain green.
+
+### Step 1: the model door
+
+- Two providers behind one door: Nemotron on Nebius Token Factory (`NEBIUS_API_KEY`) and Claude through Anthropic (`ANTHROPIC_API_KEY`). The key that is set picks the provider, Nemotron first when both are, and `BIRDSI_PROVIDER` forces one. Two sizes per provider: a small model (Nemotron 3 Nano or Claude Haiku 4.5) for reading and the docs check, and a large one (Nemotron 3 Super or Claude Opus 5.5) for verification, with `BIRDSI_MODEL_NANO` and `BIRDSI_MODEL_SUPER` to override the ids. `BIRDSI_MODEL_DOCS` is gone.
+- Token Factory calls use its JSON schema output, answer in plain JSON mode for a model that refuses the schema, retry on rate limits, server errors and lost connections with the provider's retry-after, and price cached prompt tokens at the cached price.
+- The docs check runs on whichever provider is set, with Tavily. Without a model key the map runs without it and says so.
+- Reasoning a model wraps in think tags is dropped before an answer is parsed, and an answer cut off at the output limit is asked again shorter.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

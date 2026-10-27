@@ -31,7 +31,7 @@ export const docsCheck: Check = {
   id: "docs",
   step: "docs",
   label: "Checking packages against their current documentation",
-  available: (config) => config.tavilyApiKey !== null && config.anthropic.apiKey !== null,
+  available: (config) => config.tavilyApiKey !== null && config.provider !== null,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     if (!ctx.config.tavilyApiKey) return [];
     const client = tavily({ apiKey: ctx.config.tavilyApiKey });

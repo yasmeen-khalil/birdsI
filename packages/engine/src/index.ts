@@ -1,4 +1,4 @@
-export { loadEngineConfig, DEFAULT_BUDGET, DOCS_MODEL, type EngineConfig, type ScanBudget } from "./config";
+export { loadEngineConfig, detectProvider, DEFAULT_BUDGET, NEBIUS_MODELS, ANTHROPIC_MODELS, type EngineConfig, type ModelPrice, type ModelTier, type Provider, type ScanBudget } from "./config";
 export { ModelClient, BudgetExceededError, extractJson, type Usage, type UsageSink, type BeforeCall } from "./models/client";
 export { toJsonSchema } from "./models/schema";
 export type { Snapshot } from "./source/types";

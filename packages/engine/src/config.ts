@@ -1,21 +1,38 @@
 /**
  * Engine configuration, read once from the environment by the process that
- * hosts the engine (worker or web).
+ * hosts the engine (worker or web). Never throws: every integration degrades
+ * to "off" with a note, so the product stays usable while keys are set up.
  *
- * Since v3 nothing in birdsI needs a model except the official-docs check,
- * which compares a package's own current documentation with how the code
- * uses it. That check runs only when both ANTHROPIC_API_KEY and
- * TAVILY_API_KEY are set; without them a map still runs in full and says the
- * docs check was skipped.
+ * Two providers sit behind one door: Nemotron on Nebius Token Factory, and
+ * Claude through the Anthropic API. NEBIUS_API_KEY selects Nemotron, otherwise
+ * ANTHROPIC_API_KEY selects Claude, and BIRDSI_PROVIDER picks one when both
+ * keys exist. With no model key, nothing that needs a model runs.
  */
+export type Provider = "anthropic" | "nebius";
+
+/** Two sizes of model: nano reads and answers everyday calls, super verifies and judges. */
+export type ModelTier = "nano" | "super";
+
+/** Per million tokens, in microdollars: $1 is 1,000,000. */
+export interface ModelPrice {
+  input: number;
+  /** Prompt tokens the provider served from its cache. */
+  cachedInput: number;
+  output: number;
+}
+
 export interface EngineConfig {
+  /** Null when no model key is set: the map runs without the docs check. */
+  provider: Provider | null;
   anthropic: {
     apiKey: string | null;
   };
-  models: {
-    /** The small model that reads documentation pages against the code. */
-    docs: string;
+  tokenFactory: {
+    apiKey: string | null;
+    /** Ends with a slash, so "chat/completions" resolves under it. */
+    baseUrl: string;
   };
+  models: Record<ModelTier, string>;
   tavilyApiKey: string | null;
   github: {
     appId: string | null;
@@ -24,8 +41,8 @@ export interface EngineConfig {
   };
   /** Ceilings for one map of the code. */
   budget: ScanBudget;
-  /** Approximate prices used for the usage ledger, per million tokens, in microdollars. */
-  prices: Record<string, { input: number; output: number }>;
+  /** Prices for the usage ledger, by model id. */
+  prices: Record<string, ModelPrice>;
 }
 
 export interface ScanBudget {
@@ -41,11 +58,27 @@ export interface ScanBudget {
   concurrency: number;
 }
 
-const DOCS_MODEL = "claude-haiku-4-5";
+/** Token Factory ids, from its model catalog (read 2026-10-27). */
+export const NEBIUS_MODELS: Record<ModelTier, string> = {
+  nano: "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+  super: "nvidia/nemotron-3-super-120b-a12b",
+};
 
-/** Microdollars per million tokens: $1 = 1,000,000 microdollars. */
-const DEFAULT_PRICES: EngineConfig["prices"] = {
-  [DOCS_MODEL]: { input: 1_000_000, output: 5_000_000 },
+export const ANTHROPIC_MODELS: Record<ModelTier, string> = {
+  nano: "claude-haiku-4-5",
+  super: "claude-opus-5-5",
+};
+
+const TOKEN_FACTORY_URL = "https://api.tokenfactory.nebius.com/v1/";
+
+/** Catalog prices on 2026-10-27, in microdollars per million tokens. */
+export const DEFAULT_PRICES: Record<string, ModelPrice> = {
+  [NEBIUS_MODELS.nano]: { input: 60_000, cachedInput: 12_000, output: 240_000 },
+  [NEBIUS_MODELS.super]: { input: 300_000, cachedInput: 60_000, output: 900_000 },
+  "nvidia/Nemotron-3_5-Lightning": { input: 60_000, cachedInput: 30_000, output: 240_000 },
+  "nvidia/Nemotron-3-Ultra-550b-a55b": { input: 1_000_000, cachedInput: 120_000, output: 3_000_000 },
+  [ANTHROPIC_MODELS.nano]: { input: 1_000_000, cachedInput: 100_000, output: 5_000_000 },
+  [ANTHROPIC_MODELS.super]: { input: 4_000_000, cachedInput: 200_000, output: 20_000_000 },
 };
 
 export const DEFAULT_BUDGET: ScanBudget = {
@@ -68,14 +101,40 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-/** Builds the config from the environment. Never throws: every integration degrades to "off" with a note. */
+/**
+ * Which provider the environment selects: the forced one when its key is
+ * set, else Nemotron when its key is set, else Claude, else none.
+ */
+export function detectProvider(): Provider | null {
+  const forced = env("BIRDSI_PROVIDER");
+  const nebius = env("NEBIUS_API_KEY") !== null;
+  const anthropic = env("ANTHROPIC_API_KEY") !== null;
+  if (forced === "nebius" && nebius) return "nebius";
+  if (forced === "anthropic" && anthropic) return "anthropic";
+  if (nebius) return "nebius";
+  if (anthropic) return "anthropic";
+  return null;
+}
+
+/** Builds the config from the environment. Never throws. */
 export function loadEngineConfig(overrides: Partial<EngineConfig> = {}): EngineConfig {
-  const docsModel = env("BIRDSI_MODEL_DOCS") ?? DOCS_MODEL;
-  const prices: EngineConfig["prices"] = { ...DEFAULT_PRICES };
-  if (!prices[docsModel]) prices[docsModel] = DEFAULT_PRICES[DOCS_MODEL]!;
+  const provider = detectProvider();
+  const defaults = provider === "anthropic" ? ANTHROPIC_MODELS : NEBIUS_MODELS;
+  const models: Record<ModelTier, string> = {
+    nano: env("BIRDSI_MODEL_NANO") ?? defaults.nano,
+    super: env("BIRDSI_MODEL_SUPER") ?? defaults.super,
+  };
+  const prices: Record<string, ModelPrice> = { ...DEFAULT_PRICES };
+  for (const tier of ["nano", "super"] as const) {
+    // An id the table does not know is priced like the tier's default, so the ledger never prices it at zero.
+    if (!prices[models[tier]]) prices[models[tier]] = DEFAULT_PRICES[defaults[tier]]!;
+  }
+  const baseUrl = env("NEBIUS_BASE_URL") ?? TOKEN_FACTORY_URL;
   return {
+    provider,
     anthropic: { apiKey: env("ANTHROPIC_API_KEY") },
-    models: { docs: docsModel },
+    tokenFactory: { apiKey: env("NEBIUS_API_KEY"), baseUrl: baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/` },
+    models,
     tavilyApiKey: env("TAVILY_API_KEY"),
     github: {
       appId: env("GITHUB_APP_ID"),
@@ -91,5 +150,3 @@ export function loadEngineConfig(overrides: Partial<EngineConfig> = {}): EngineC
     ...overrides,
   };
 }
-
-export { DOCS_MODEL, DEFAULT_PRICES };
