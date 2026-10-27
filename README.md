@@ -1,6 +1,6 @@
 # birdsI
 
-The cockpit for your apps. birdsI maps each app from its code: the services it runs on, its deployments, crons, webhooks, store apps, migrations and the settings each deployment needs. Then it reads the vendor accounts with keys that only read, and tells you what needs you. No model reads the code.
+The cockpit for your apps. birdsI maps each app from its code: the services it runs on, its deployments, crons, webhooks, store apps, migrations and the settings each deployment needs. Then it reads the vendor accounts with keys that only read, and tells you what needs you. Nothing a model says reaches you unverified: the map is read by rules that cite the file and line, and the one model call today, the optional docs check, must cite the package's own documentation.
 
 Run `npx birdsi` in an app's folder and its cockpit opens: the open alerts, each Vercel project, Supabase project and OneSignal app as birdsI last read it, and what the map read from the code. Until the package is on npm, run it from a clone: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`.
 
