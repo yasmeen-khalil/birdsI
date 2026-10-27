@@ -20,3 +20,5 @@ export * from "./vendors/index";
 export { buildServiceMap, describeSchedule, parseMarkers, type MapMeta } from "./map/index";
 export { readProject, markerQuery, fileForLabel, owedFromMarkers, owedFromHistory, describeMarker, MARKER_KINDS, ReadError, reasonForStatus, type ProjectToRead, type ReadContext } from "./reads/index";
 export { appAlerts, ageWords, dateWords, daysUntil, type AlertInput, type AlertProject, type AlertResult } from "./cockpit/alerts";
+export { explainFailure, failedProduction, type Failure } from "./cockpit/explain";
+export { watchLimits, tavilyExtract, checkQuotes, normalizeText, quotesByVendor, type ExtractPages, type WatchInput } from "./limits/watch";

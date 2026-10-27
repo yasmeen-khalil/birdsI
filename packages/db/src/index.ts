@@ -14,6 +14,7 @@ export * from "./maps";
 export * from "./reads";
 export * from "./alerts";
 export * from "./entries";
+export * from "./watch";
 export * from "./agent";
 export * from "./record";
 export * from "./schema";

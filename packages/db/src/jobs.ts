@@ -2,7 +2,7 @@ import { getDb, unwrap } from "./client";
 import { schemaHas } from "./schema";
 
 /** The map of the code, and the reads of the vendor accounts. ("fix" and "embed" jobs were removed in v3.) */
-export type JobKind = "scan" | "vendor_sync";
+export type JobKind = "scan" | "vendor_sync" | "limits_watch";
 
 export interface JobRow {
   id: string;
@@ -147,6 +147,14 @@ export async function failJob(job: JobRow, workerId: string, message: string): P
 }
 
 /** True when a job of this kind with this payload key is queued or running. */
+/** When the newest job of a kind finished, or null when none has. */
+export async function lastJobFinishedAt(kind: JobKind): Promise<string | null> {
+  const db = getDb();
+  const { data, error } = await db.from("jobs").select("finished_at").eq("kind", kind).eq("status", "done").order("finished_at", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error(`lastJobFinishedAt: ${error.message}`);
+  return (data as { finished_at: string | null } | null)?.finished_at ?? null;
+}
+
 export async function jobActive(kind: JobKind, payloadKey: string, payloadValue: string): Promise<boolean> {
   const db = getDb();
   const { data, error } = await db.from("jobs").select("id").eq("kind", kind).in("status", ["queued", "running"]).contains("payload", { [payloadKey]: payloadValue }).limit(1);

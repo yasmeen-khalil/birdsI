@@ -41,13 +41,13 @@ export async function assertWithinSpendCaps(ownerUserId: string | null, options:
   const globalCap = capUsd("BIRDSI_DAILY_SPEND_CAP_USD", 50);
   const globalSpent = await spentFor("global", () => totalSpend(since()), fresh);
   if (globalSpent >= globalCap * 1_000_000) {
-    throw new SpendCapError("birdsI has reached its daily budget for docs checks. Maps still run, without the docs check, and the budget opens again within 24 hours.");
+    throw new SpendCapError("birdsI has reached its daily budget for model calls. Maps still run by rules, without the model's reading and the docs check, and the budget opens again within 24 hours.");
   }
   if (!ownerUserId) return;
   const userCap = capUsd("BIRDSI_USER_DAILY_SPEND_CAP_USD", 5);
   const userSpent = await spentFor(`user:${ownerUserId}`, async () => (await usageForUser(ownerUserId, since())).costMicrodollars, fresh);
   if (userSpent >= userCap * 1_000_000) {
-    throw new SpendCapError(`You have used today's docs check budget ($${userCap}). Maps still run, without the docs check, and the budget opens again within 24 hours.`);
+    throw new SpendCapError(`You have used today's model budget ($${userCap}). Maps still run by rules, without the model's reading and the docs check, and the budget opens again within 24 hours.`);
   }
 }
 

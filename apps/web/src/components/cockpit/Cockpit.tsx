@@ -122,6 +122,11 @@ function VercelProject({ card }: { card: VercelCard }) {
                       </span>
                     </span>
                     {prod.state === "ERROR" && prod.errorMessage && <span style={{ color: "var(--critical)" }}>{prod.errorMessage}</span>}
+                    {prod.state === "ERROR" && card.failure && (
+                      <span className="c2">
+                        {card.failure.explanation} <span className="c3">(as the model read the error lines)</span>
+                      </span>
+                    )}
                     {prod.state === "ERROR" && card.live && (
                       <span className="c3">
                         Live: the deployment from <LocalTime iso={card.live.createdAt} style="date" />.

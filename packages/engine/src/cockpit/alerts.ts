@@ -1,5 +1,5 @@
 import { bestFacts, checkedLimit, envNeededBy, LIMITS_BY_SLUG, missingEnv, roleForLabel, tierFor } from "@birdsi/shared";
-import type { AlertDraft, AppDeadline, MapEnv, ProjectReadData, ServiceMap, SupabaseRead, Vendor, VercelRead, OneSignalRead } from "@birdsi/shared";
+import type { AlertDraft, AppDeadline, LimitsDrift, MapEnv, ProjectReadData, ServiceMap, SupabaseRead, Vendor, VercelRead, OneSignalRead } from "@birdsi/shared";
 
 /**
  * The alert rules of the cockpit. Each alert is one sentence the owner can
@@ -27,6 +27,10 @@ export interface AlertInput {
   /** The app's vendors with their facts, for plan limits. */
   vendors: Vendor[];
   deadlines: AppDeadline[];
+  /** The newest check of each pricing page the checked limits list rests on, for the vendors this app uses. */
+  drift?: LimitsDrift[];
+  /** A failed deployment explained by the model, by project id, written into the alert's details. */
+  explanations?: Map<string, { text: string; model: string }>;
   now: Date;
 }
 
@@ -123,6 +127,7 @@ export function appAlerts(input: AlertInput): AlertResult {
 
   planLimitAlerts(drafts, checked, input);
   deadlineAlerts(drafts, input);
+  driftAlerts(drafts, checked, input);
 
   const order = { critical: 0, warning: 1, notice: 2 } as const;
   drafts.sort((a, b) => order[a.severity] - order[b.severity] || a.kind.localeCompare(b.kind) || a.dedupeKey.localeCompare(b.dedupeKey));
@@ -148,7 +153,7 @@ function vercelAlerts(drafts: AlertDraft[], checked: Set<string>, input: AlertIn
         projectId: p.id,
         sentence: `The newest production deployment of the Vercel project ${name} failed ${ageWords(newest.createdAt, now)}${commit}${says}. ${result}`,
         action: "Open the deployment, fix the build, and push again.",
-        details: { deploymentId: newest.id, commitSha: newest.commitSha, errorMessage: newest.errorMessage, liveDeploymentId: live?.id ?? null },
+        details: { deploymentId: newest.id, commitSha: newest.commitSha, errorMessage: newest.errorMessage, liveDeploymentId: live?.id ?? null, ...(input.explanations?.get(p.id) ? { explanation: input.explanations.get(p.id)!.text, explainedBy: input.explanations.get(p.id)!.model } : {}) },
         source: { label: "The deployment on Vercel", url: newest.inspectorUrl ?? read.deployments.source.page, path: null, line: null },
         dedupeKey: `deployment_failed:${p.id}:${newest.id}`,
         scope: `deployment_failed:${p.id}`,
@@ -391,6 +396,42 @@ function planLimitAlerts(drafts: AlertDraft[], checked: Set<string>, input: Aler
 }
 
 /** Dates the owner asked to be warned about, from 30 days before to 14 days after. */
+/** A short stable key for a list of words (FNV-1a), so an alert follows the same sentences across weekly checks. */
+function keyOf(words: string[]): string {
+  let hash = 0x811c9dc5;
+  for (const ch of [...words].sort().join("\n")) {
+    hash ^= ch.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/**
+ * A pricing page that no longer has a sentence the checked limits list rests
+ * on, for a vendor this app uses. A page that could not be read changes
+ * nothing: the notice stays as it was until the page is read again.
+ */
+function driftAlerts(drafts: AlertDraft[], checked: Set<string>, input: AlertInput): void {
+  for (const d of input.drift ?? []) {
+    if (!input.vendors.some((v) => v.slug === d.vendor)) continue;
+    if (d.error) continue;
+    checked.add(`limits_drift:${d.vendor}`);
+    if (d.missing.length === 0) continue;
+    const name = VENDOR_NAME[d.vendor] ?? input.vendors.find((v) => v.slug === d.vendor)?.name ?? d.vendor;
+    drafts.push({
+      kind: "limits_drift",
+      severity: "notice",
+      projectId: null,
+      sentence: `The ${name} pricing page no longer has ${d.missing.length === 1 ? "the sentence" : `${d.missing.length} sentences`} the checked limits list rests on (${listWords(d.missing.map((m) => m.label))}), checked ${dateWords(d.checkedAt)}, so the list's ${name} limits may be out of date.`,
+      action: `${d.proposal ? `What the page appears to say now, as the model read it: ${d.proposal} ` : ""}Re-read the page and update the checked limits list. This closes when the page matches the list again.`,
+      details: { vendor: d.vendor, url: d.url, missing: d.missing, proposal: d.proposal, checkedAt: d.checkedAt },
+      source: { label: `The ${name} pricing page`, url: d.url, path: null, line: null },
+      dedupeKey: `limits_drift:${d.vendor}:${keyOf(d.missing.map((m) => m.label))}`,
+      scope: `limits_drift:${d.vendor}`,
+    });
+  }
+}
+
 function deadlineAlerts(drafts: AlertDraft[], input: AlertInput): void {
   for (const d of input.deadlines) {
     const days = daysUntil(`${d.dueOn}T00:00:00Z`, input.now);

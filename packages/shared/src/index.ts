@@ -12,5 +12,6 @@ export * from "./cockpit";
 export * from "./checklist";
 export * from "./icons";
 export * from "./entries";
+export * from "./watch";
 export * from "./presence";
 export * from "./policy";

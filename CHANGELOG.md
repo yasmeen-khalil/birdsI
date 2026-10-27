@@ -48,6 +48,12 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - A renewal date you entered joins the alerts like a date to watch, from 30 days before.
 - The Set up page has an optional step for it, and the terminal's cockpit says the cost in one line with its three parts.
 
+### Step 7: a failed deployment in plain words, and the watch over the pricing pages
+
+- When the newest production deployment of a Vercel project failed, the small model reads the error lines Vercel kept (never the code) and says in two or three plain sentences what broke and what to look at. The explanation sits on the failed-deployment alert, on the Vercel card and in the terminal, marked as the model's reading. It is made once per failure: while the alert stays open the same words are reused.
+- Once a week, when Tavily is set up on birdsI, the worker reads every pricing page the checked limits list rests on (migration `20261027000100_limits_watch.sql`, table `limits_watch`). Code checks that every quoted sentence is still on its page. When one is gone, the large model says what the page states now, as a proposal for a person. The list itself is never changed by a machine. The next read of every app that uses that vendor opens a notice, Pricing page changed, with the sentences gone and the proposal. It closes by itself when the page matches the list again, so updating the list closes it. A page that could not be read, or came back nearly empty, changes nothing until it is read.
+- The daily spend caps now gate every model call (the reading, the purposes, the docs check, the explanation, the watch), and say so.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

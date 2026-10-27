@@ -1,7 +1,8 @@
 import { hostname } from "node:os";
-import { claimJob, completeJob, enqueueJob, failExhaustedStaleJobs, failJob, heartbeat, JobLostError, jobActive, purgeOldSnapshots, purgeStaleWorkers, reposDueForSync, sweepDeviceLogins, updateScan, userIdsWithConnections, workerSeen, type JobRow } from "@birdsi/db";
+import { lastJobFinishedAt, claimJob, completeJob, enqueueJob, failExhaustedStaleJobs, failJob, heartbeat, JobLostError, jobActive, purgeOldSnapshots, purgeStaleWorkers, reposDueForSync, sweepDeviceLogins, updateScan, userIdsWithConnections, workerSeen, type JobRow } from "@birdsi/db";
 import { loadEngineConfig } from "@birdsi/engine";
 import { runScanJob } from "./scan-job";
+import { runLimitsWatchJob } from "./limits-watch-job";
 import { runVendorSyncJob } from "./vendor-sync-job";
 
 /**
@@ -23,6 +24,7 @@ async function handle(job: JobRow): Promise<void> {
   };
   if (job.kind === "scan") return runScanJob(config, job, beat);
   if (job.kind === "vendor_sync") return runVendorSyncJob(config, job, beat);
+  if (job.kind === "limits_watch") return runLimitsWatchJob(config, job, beat);
   throw new Error(`unknown job kind ${job.kind}`);
 }
 
@@ -68,7 +70,19 @@ async function scheduleVendorSyncs(): Promise<number> {
   return queued;
 }
 
-/** Once an hour: uploads whose map never ran go after a day, stale worker rows go, old sign-in codes expire, due account reads are queued. */
+const WATCH_EVERY_MS = 7 * 86_400_000;
+
+/** Once a week, when Tavily is set up: the pricing pages behind the checked limits list are read again. */
+async function scheduleLimitsWatch(): Promise<boolean> {
+  if (!config.tavilyApiKey) return false;
+  const last = await lastJobFinishedAt("limits_watch");
+  if (last && Date.now() - Date.parse(last) < WATCH_EVERY_MS) return false;
+  if (await jobActive("limits_watch", "scope", "all")) return false;
+  await enqueueJob("limits_watch", { scope: "all" }, { maxAttempts: 1 });
+  return true;
+}
+
+/** Once an hour: uploads whose map never ran go after a day, stale worker rows go, old sign-in codes expire, due account reads are queued, the weekly limits watch when it is due. */
 async function sweep(): Promise<void> {
   if (Date.now() - lastSweep < SWEEP_MS) return;
   lastSweep = Date.now();
@@ -94,6 +108,11 @@ async function sweep(): Promise<void> {
     if (queued > 0) console.log(`[worker] scheduled ${queued} vendor sync(s)`);
   } catch (error) {
     console.error(`[worker] sync schedule failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  try {
+    if (await scheduleLimitsWatch()) console.log("[worker] scheduled the weekly limits watch");
+  } catch (error) {
+    console.error(`[worker] limits watch schedule failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -123,7 +142,7 @@ async function loop(): Promise<void> {
     await failExhausted();
     let job: JobRow | null = null;
     try {
-      job = await claimJob(workerId, ["scan", "vendor_sync"]);
+      job = await claimJob(workerId, ["scan", "vendor_sync", "limits_watch"]);
     } catch (error) {
       console.error(`[worker] claim failed: ${error instanceof Error ? error.message : String(error)}`);
       await sleep(IDLE_MS * 3);

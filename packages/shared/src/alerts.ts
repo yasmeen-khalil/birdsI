@@ -8,7 +8,7 @@ import { z } from "zod";
  * service map, the project reads, the account facts and the dates to watch.
  */
 
-export const AppAlertKind = z.enum(["project_paused", "deployment_failed", "cron_missing", "env_missing", "migration_owed", "plan_limit", "deadline", "read_failed"]);
+export const AppAlertKind = z.enum(["project_paused", "deployment_failed", "cron_missing", "env_missing", "migration_owed", "plan_limit", "deadline", "read_failed", "limits_drift"]);
 export type AppAlertKind = z.infer<typeof AppAlertKind>;
 
 export const ALERT_KIND_LABEL: Record<AppAlertKind, string> = {
@@ -20,6 +20,7 @@ export const ALERT_KIND_LABEL: Record<AppAlertKind, string> = {
   plan_limit: "Plan limit",
   deadline: "Date",
   read_failed: "Could not read",
+  limits_drift: "Pricing page changed",
 };
 
 export const AlertSeverity = z.enum(["critical", "warning", "notice"]);

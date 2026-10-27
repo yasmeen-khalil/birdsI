@@ -58,6 +58,8 @@ export const VercelCard = CardBase.extend({
   domains: partOf(z.array(VercelDomain)),
   errors: partOf(z.array(VercelLogLine)),
   keyExpiry: partOf(z.string().nullable()),
+  /** The newest failed production deployment explained by the model, from the open alert. Judgment. */
+  failure: z.object({ explanation: z.string(), model: z.string() }).nullable(),
 });
 export type VercelCard = z.infer<typeof VercelCard>;
 
@@ -303,9 +305,11 @@ export function cockpitView(input: CockpitInput): CockpitView {
       if (data?.project.ok) base.title = p.label && p.label !== data.project.value.name ? `${data.project.value.name} (${p.label})` : data.project.value.name;
       const root = data?.project.ok ? data.project.value.rootDirectory : null;
       const crons = (map?.crons ?? []).filter((c) => root === null || dirOf(c.source.path) === root);
+      const failureAlert = input.alerts.find((a) => !a.resolvedAt && a.kind === "deployment_failed" && a.projectId === p.id && typeof a.details["explanation"] === "string");
       return {
         ...base,
         role,
+        failure: failureAlert ? { explanation: String(failureAlert.details["explanation"]), model: String(failureAlert.details["explainedBy"] ?? "the model") } : null,
         productionUrl: data?.project.ok ? data.project.value.productionUrl : null,
         production: production[0] ?? null,
         live: production.find((d) => d.state === "READY") ?? null,

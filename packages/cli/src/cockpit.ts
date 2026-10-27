@@ -64,6 +64,7 @@ export function cockpitLines(v: CockpitView, q: Quote = plain): string[] {
     }
     const prod = c.production;
     lines.push(`  Production: ${prod ? `${prod.state.toLowerCase()} ${prod.createdAt.slice(0, 16).replace("T", " ")} UTC${prod.commitSha ? `, ${prod.commitSha.slice(0, 7)}` : ""}${prod.commitMessage ? ` ${q(prod.commitMessage)}` : ""}${prod.errorMessage ? `. Error: ${q(prod.errorMessage)}` : ""}` : c.deploymentsPart.ok ? "no production deployment read" : notRead(c.deploymentsPart.reason)}${c.productionUrl ? `. ${c.productionUrl}` : ""}`);
+    if (c.failure) lines.push(`  Why, as the model read the error lines: ${q(c.failure.explanation)}`);
     if (c.env.ok) for (const e of c.env.value) lines.push(`  Env, ${e.environment}: ${e.set} of ${e.needed} names the code needs are set${e.missing.length ? `. Missing: ${e.missing.join(", ")}` : ""}`);
     else lines.push(`  Env: ${notRead(c.env.reason)}`);
     if (c.crons.ok) lines.push(`  Crons: ${c.crons.value.expected.length === 0 ? "none expected" : c.crons.value.expected.map((e) => `${e.path} ${e.registered ? "registered" : "NOT registered"}`).join(", ")}${c.crons.value.enabled ? "" : ". Switched off on Vercel"}`);

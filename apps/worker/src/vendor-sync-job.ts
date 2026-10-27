@@ -1,7 +1,8 @@
-import { alertsAvailable, decryptSecret, deadlinesForApp, entriesForApp, expireAskedFacts, factsForVendors, keysForRepo, latestServiceMap, markConnectionProbed, readsAvailable, replaceFacts, repoWithInstallation, saveProjectRead, setAlertEmail, setVendorsSyncedAt, syncAlerts, toVendor, userById, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
-import { appAlerts, CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, readProject, settingsForProject, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
+import { alertsForApp, latestLimitsWatch, recordUsage, alertsAvailable, decryptSecret, deadlinesForApp, entriesForApp, expireAskedFacts, factsForVendors, keysForRepo, latestServiceMap, markConnectionProbed, readsAvailable, replaceFacts, repoWithInstallation, saveProjectRead, setAlertEmail, setVendorsSyncedAt, syncAlerts, toVendor, userById, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
+import { explainFailure, failedProduction, ModelClient, appAlerts, CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, readProject, settingsForProject, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
 import { emailEnv, sendAlertEmail } from "./alert-email";
 import { planReads } from "./read-plan";
+import { spendHook } from "./spend";
 import { bestFacts, LIMITS_BY_SLUG, projectDashboardUrl, readParts, readsInDepth, tierFor, type FactSource, type ProjectHints, type ProjectReadData } from "@birdsi/shared";
 
 /** One sync holds the only worker while it runs, so it stops starting new vendors after this long. */
@@ -10,10 +11,11 @@ const SYNC_BUDGET_MS = 10 * 60_000;
 /**
  * The read of the accounts. For every vendor of a repository: read the
  * connected account, and read the Stripe Projects data the CLI collected.
- * No model is called and nothing is asked: what birdsI cannot read, it says
+ * The small model explains a failed deployment from the error lines the
+ * provider kept, never the code. Nothing is asked: what birdsI cannot read, it says
  * it could not read.
  */
-export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heartbeat: () => Promise<void>): Promise<void> {
+export async function runVendorSyncJob(config: EngineConfig, job: JobRow, heartbeat: () => Promise<void>): Promise<void> {
   // Each key reads its own project of this app; a vendor with no tied key is read with the owner's untied key, the old way.
   const repoId = String(job.payload["repoId"]);
   const ownerUserId = String(job.payload["ownerUserId"]);
@@ -91,7 +93,34 @@ export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heart
       const app = keys.app;
       const facts = await factsForVendors(vendors.map((v) => v.id));
       const withFacts = vendors.map((v) => toVendor(v, facts.filter((f) => f.vendor_id === v.id), true));
+      // A failed production deployment explained in plain words by the small model, once per failure: an open alert that already carries one is reused.
+      const explanations = new Map<string, { text: string; model: string }>();
+      const spend = spendHook(ownerUserId);
+      const models = new ModelClient(config, { beforeCall: spend.beforeCall, onUsage: (u) => recordUsage({ ownerUserId, scanId: null, purpose: u.purpose, model: u.model, inputTokens: u.inputTokens, outputTokens: u.outputTokens, costMicrodollars: u.costMicrodollars }) });
+      if (models.available) {
+        const open = await alertsForApp(app.id).catch(() => []);
+        for (const project of keys.projects.filter((p) => p.vendor === "vercel" && p.kind === "project")) {
+          const read = readsNow.get(project.id);
+          if (!read || read.vendor !== "vercel") continue;
+          const failure = failedProduction(read);
+          if (!failure) continue;
+          const prior = open.find((a) => !a.resolvedAt && a.kind === "deployment_failed" && a.details["deploymentId"] === failure.deployment.id && typeof a.details["explanation"] === "string");
+          if (prior) {
+            explanations.set(project.id, { text: String(prior.details["explanation"]), model: String(prior.details["explainedBy"] ?? models.modelId("nano")) });
+            continue;
+          }
+          try {
+            explanations.set(project.id, await explainFailure(models, { project: project.label ?? project.ref, ...failure }));
+          } catch (error) {
+            console.error(`[worker] could not explain the failed deployment of ${project.ref}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+      }
+      const slugs = new Set(vendors.map((v) => v.slug));
+      const drift = (await latestLimitsWatch().catch(() => [])).filter((d) => slugs.has(d.vendor));
       const { drafts, checked } = appAlerts({
+        drift,
+        explanations,
         app: { name: app.name, environments: app.environments },
         projects: keys.projects.map((p) => ({ id: p.id, vendor: p.vendor, kind: p.kind, ref: p.ref, label: p.label, plan: p.plan, dashboardUrl: projectDashboardUrl({ vendor: p.vendor, kind: p.kind, ref: p.ref, settings: p.settings ?? {} }) })),
         map,
