@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
-import { FACT_SOURCE_LABEL, type FactKind, type Runway, type Vendor, type VendorFact, type Watch } from "@birdsi/shared";
+import { iconUrlFor, FACT_SOURCE_LABEL, type FactKind, type Runway, type Vendor, type VendorFact, type Watch } from "@birdsi/shared";
 import { LocalTime } from "../LocalTime";
 import { hostOf, safeUrl } from "../format";
 import { icon14 } from "../icon";
 import { CATEGORY_LABEL, WatchList } from "./OpsParts";
+import { ServiceIcon } from "../Logos";
 
 const FACT_ORDER: FactKind[] = ["plan", "cost", "usage", "limit", "billing", "status"];
 const FACT_HEADING: Record<FactKind, string> = { plan: "Plan", cost: "Cost", usage: "Usage", limit: "Limits", billing: "Billing", status: "Status", purpose: "Purpose" };
@@ -73,6 +74,7 @@ export function VendorCard({ vendor, watches = [], runways = [] }: { vendor: Ven
     <article className="panel grid grid-cols-1 gap-x-8 gap-y-5 min-[901px]:grid-cols-12" style={{ padding: "24px 26px" }} aria-labelledby={`v-${vendor.id}`}>
       <div className="flex min-w-0 flex-col gap-3 min-[901px]:col-span-5">
         <div className="flex flex-wrap items-center gap-2.5">
+          <ServiceIcon name={vendor.name} url={iconUrlFor(vendor.slug)} size={28} />
           <h3 id={`v-${vendor.id}`} className="t-h2" style={{ fontSize: 24 }}>
             {vendor.name}
           </h3>

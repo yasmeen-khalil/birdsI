@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { cockpitView, type AppProject, type ProjectRead, type ServiceMap, type StoredMap, type VercelRead } from "@birdsi/shared";
+import { cockpitView, listPricePerMonth, type AppProject, type Finding, type ProjectRead, type ServiceMap, type StoredMap, type Vendor, type VercelRead } from "@birdsi/shared";
 import { collectDependencies } from "../inventory/manifests";
 import { walkInventory } from "../inventory/walk";
 import { buildServiceMap } from "../map/index";
@@ -91,5 +91,102 @@ describe("the cockpit view", () => {
     expect(view.vercel[0]).toMatchObject({ state: "no_reads", reason: expect.stringContaining("20261018000300") });
     expect(view.map).toBeNull();
     expect(view.vercel[0]!.env).toEqual({ ok: false, reason: "No service map of this app yet." });
+  });
+});
+
+function vendor(slug: string, name: string, category: Vendor["category"], facts: Array<Partial<Vendor["facts"][number]> & Pick<Vendor["facts"][number], "kind" | "metric" | "label" | "value">>): Vendor {
+  return {
+    id: `v-${slug}`,
+    repoId: "r",
+    slug,
+    name,
+    category,
+    what: "",
+    purpose: null,
+    detectedBy: ["package"],
+    packages: [],
+    envVars: [],
+    callSites: [],
+    pricingUrl: null,
+    docsUrl: `https://${slug}.example/docs`,
+    connectable: true,
+    connected: true,
+    facts: facts.map((f, i) => ({ id: `f-${slug}-${i}`, vendorId: `v-${slug}`, numeric: null, unit: null, limitNumeric: null, source: "connector", evidence: {}, observedAt: "2026-10-27T00:00:00.000Z", ...f })),
+    updatedAt: "2026-10-27T00:00:00.000Z",
+  };
+}
+
+function finding(id: string, over: Partial<Finding>): Finding {
+  return {
+    id,
+    scanId: "s",
+    repoId: "r",
+    key: `k-${id}`,
+    checkId: "gaps",
+    title: `Finding ${id}`,
+    explanation: "",
+    whyItMatters: "",
+    severity: "low",
+    confidence: "proven",
+    category: "gap",
+    location: null,
+    evidence: { advisories: [] },
+    actionKind: "fix",
+    steps: [],
+    fixPlan: null,
+    status: "open",
+    createdAt: "2026-10-27T00:00:00.000Z",
+    ...over,
+  };
+}
+
+describe("the cockpit's sections", () => {
+  it("groups services by what they are for, with their docs, and summarizes dependencies, security and money", () => {
+    const vendors = [
+      vendor("vercel", "Vercel", "hosting", [
+        { kind: "plan", metric: "plan", label: "Plan", value: "pro" },
+        { kind: "cost", metric: "spend_month", label: "Spend this month", value: "$12.50", numeric: 12.5, unit: "USD" },
+        { kind: "usage", metric: "function_invocations", label: "Function invocations", value: "500,000", numeric: 500_000, limitNumeric: 1_000_000 },
+      ]),
+      vendor("stripe", "Stripe", "payments", []),
+    ];
+    const findings = [
+      finding("1", { severity: "high", category: "security", title: "The webhook does not check who sent the request", location: { path: "src/app/api/stripe/webhook/route.ts" } }),
+      finding("2", { severity: "low", category: "stale" }),
+      finding("3", { severity: "critical", category: "security", status: "dismissed" }),
+    ];
+    const dependencies = [
+      { ecosystem: "npm" as const, name: "stripe", versionInUse: "14.0.0", latestVersion: "17.0.0", manifestPath: "package.json", direct: true, vulnerabilities: [], docsCheck: { status: "current" as const, checkedAt: "2026-10-27T09:00:00.000Z", doc: { url: "https://docs.stripe.com/api", title: "Stripe API", excerpt: "" } } },
+      { ecosystem: "npm" as const, name: "eslint", versionInUse: "9.0.0", latestVersion: "9.1.0", manifestPath: "package.json", direct: true, vulnerabilities: [], docsCheck: null },
+    ];
+    const view = cockpitView({ appName: "Cockpit", environments: ["production"], projects: [], map: stored, mapReason: null, reads: new Map(), readsReason: null, alerts: [], alertsReason: null, email, vendors, dependencies, findings, scope: null, scanFinishedAt: "2026-10-27T10:00:00.000Z" });
+
+    expect(view.purposeGroups.map((g) => g.label)[0]).toBe("Hosting");
+    expect(view.purposeGroups.flatMap((g) => g.services.map((s) => s.slug))).toEqual(expect.arrayContaining(["vercel", "stripe", "clerk"]));
+    const stripe = view.services.find((s) => s.slug === "stripe")!;
+    expect(stripe.docs).toMatchObject({ url: "https://docs.stripe.com/api", checkedAt: "2026-10-27T09:00:00.000Z", status: "current", packages: 1 });
+    expect(stripe.icon).toBe("https://cdn.simpleicons.org/stripe");
+    expect(view.dependencies).toMatchObject({ total: 2, direct: 2, behind: 1, docsChecked: 1, docsCheckedAt: "2026-10-27T09:00:00.000Z", devtools: ["eslint"] });
+
+    expect(view.security).toMatchObject({ total: 2, bySeverity: { critical: 0, high: 1, medium: 0, low: 1 }, finishedAt: "2026-10-27T10:00:00.000Z" });
+    expect(view.security!.byCategory).toEqual([
+      { category: "security", label: "Security", count: 1, worst: "high" },
+      { category: "stale", label: "Stale code and settings", count: 1, worst: "low" },
+    ]);
+    expect(view.security!.top[0]).toMatchObject({ id: "1", severity: "high", path: "src/app/api/stripe/webhook/route.ts" });
+
+    const read = view.money.lines.find((l) => l.kind === "read")!;
+    expect(read).toMatchObject({ slug: "vercel", monthlyUsd: 12.5, yearlyUsd: 150 });
+    expect(view.money.monthlyReadUsd).toBe(12.5);
+    expect(view.money.yearlyReadUsd).toBe(150);
+    expect(view.money.lines.some((l) => l.kind === "list" && l.slug === "vercel")).toBe(true);
+    expect(view.money.limits[0]).toMatchObject({ slug: "vercel", used: 500_000, limit: 1_000_000, pct: 50 });
+  });
+
+  it("reads a list price from the words on the checked list", () => {
+    expect(listPricePerMonth("$20 a month")).toBe(20);
+    expect(listPricePerMonth("$0 a month")).toBe(0);
+    expect(listPricePerMonth("$99 a year")).toBe(8.25);
+    expect(listPricePerMonth("Contact sales")).toBeNull();
   });
 });

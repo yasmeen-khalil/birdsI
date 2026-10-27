@@ -1,4 +1,4 @@
-import type { Dependency, FindingDraft, ScanEvent, ScanStep, ServiceMap } from "@birdsi/shared";
+import type { Dependency, FindingDraft, Prompts, ScanEvent, ScanStep, ServiceMap } from "@birdsi/shared";
 import type { EngineConfig, ScanBudget } from "../config";
 import type { Inventory, InventoryFile } from "../inventory/walk";
 import type { RawDependency } from "../inventory/manifests";
@@ -19,6 +19,8 @@ export interface CheckContext {
   /** The service map, complete with the model's confirmed finds, or null when it could not be read. */
   map: ServiceMap | null;
   mapContext: MapContext | null;
+  /** The owner's additions to the prompts, by section. */
+  prompts: Prompts;
   models: ModelClient;
   /** Reads a file from the snapshot, windowed to the budget's byte cap. */
   read: (path: string) => Promise<string>;

@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { AlertEmailState, AppAlert } from "./alerts";
 import { type AppProject } from "./apps";
+import { Confidence, ScanScope, SEVERITY_ORDER, Severity, type Dependency, type Finding } from "./domain";
+import { CATEGORY_ORDER, VENDOR_CATEGORY_LABEL, iconUrlFor } from "./icons";
 import { LIMITS_BY_SLUG, checkedLimit, tierFor } from "./limits";
 import { envNeededBy, missingEnv, roleForLabel, Found, MapPublicSurface, MapStoreApp, MapWebhook, ModelFind, ReaderStats, SourceLine, type StoredMap } from "./map";
-import { bestFacts, type Vendor } from "./ops";
+import { bestFacts, FACT_SOURCE_LABEL, type Vendor } from "./ops";
 import { AdvisorLint, OneSignalNotification, OwedMigration, VercelDeployment, VercelDomain, VercelLogLine, readsInDepth, type ProjectRead, type Reading } from "./reads";
 
 /**
@@ -92,8 +94,81 @@ export const ServiceRow = z.object({
   /** What the app uses it for, as the model read it. Judgment. */
   purpose: z.string().nullable(),
   found: Found.nullable(),
+  categoryLabel: z.string(),
+  /** The vendor's logo, when one is known. */
+  icon: z.string().nullable(),
+  /** Its documentation: the page, and whether the docs check read it and when. */
+  docs: z.object({ url: z.string().nullable(), checkedAt: z.string().nullable(), status: z.string().nullable(), note: z.string().nullable(), packages: z.number().int() }),
 });
 export type ServiceRow = z.infer<typeof ServiceRow>;
+
+/** Services grouped by what they are for. */
+export const PurposeGroup = z.object({ category: z.string(), label: z.string(), services: z.array(ServiceRow) });
+export type PurposeGroup = z.infer<typeof PurposeGroup>;
+
+export const DependencySummary = z.object({
+  total: z.number().int(),
+  direct: z.number().int(),
+  vulnerable: z.number().int(),
+  /** Two or more major versions behind the latest release. */
+  behind: z.number().int(),
+  docsChecked: z.number().int(),
+  docsCheckedAt: z.string().nullable(),
+  /** Packages that work from the command line or a config file: the devtools. */
+  devtools: z.array(z.string()),
+});
+export type DependencySummary = z.infer<typeof DependencySummary>;
+
+export const FINDING_CATEGORY_LABEL: Record<string, string> = {
+  security: "Security",
+  gap: "Gaps",
+  inconsistency: "Inconsistencies",
+  contradiction: "Contradictions",
+  redundancy: "Redundancies",
+  stale: "Stale code and settings",
+  dependency: "Dependencies",
+  docs: "Against the documentation",
+  config: "Repository settings",
+};
+
+export const SecuritySummary = z.object({
+  total: z.number().int(),
+  bySeverity: z.record(Severity, z.number().int()),
+  byCategory: z.array(z.object({ category: z.string(), label: z.string(), count: z.number().int(), worst: Severity.nullable() })),
+  /** The most serious open findings, five at most. */
+  top: z.array(z.object({ id: z.string(), key: z.string(), title: z.string(), severity: Severity, confidence: Confidence, category: z.string(), path: z.string().nullable() })),
+  scope: ScanScope.nullable(),
+  finishedAt: z.string().nullable(),
+});
+export type SecuritySummary = z.infer<typeof SecuritySummary>;
+
+export const MoneyLine = z.object({
+  slug: z.string(),
+  name: z.string(),
+  /** read: money read from the account. list: a plan's list price from the checked limits list. manual: entered by the owner. */
+  kind: z.enum(["read", "list", "manual"]),
+  label: z.string(),
+  monthlyUsd: z.number().nullable(),
+  yearlyUsd: z.number().nullable(),
+  source: z.string(),
+  note: z.string().nullable(),
+});
+export type MoneyLine = z.infer<typeof MoneyLine>;
+
+export const LimitLine = z.object({ slug: z.string(), name: z.string(), label: z.string(), used: z.number(), limit: z.number(), unit: z.string().nullable(), pct: z.number().int() });
+export type LimitLine = z.infer<typeof LimitLine>;
+
+export const MoneySummary = z.object({
+  /** Money read from accounts this month, and the same every month for a year. Null when no account reports spend. */
+  monthlyReadUsd: z.number().nullable(),
+  yearlyReadUsd: z.number().nullable(),
+  /** The list prices of the plans the accounts are on, from the checked limits list. Not money spent. */
+  monthlyListUsd: z.number().nullable(),
+  yearlyListUsd: z.number().nullable(),
+  lines: z.array(MoneyLine),
+  limits: z.array(LimitLine),
+});
+export type MoneySummary = z.infer<typeof MoneySummary>;
 
 export const CronRow = z.object({
   path: z.string(),
@@ -112,7 +187,9 @@ export type CronRow = z.infer<typeof CronRow>;
 
 export const CockpitView = z.object({
   appName: z.string(),
-  map: z.object({ mappedAt: z.string(), commit: z.string().nullable(), branch: z.string().nullable(), roles: z.array(z.string()), roleEnv: z.string().nullable(), files: z.number().int(), reader: ReaderStats.nullable() }).nullable(),
+  map: z.object({ mappedAt: z.string(), commit: z.string().nullable(), branch: z.string().nullable(), roles: z.array(z.string()), roleEnv: z.string().nullable(), files: z.number().int(), packages: z.number().int(), routes: z.number().int(), reader: ReaderStats.nullable(), scope: ScanScope.nullable() }).nullable(),
+  /** The live address the app's own icon is fetched from, or null. */
+  appIconBase: z.string().nullable(),
   mapReason: z.string().nullable(),
   readsReason: z.string().nullable(),
   lastReadAt: z.string().nullable(),
@@ -123,6 +200,10 @@ export const CockpitView = z.object({
   /** Vendors the code uses that birdsI reads in depth, with no project declared for them yet. */
   undeclared: z.array(z.object({ slug: z.string(), name: z.string() })),
   services: z.array(ServiceRow),
+  purposeGroups: z.array(PurposeGroup),
+  dependencies: DependencySummary.nullable(),
+  security: SecuritySummary.nullable(),
+  money: MoneySummary,
   /** Confirmed finds of the model with no part of the map to join: migration sources, second deployables, anything else. */
   alsoFound: z.array(ModelFind),
   crons: z.array(CronRow),
@@ -148,6 +229,29 @@ export interface CockpitInput {
   alertsReason: string | null;
   email: AlertEmailState;
   vendors: Vendor[];
+  /** The newest finished map's packages, findings and scope, for the services' docs, the security section and the money section. */
+  dependencies?: Dependency[];
+  findings?: Finding[];
+  scope?: ScanScope | null;
+  scanFinishedAt?: string | null;
+}
+
+/** Packages that work from the command line, a config file or the framework: the devtools. */
+const DEVTOOL = /^(@types\/|eslint|prettier|typescript$|vitest|jest|@vitest|tsx$|ts-node|esbuild|tailwindcss|postcss|autoprefixer|@tailwindcss|turbo$|husky|lint-staged|@playwright|playwright|cypress|storybook|@storybook|wrangler|nodemon|concurrently|dotenv|cross-env|rimraf|npm-run-all|@biomejs|biome|knip|@eslint|@typescript-eslint|eslint-|supabase$|vercel$)/;
+
+function majorOf(version: string | null): number | null {
+  const m = version?.match(/(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+/** A plan's list price in dollars a month, from the words on the checked list ("$20 a month", "$99 a year"), or null when the words name no price. */
+export function listPricePerMonth(price: string): number | null {
+  const m = price.match(/\$([\d,]+(?:\.\d+)?)/);
+  if (!m) return null;
+  const amount = Number(m[1]!.replace(/,/g, ""));
+  if (!Number.isFinite(amount)) return null;
+  if (/year|annual/i.test(price)) return Math.round((amount / 12) * 100) / 100;
+  return amount;
 }
 
 function part<T>(r: Reading<unknown> | undefined, value: () => T): { ok: true; value: T } | { ok: false; reason: string } {
@@ -261,8 +365,12 @@ export function cockpitView(input: CockpitInput): CockpitView {
     });
 
   const declared = new Set(input.projects.map((p) => p.vendor));
+  const dependencies = input.dependencies ?? [];
   const services: ServiceRow[] = (map?.services ?? []).map((s) => {
     const projects = input.projects.filter((p) => p.vendor === s.slug);
+    const vendor = input.vendors.find((v) => v.slug === s.slug);
+    const checked = dependencies.filter((d) => s.packages.includes(d.name) && d.docsCheck).sort((a, b) => (b.docsCheck!.checkedAt ?? "").localeCompare(a.docsCheck!.checkedAt ?? ""));
+    const newest = checked[0]?.docsCheck ?? null;
     return {
       slug: s.slug,
       name: s.name,
@@ -278,8 +386,84 @@ export function cockpitView(input: CockpitInput): CockpitView {
       firstSeen: s.imports[0] ?? s.sources[0] ?? null,
       purpose: s.purpose,
       found: s.found,
+      categoryLabel: VENDOR_CATEGORY_LABEL[s.category as keyof typeof VENDOR_CATEGORY_LABEL] ?? s.category,
+      icon: iconUrlFor(s.slug),
+      docs: { url: newest?.doc?.url ?? vendor?.docsUrl ?? null, checkedAt: newest?.checkedAt ?? null, status: newest?.status ?? null, note: newest?.note ?? null, packages: checked.length },
     };
   });
+  const purposeGroups: PurposeGroup[] = CATEGORY_ORDER.map((category) => ({ category, label: VENDOR_CATEGORY_LABEL[category], services: services.filter((s) => s.category === category) })).filter((g) => g.services.length > 0);
+
+  const dependencySummary: DependencySummary | null =
+    input.dependencies === undefined
+      ? null
+      : {
+          total: dependencies.length,
+          direct: dependencies.filter((d) => d.direct).length,
+          vulnerable: dependencies.filter((d) => d.vulnerabilities.length > 0).length,
+          behind: dependencies.filter((d) => {
+            const used = majorOf(d.versionInUse);
+            const latest = majorOf(d.latestVersion);
+            return used !== null && latest !== null && latest - used >= 2;
+          }).length,
+          docsChecked: dependencies.filter((d) => d.docsCheck && d.docsCheck.status !== "unknown").length,
+          docsCheckedAt: dependencies.map((d) => d.docsCheck?.checkedAt ?? "").sort().at(-1) || null,
+          devtools: dependencies.filter((d) => d.direct && DEVTOOL.test(d.name)).map((d) => d.name).sort(),
+        };
+
+  const openFindings = (input.findings ?? []).filter((f) => f.status !== "dismissed" && f.status !== "fixed");
+  const rank = (f: Finding) => SEVERITY_ORDER.indexOf(f.severity);
+  const security: SecuritySummary | null =
+    input.findings === undefined
+      ? null
+      : {
+          total: openFindings.length,
+          bySeverity: Object.fromEntries(SEVERITY_ORDER.map((sev) => [sev, openFindings.filter((f) => f.severity === sev).length])) as Record<Severity, number>,
+          byCategory: Object.keys(FINDING_CATEGORY_LABEL)
+            .map((category) => {
+              const list = openFindings.filter((f) => f.category === category);
+              return { category, label: FINDING_CATEGORY_LABEL[category]!, count: list.length, worst: list.length > 0 ? [...list].sort((a, b) => rank(a) - rank(b))[0]!.severity : null };
+            })
+            .filter((c) => c.count > 0),
+          top: [...openFindings]
+            .sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title))
+            .slice(0, 5)
+            .map((f) => ({ id: f.id, key: f.key, title: f.title, severity: f.severity, confidence: f.confidence, category: f.category, path: f.location?.path ?? null })),
+          scope: input.scope ?? null,
+          finishedAt: input.scanFinishedAt ?? null,
+        };
+
+  const moneyLines: MoneyLine[] = [];
+  const limitLines: LimitLine[] = [];
+  for (const v of input.vendors) {
+    const facts = bestFacts(v.facts);
+    const spend = facts.find((f) => f.kind === "cost" && f.metric === "spend_month" && f.numeric !== null && f.source === "connector");
+    if (spend) moneyLines.push({ slug: v.slug, name: v.name, kind: "read", label: spend.label, monthlyUsd: spend.numeric, yearlyUsd: Math.round(spend.numeric! * 12 * 100) / 100, source: "Read from the account this month", note: "A year at this month's rate." });
+    const plan = facts.find((f) => f.kind === "plan");
+    const limits = LIMITS_BY_SLUG.get(v.slug);
+    const tier = plan && limits ? tierFor(limits, plan.value) : null;
+    if (plan && tier) {
+      const monthly = listPricePerMonth(tier.price);
+      moneyLines.push({ slug: v.slug, name: v.name, kind: "list", label: `${tier.name} plan`, monthlyUsd: monthly, yearlyUsd: monthly === null ? null : Math.round(monthly * 12 * 100) / 100, source: `${FACT_SOURCE_LABEL[plan.source]}. List price from the checked limits list, read ${limits!.verifiedOn}.`, note: monthly === null ? tier.price : "A list price, not money spent." });
+    }
+    for (const f of facts) {
+      if (f.kind !== "usage" || f.numeric === null) continue;
+      const limit = f.limitNumeric ?? checkedLimit(v.slug, plan?.value ?? null, f.metric)?.amount ?? null;
+      if (limit === null || limit <= 0) continue;
+      limitLines.push({ slug: v.slug, name: v.name, label: f.label, used: f.numeric, limit, unit: f.unit, pct: Math.min(999, Math.round((f.numeric / limit) * 100)) });
+    }
+  }
+  const sum = (kind: MoneyLine["kind"], field: "monthlyUsd" | "yearlyUsd") => {
+    const list = moneyLines.filter((l) => l.kind === kind && l[field] !== null);
+    return list.length > 0 ? Math.round(list.reduce((a, l) => a + l[field]!, 0) * 100) / 100 : null;
+  };
+  const money: MoneySummary = {
+    monthlyReadUsd: sum("read", "monthlyUsd"),
+    yearlyReadUsd: sum("read", "yearlyUsd"),
+    monthlyListUsd: sum("list", "monthlyUsd"),
+    yearlyListUsd: sum("list", "yearlyUsd"),
+    lines: moneyLines.sort((a, b) => a.name.localeCompare(b.name) || a.kind.localeCompare(b.kind)),
+    limits: limitLines.sort((a, b) => b.pct - a.pct),
+  };
   const undeclared = (map?.services ?? []).filter((s) => VENDOR_NAMES[s.slug] && !declared.has(s.slug)).map((s) => ({ slug: s.slug, name: s.name }));
 
   const crons: CronRow[] = (map?.crons ?? []).map((c) => ({
@@ -312,7 +496,8 @@ export function cockpitView(input: CockpitInput): CockpitView {
 
   return {
     appName: input.appName,
-    map: map && input.map ? { mappedAt: input.map.createdAt, commit: map.commit, branch: map.branch, roles: map.roles.names, roleEnv: map.roles.envName, files: map.counts.files, reader: map.reader } : null,
+    map: map && input.map ? { mappedAt: input.map.createdAt, commit: map.commit, branch: map.branch, roles: map.roles.names, roleEnv: map.roles.envName, files: map.counts.files, packages: map.counts.packages, routes: map.counts.routes, reader: map.reader, scope: input.scope ?? null } : null,
+    appIconBase: vercel.find((c) => c.productionUrl)?.productionUrl ?? map?.storeApps.find((a) => a.webUrl)?.webUrl ?? null,
     mapReason: input.mapReason,
     readsReason: input.readsReason,
     lastReadAt,
@@ -322,6 +507,10 @@ export function cockpitView(input: CockpitInput): CockpitView {
     onesignal,
     undeclared,
     services,
+    purposeGroups,
+    dependencies: dependencySummary,
+    security,
+    money,
     alsoFound: map?.modelFinds.filter((f) => !f.merged) ?? [],
     crons,
     webhooks: map?.webhooks ?? [],

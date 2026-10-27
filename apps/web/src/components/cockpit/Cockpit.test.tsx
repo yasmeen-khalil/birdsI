@@ -34,6 +34,7 @@ describe("the cockpit page", () => {
     expect(html).toContain("The code uses ");
     for (const text of ["Services", "Crons", "/api/cron/purge-deleted", "every day at 04:00 UTC", "checks CRON_SECRET", "Webhooks", "/api/stripe/webhook", "Store apps", "com.example.cockpit", "Migrations", "0002_social.sql", "Public pages"]) expect(html).toContain(text);
     expect(html).not.toContain("Deployments");
+    for (const text of ["Services and dependencies", "The last map", "Security", "Money", "No model read the code"]) expect(html).toContain(text);
   });
 
   it("shows an open alert with its sentence and what to do", () => {

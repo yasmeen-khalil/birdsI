@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { FindKind, VendorCategory, type ServiceMap } from "@birdsi/shared";
+import { FindKind, VendorCategory, type PromptSection, type ServiceMap } from "@birdsi/shared";
+import { DOCS_SYSTEM } from "../checks/docs";
 import { toJsonSchema } from "../models/schema";
 
 /** One thing the model says the rules missed, with the line that proves it. */
@@ -40,6 +41,17 @@ Report an entry only when the code you are shown proves it and the map does not 
 For every entry give the file exactly as its heading shows it, the line number shown at the start of the line, and that line's text copied exactly. An entry whose line does not say what you claim is dropped. Prefer the line that names the thing: the import, the env read, the schedule, the route. When nothing is missing, return an empty list. Never report what the map already has, and never guess from a file name alone.`;
 
 export const PURPOSES_SYSTEM = `You write one plain sentence per service saying what this app uses it for, from the lines of code shown and nothing else. Name the feature or the job in the app's own terms, for example: sends the daily digest emails, or stores uploaded photos. When the lines do not say what it is for, answer null for that service. Keep every sentence under twenty words. Do not use emojis, em dashes, semicolons or exclamation marks.`;
+
+export const SECURITY_SYSTEM = `The security pass: for every route and server action, the model quotes the line that checks who the caller is, with the whole file in view, and the verifier confirms the quote. A route with no confirmable check is shown only after a second pass, asked to prove the opposite, fails. Not on in this version: it is measured against labelled findings first.`;
+
+/** The default prompt of each section, shown beside the owner's addition. */
+export const DEFAULT_PROMPTS: Record<PromptSection, string> = { reader: READER_SYSTEM, purposes: PURPOSES_SYSTEM, docs: DOCS_SYSTEM, security: SECURITY_SYSTEM };
+
+/** The system prompt with the owner's addition for this app, when there is one. */
+export function withOwner(system: string, addition: string | undefined): string {
+  const text = addition?.trim();
+  return text ? `${system}\n\nThe owner adds, for this app: ${text}` : system;
+}
 
 /** The map so far, in a few lines, as the stable prefix of every reading call. */
 export function mapSummary(map: ServiceMap): string {

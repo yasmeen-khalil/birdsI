@@ -10,6 +10,7 @@ import {
   insertFindings,
   latestServiceMap,
   MAPS_MIGRATION,
+  promptsForRepo,
   recordUsage,
   releaseSnapshot,
   replaceVendors,
@@ -83,9 +84,12 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
   const hints: ProjectHints | null = scan.snapshot_id ? (((await snapshotById(scan.snapshot_id))?.project_hints as ProjectHints | null) ?? null) : null;
   // The previous map lets the model read only the files that changed since.
   const previousMap = scan.repo_id ? await latestServiceMap(scan.repo_id).catch(() => null) : null;
+  // The owner's additions to the prompts, the newest per section from the record.
+  const prompts = scan.repo_id ? await promptsForRepo(scan.repo_id).catch(() => ({})) : {};
   try {
     const result = await runScan(config, {
       previousMap: previousMap?.map ?? null,
+      prompts,
       snapshot: async () => {
         snapshot = await resolveSnapshot(config, scan.repo_id, scan.snapshot_id, scan.branch);
         if (snapshot.commitSha || snapshot.branch) await updateScan(scanId, { commit_sha: snapshot.commitSha, branch: snapshot.branch ?? scan.branch });

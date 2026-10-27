@@ -4,7 +4,13 @@ import { errorMessage, filterModelFindings, isBudget, MODEL_FINDINGS_JSON_SCHEMA
 import { runPool } from "./pool";
 import type { Check, CheckContext } from "./types";
 
-const SYSTEM = `You are birdsI, comparing how an application uses a package with what the package's current official documentation says. ${REVIEW_VOICE}
+/** The system prompt with the owner's addition for this app, when there is one. Kept here so the docs check does not import the reader. */
+function withOwnerPrompt(system: string, addition: string | undefined): string {
+  const text = addition?.trim();
+  return text ? `${system}\n\nThe owner adds, for this app: ${text}` : system;
+}
+
+export const DOCS_SYSTEM = `You are birdsI, comparing how an application uses a package with what the package's current official documentation says. ${REVIEW_VOICE}
 
 You are given: the package and version in use, excerpts of current documents found on the web (each with a URL), and the places in the code that use the package.
 
@@ -57,7 +63,7 @@ export const docsCheck: Check = {
           const allowed = new Map(hits.map((h) => [h.url, { title: h.title, ...(h.publishedAt ? { publishedAt: h.publishedAt } : {}) }]));
           const result = await ctx.models.complete({
             purpose: "docs",
-            system: SYSTEM,
+            system: withOwnerPrompt(DOCS_SYSTEM, ctx.prompts.docs),
             user: [
               `Package: ${dep.name} (${dep.ecosystem}), version in use ${dep.versionInUse}${dep.latestVersion ? `, latest ${dep.latestVersion}` : ""}. Declared in ${dep.manifestPath}.`,
               `Documents:\n${hits.map((h, i) => `[${i + 1}] ${h.title}\nURL: ${h.url}${h.publishedAt ? `\nPublished: ${h.publishedAt}` : ""}\n${h.content.slice(0, 1800)}`).join("\n\n")}`,

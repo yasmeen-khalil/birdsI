@@ -1,6 +1,7 @@
 export { loadEngineConfig, detectProvider, DEFAULT_BUDGET, NEBIUS_MODELS, ANTHROPIC_MODELS, type EngineConfig, type ModelPrice, type ModelTier, type Provider, type ScanBudget } from "./config";
 export { ModelClient, BudgetExceededError, extractJson, type Usage, type UsageSink, type BeforeCall } from "./models/client";
 export { readWithModel, readerNote, readable, type ReadInput, type ReadResult } from "./reader/index";
+export { DEFAULT_PROMPTS } from "./reader/schema";
 export { buildServiceMapWithContext, type MapContext } from "./map/index";
 export { toJsonSchema } from "./models/schema";
 export type { Snapshot } from "./source/types";

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Dependency, FindingDraft, ProjectHints, ScanEvent, ScanScope, ScanStats, ScanStep, ScanSummary, ServiceMap, VendorDraft } from "@birdsi/shared";
+import type { Dependency, FindingDraft, ProjectHints, Prompts, ScanEvent, ScanScope, ScanStats, ScanStep, ScanSummary, ServiceMap, VendorDraft } from "@birdsi/shared";
 import { checksFor } from "../checks/registry";
 import type { Check, CheckContext } from "../checks/types";
 import { toDependency } from "../checks/vulnerabilities";
@@ -26,6 +26,8 @@ export interface ScanInput {
   onMap?: (map: ServiceMap) => Promise<void> | void;
   /** The previous map of the same repository, so the model reads only the files that changed. */
   previousMap?: ServiceMap | null;
+  /** The owner's additions to the prompts, by section. */
+  prompts?: Prompts;
   signal?: AbortSignal;
   onEvent: (event: ScanEvent) => Promise<void>;
   onUsage?: (usage: Usage) => Promise<void> | void;
@@ -173,7 +175,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
     await emit({ type: "step_started", step: "review", label: STEP_LABELS.review });
     if (map && mapContext) {
       try {
-        const read = await readWithModel({ inventory, map, context: mapContext, models, previous: input.previousMap ?? null, maxInputTokens: budget.maxReadTokens, concurrency: budget.readConcurrency, emit, signal });
+        const read = await readWithModel({ inventory, map, context: mapContext, models, previous: input.previousMap ?? null, maxInputTokens: budget.maxReadTokens, concurrency: budget.readConcurrency, prompts: input.prompts ?? {}, emit, signal });
         map = read.map;
         readerLine = readerNote(read.stats);
         await note(readerLine);
@@ -213,6 +215,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
     filesToRead,
     map,
     mapContext,
+    prompts: input.prompts ?? {},
     models,
     read,
     emit,

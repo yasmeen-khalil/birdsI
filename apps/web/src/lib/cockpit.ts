@@ -2,6 +2,7 @@ import { addDeadline, ALERTS_MIGRATION, alertsAvailable, alertsForApp, appsAvail
 import { AddDeadlineRequest, alertEmailState, cockpitView, readsInDepth, type AlertsResponse, type AppDeadline, type CockpitView, type MapResponse, type ProjectRead, type ReadsResponse } from "@birdsi/shared";
 import { loadApp } from "./apps";
 import { loadVendors } from "./ops";
+import { loadLatestScan } from "./scans";
 import { ApiError } from "./api";
 import { note, ownerAuthor } from "./record";
 
@@ -75,7 +76,7 @@ export async function removeAppDeadline(repoId: string, user: UserRow, deadlineI
  */
 export async function loadCockpit(repoId: string, user: UserRow): Promise<CockpitView> {
   const repo = await repoForUser(repoId, user.id);
-  const [appData, mapData, readsData, alertData, vendorData] = await Promise.all([loadApp(repo.id, user), loadServiceMap(repo.id, user), loadReads(repo.id, user), loadAlerts(repo.id, user), loadVendors(repo.id, user)]);
+  const [appData, mapData, readsData, alertData, vendorData, latestScan] = await Promise.all([loadApp(repo.id, user), loadServiceMap(repo.id, user), loadReads(repo.id, user), loadAlerts(repo.id, user), loadVendors(repo.id, user), loadLatestScan(repo.id, user)]);
   const reads = new Map<string, ProjectRead>(readsData.reads.map((r) => [r.projectId, r]));
   const name = appData.app?.name ?? repo.full_name.split("/").pop() ?? repo.full_name;
   return cockpitView({
@@ -91,5 +92,9 @@ export async function loadCockpit(repoId: string, user: UserRow): Promise<Cockpi
     alertsReason: alertData.reason,
     email: alertData.email,
     vendors: vendorData.vendors,
+    dependencies: latestScan?.dependencies,
+    findings: latestScan?.findings,
+    scope: latestScan?.scan.summary?.scope ?? null,
+    scanFinishedAt: latestScan?.scan.finishedAt ?? null,
   });
 }

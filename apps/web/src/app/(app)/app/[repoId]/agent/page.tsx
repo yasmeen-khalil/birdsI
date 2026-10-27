@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
-import type { ActionRequest } from "@birdsi/shared";
+import { PROMPT_SECTION_INTRO, PROMPT_SECTION_LABEL, PromptSection, type ActionRequest } from "@birdsi/shared";
+import { DEFAULT_PROMPTS } from "@birdsi/engine";
 import { CopyButton } from "@/components/CopyButton";
 import { Frame } from "@/components/Frame";
 import { LocalTime } from "@/components/LocalTime";
 import { plural } from "@/components/format";
 import { ActionCard, costText, PolicyControls, QuestionCard } from "@/components/ops/AgentControls";
 import { RecordPanel } from "@/components/ops/RecordPanel";
+import { PromptEditor } from "@/components/ops/PromptEditor";
 import { repoContext } from "@/components/server/data";
 import { loadActions, loadQuestions, loadRecord } from "@/lib/ops";
+import { loadPrompts } from "@/lib/prompts";
 
 export const metadata: Metadata = { title: "Agent" };
 
@@ -48,6 +51,7 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
   const { repoId } = await params;
   const { user, repo } = await repoContext(repoId);
   const [questions, { actions, policy }, record] = await Promise.all([loadQuestions(repo.id, user), loadActions(repo.id, user), loadRecord(repo.id, user, { limit: 30 })]);
+  const prompts = await loadPrompts(repo.id, user);
   const open = questions.filter((q) => q.status === "open");
   const answered = questions.filter((q) => q.status === "answered").sort((a, b) => (b.answeredAt ?? "").localeCompare(a.answeredAt ?? ""));
   const pending = actions.filter((a) => a.status === "pending");
@@ -143,6 +147,16 @@ export default async function AgentPage({ params }: { params: Promise<{ repoId: 
             })}
           </div>
         )}
+      </section>
+
+      <section className="flex flex-col gap-5" aria-labelledby="prompts-title" id="prompts">
+        <SectionHead id="prompts-title" title="Prompts" intro="Each part of the cockpit that uses a model has a prompt. The default is birdsI's and stays. What you add here is this app's: used by the next map, kept in the record with its date." />
+        <div className="flex flex-col gap-9" style={{ maxWidth: 820 }}>
+          {PromptSection.options.map((section) => {
+            const saved = prompts.find((p) => p.section === section);
+            return <PromptEditor key={section} repoId={repo.id} section={section} label={PROMPT_SECTION_LABEL[section]} intro={PROMPT_SECTION_INTRO[section]} fallback={DEFAULT_PROMPTS[section]} initial={saved?.text ?? ""} updatedAt={saved?.updatedAt ?? null} />;
+          })}
+        </div>
       </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="record-title">

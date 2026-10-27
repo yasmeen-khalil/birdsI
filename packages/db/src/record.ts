@@ -56,6 +56,20 @@ export async function addRecordEntry(repoId: string, input: RecordInput): Promis
   return data as RecordRow;
 }
 
+/** The newest entry per subject of one kind: the prompt per section, and any other record where the latest entry wins. */
+export async function latestRecordBySubject(repoId: string, kind: RecordKind): Promise<Map<string, RecordRow>> {
+  const out = new Map<string, RecordRow>();
+  for (const row of await recordForRepo(repoId, { kind, limit: 200 })) if (row.subject && !out.has(row.subject)) out.set(row.subject, row);
+  return out;
+}
+
+/** The owner's prompt additions for a repository, by section, for the worker before a map. */
+export async function promptsForRepo(repoId: string): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const [subject, row] of await latestRecordBySubject(repoId, "prompt")) if (row.text.trim()) out[subject] = row.text;
+  return out;
+}
+
 /** Newest first. Empty before the record migration has run. */
 export async function recordForRepo(repoId: string, options: { kind?: RecordKind; limit?: number } = {}): Promise<RecordRow[]> {
   if (!(await recordAvailable())) return [];

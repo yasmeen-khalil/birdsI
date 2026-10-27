@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, ExternalLink } from "lucide-react";
-import type { CockpitView, CronRow, OneSignalCard, SupabaseCard, VercelCard } from "@birdsi/shared";
+import type { CockpitView, CronRow, OneSignalCard, ServiceRow, SupabaseCard, VercelCard } from "@birdsi/shared";
 import { AlertItem } from "../alerts/AlertStream";
 import { LocalTime } from "../LocalTime";
 import { plural, safeUrl, shortSha } from "../format";
 import { icon14 } from "../icon";
+import { ServiceIcon } from "../Logos";
 
 /**
  * The cockpit of one app, rendered from the view every surface shares: the
@@ -395,9 +396,90 @@ function CronLine({ cron }: { cron: CronRow }) {
   );
 }
 
+const SEVERITIES = ["critical", "high", "medium", "low"] as const;
+const SEVERITY_WORD: Record<(typeof SEVERITIES)[number], string> = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+
+function usd(n: number): string {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+
+function docsWord(status: string | null): string {
+  if (status === "current") return "in line with them";
+  if (status === "behind") return "behind them";
+  if (status === "deprecated") return "using something they deprecate";
+  return "";
+}
+
+function SectionLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className="t-small c2 inline-flex items-center gap-1.5 self-start" style={{ minHeight: 32 }}>
+      {children}
+      <ArrowRight {...icon14} />
+    </Link>
+  );
+}
+
+function ServiceLine({ s }: { s: ServiceRow }) {
+  const docs = s.docs.checkedAt ? `Docs read ${s.docs.checkedAt.slice(0, 10)}${docsWord(s.docs.status) ? `, ${docsWord(s.docs.status)}` : ""}.` : "Docs not read yet.";
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3" style={{ padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
+      <span className="flex min-w-0 items-start gap-3">
+        <ServiceIcon name={s.name} url={s.icon} />
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="t-body" style={{ fontWeight: 600 }}>
+            {s.name}
+            {s.plan && (
+              <span className="tag" style={{ marginLeft: 8 }}>
+                {s.plan}
+              </span>
+            )}
+          </span>
+          {s.purpose ? (
+            <span className="t-small c2">
+              {s.purpose} <span className="c3">(as read by the model)</span>
+            </span>
+          ) : null}
+          <span className="t-small c3">
+            {s.found ? (
+              <>
+                Found by the model, confirmed at{" "}
+                <span className="t-mono-s">
+                  {s.found.at.path}:{s.found.at.line}
+                </span>
+              </>
+            ) : (
+              <>
+                Found by {s.how.join(", ")}
+                {s.firstSeen ? (
+                  <>
+                    {", "}
+                    <span className="t-mono-s">
+                      {s.firstSeen.path}:{s.firstSeen.line}
+                    </span>
+                  </>
+                ) : null}
+              </>
+            )}
+            . {s.projects === 0 ? (s.readsInDepth ? "No project declared." : "Not read by birdsI yet.") : `${plural(s.projects, "project")}, ${s.keyed} with a key.`} {docs}
+          </span>
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-3 t-small">
+        {s.docs.url && <Out href={s.docs.url}>Docs</Out>}
+        {s.dashboardUrl && <Out href={s.dashboardUrl}>Dashboard</Out>}
+        {s.pricingUrl && <Out href={s.pricingUrl}>Pricing</Out>}
+      </span>
+    </div>
+  );
+}
+
 export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: string }) {
   const base = `/app/${repoId}`;
   const shownAlerts = view.alerts.open.slice(0, 5);
+  const map = view.map;
+  const dep = view.dependencies;
+  const sec = view.security;
+  const money = view.money;
   return (
     <div className="flex flex-col gap-14 max-[900px]:gap-10">
       <Section
@@ -412,10 +494,7 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
             ))}
           </div>
         )}
-        <Link href={`${base}/alerts`} className="t-small c2 inline-flex items-center gap-1.5 self-start" style={{ minHeight: 32 }}>
-          {view.alerts.open.length > shownAlerts.length ? `All ${view.alerts.open.length} open alerts, and the closed ones` : "The alert stream"}
-          <ArrowRight {...icon14} />
-        </Link>
+        <SectionLink href={`${base}/alerts`}>{view.alerts.open.length > shownAlerts.length ? `All ${view.alerts.open.length} open alerts, and the closed ones` : "The alert stream"}</SectionLink>
       </Section>
 
       {view.undeclared.length > 0 && (
@@ -430,8 +509,64 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
         </Link>
       )}
 
+      {!map ? (
+        <Section id="cockpit-services" title="Services and dependencies" intro={view.mapReason ?? "No service map yet."}>
+          <span />
+        </Section>
+      ) : (
+        <Section
+          id="cockpit-services"
+          title="Services and dependencies"
+          intro={
+            <>
+              {plural(view.services.length, "service")} the code uses, by what each is for, with its documentation and the key that reads it.
+              {map.reader ? ` The model (${map.reader.model}) read ${plural(map.reader.filesRead, "file")} and confirmed ${plural(map.reader.confirmed + map.reader.carried, "find")} at their lines.` : " No model read the code for this map."}
+            </>
+          }
+        >
+          <div className="flex flex-col gap-6">
+            {view.purposeGroups.map((g) => (
+              <div key={g.category} className="flex flex-col" role="group" aria-label={g.label}>
+                <div className="ghead">
+                  <span className="t-label">{g.label}</span>
+                  <span className="t-small c3">{g.services.length}</span>
+                </div>
+                {g.services.map((s) => (
+                  <ServiceLine key={s.slug} s={s} />
+                ))}
+              </div>
+            ))}
+          </div>
+          {view.alsoFound.length > 0 && (
+            <div className="flex flex-col gap-1" style={{ paddingTop: 12 }}>
+              <span className="t-small c2">Also found by the model and confirmed at its line, with no part of the map to join yet:</span>
+              {view.alsoFound.map((f) => (
+                <span key={`${f.kind}:${f.at.path}:${f.at.line}`} className="t-small c3">
+                  {FIND_KINDS[f.kind] ?? f.kind}: {f.name}. {f.detail}{" "}
+                  <span className="t-mono-s">
+                    {f.at.path}:{f.at.line}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+          {dep ? (
+            <p className="t-small c2" style={{ maxWidth: 760 }}>
+              {plural(dep.total, "package")}, {dep.direct} direct{dep.vulnerable > 0 ? `, ${dep.vulnerable} with known problems` : ""}
+              {dep.behind > 0 ? `, ${dep.behind} two or more majors behind` : ""}. {dep.docsChecked > 0 ? `${dep.docsChecked} checked against their own documentation${dep.docsCheckedAt ? `, last on ${dep.docsCheckedAt.slice(0, 10)}` : ""}.` : "None checked against their documentation yet."}
+              {dep.devtools.length > 0 ? ` Devtools: ${dep.devtools.join(", ")}.` : ""}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <SectionLink href={`${base}/dependencies`}>Every package</SectionLink>
+            <SectionLink href={`${base}/vendors`}>Every vendor with its account</SectionLink>
+            <SectionLink href={`${base}/agent#prompts`}>The prompts behind this section</SectionLink>
+          </div>
+        </Section>
+      )}
+
       {view.vercel.length > 0 && (
-        <Section id="cockpit-deployments" title="Deployments" intro={view.map && view.map.roles.length > 1 ? `The code serves ${plural(view.map.roles.length, "deployment")} by ${view.map.roleEnv}: ${view.map.roles.join(", ")}. Each project is checked against the one its label names.` : undefined}>
+        <Section id="cockpit-deployments" title="Deployments" intro={map && map.roles.length > 1 ? `The code serves ${plural(map.roles.length, "deployment")} by ${map.roleEnv}: ${map.roles.join(", ")}. Each Vercel project is checked against the deployment its label names.` : undefined}>
           <div className="grid grid-cols-1 gap-4">
             {view.vercel.map((c) => (
               <VercelProject key={c.projectId} card={c} />
@@ -460,84 +595,137 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
         </Section>
       )}
 
-      {!view.map ? (
-        <Section id="cockpit-map" title="From the code" intro={view.mapReason ?? "No service map yet."}>
-          <span />
-        </Section>
-      ) : (
-        <>
-          <Section
-            id="cockpit-services"
-            title="Services"
-            intro={
+      {map ? (
+        <Section
+          id="cockpit-map"
+          title="The last map"
+          intro={
+            <>
+              Mapped <LocalTime iso={map.mappedAt} />
+              {map.commit ? ` at commit ${shortSha(map.commit)}` : ""}
+              {map.branch ? ` on ${map.branch}` : ""}: {plural(map.files, "file")}, {plural(map.packages, "package")}, {plural(map.routes, "route")}.
+            </>
+          }
+        >
+          <div className="flex flex-col gap-2 t-small c2" style={{ maxWidth: 760 }}>
+            <span>
+              {map.reader
+                ? `The model (${map.reader.model}) read ${plural(map.reader.filesRead, "file")} in ${plural(map.reader.batches, "pass", "passes")}${map.reader.filesUnchanged > 0 ? `, left ${map.reader.filesUnchanged} unchanged since the previous map` : ""}${map.reader.filesSkipped > 0 ? `, skipped ${map.reader.filesSkipped} as minified or too large` : ""}${map.reader.filesOverBudget > 0 ? `, and ${map.reader.filesOverBudget} wait for the next map, over this map's reading budget` : ""}. ${map.reader.confirmed + map.reader.carried} finds confirmed at their lines, ${map.reader.dropped} dropped.`
+                : "No model read the code: the map is what the rules read."}
+            </span>
+            {map.scope ? (
               <>
-                {plural(view.services.length, "service")} found in the code
-                {view.map.commit ? ` at commit ${shortSha(view.map.commit)}` : ""}, mapped <LocalTime iso={view.map.mappedAt} style="relative" />.
-                {view.map.reader
-                  ? ` The model (${view.map.reader.model}) read ${plural(view.map.reader.filesRead, "file")} and confirmed ${plural(view.map.reader.confirmed + view.map.reader.carried, "find")} at their lines.`
-                  : " No model read the code for this map."}
+                <span>Checked: {map.scope.checked.map((c) => c.label.toLowerCase()).join(", ")}.</span>
+                <span>Not checked: {map.scope.notChecked.map((n) => `${n.label.toLowerCase()} (${n.why})`).join(" ")}</span>
               </>
-            }
-          >
+            ) : null}
+          </div>
+          <SectionLink href={`${base}/findings`}>What this map checked, in full</SectionLink>
+        </Section>
+      ) : null}
+
+      <Section
+        id="cockpit-security"
+        title="Security"
+        intro={sec ? `${plural(sec.total, "open finding")}${sec.finishedAt ? `, from the map that finished ${sec.finishedAt.slice(0, 10)}` : ""}. Everything the rules, the databases and the cited documents found, with its severity. What was not checked is listed too.` : "No map has finished yet. This section fills in after the first map."}
+      >
+        {sec ? (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-wrap gap-2">
+              {SEVERITIES.map((s) => (
+                <Link key={s} className="chip" href={`${base}/findings?sev=${s}`} style={{ minHeight: 32 }}>
+                  {SEVERITY_WORD[s]} <b>{sec.bySeverity[s] ?? 0}</b>
+                </Link>
+              ))}
+            </div>
+            {sec.byCategory.length > 0 ? (
+              <div className="flex flex-col" style={{ borderTop: "1px solid var(--line)" }}>
+                {sec.byCategory.map((c) => (
+                  <div key={c.category} className="flex flex-wrap items-center justify-between gap-3 t-small" style={{ padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+                    <span>{c.label}</span>
+                    <span className="c2">
+                      {plural(c.count, "finding")}
+                      {c.worst ? `, worst ${SEVERITY_WORD[c.worst].toLowerCase()}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="t-small c2">Nothing open.</p>
+            )}
+            {sec.top.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="t-label c3">Start with these</span>
+                {sec.top.map((f) => (
+                  <Link key={f.id} href={`${base}/findings/${f.id}`} className="t-small" style={{ textDecoration: "none" }}>
+                    <span style={{ fontWeight: 600 }}>{SEVERITY_WORD[f.severity]}</span> {f.title}
+                    {f.path ? <span className="t-mono-s c3"> {f.path}</span> : null}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+            {sec.scope ? (
+              <p className="t-small c3" style={{ maxWidth: 760 }}>
+                Not checked: {sec.scope.notChecked.map((n) => `${n.label.toLowerCase()} (${n.why})`).join(" ")}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <SectionLink href={`${base}/findings`}>All findings, with filters</SectionLink>
+              <SectionLink href={`${base}/agent#prompts`}>The prompt for the security pass</SectionLink>
+            </div>
+          </div>
+        ) : (
+          <span />
+        )}
+      </Section>
+
+      <Section
+        id="cockpit-money"
+        title="Money"
+        intro={money.monthlyReadUsd !== null ? `${usd(money.monthlyReadUsd)} this month, read from the accounts that report spend, ${usd(money.yearlyReadUsd ?? 0)} a year at this month's rate.` : "No connected account reports spend yet. Connect Stripe, Anthropic or a Vercel team token to read it."}
+      >
+        <div className="flex flex-col gap-4">
+          {money.monthlyListUsd !== null ? (
+            <p className="t-small c2" style={{ maxWidth: 760 }}>
+              The plans the accounts are on list at {usd(money.monthlyListUsd)} a month, {usd(money.yearlyListUsd ?? 0)} a year. A list price from the checked limits list, not money spent.
+            </p>
+          ) : null}
+          {money.lines.length > 0 ? (
             <div className="flex flex-col" style={{ borderTop: "1px solid var(--line)" }}>
-              {view.services.map((s) => (
-                <div key={s.slug} className="flex flex-wrap items-center justify-between gap-3" style={{ padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
+              {money.lines.map((l) => (
+                <div key={`${l.slug}:${l.kind}:${l.label}`} className="flex flex-wrap items-start justify-between gap-3 t-small" style={{ padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
                   <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="t-body" style={{ fontWeight: 600 }}>
-                      {s.name}
-                      {s.plan && <span className="tag" style={{ marginLeft: 8 }}>{s.plan}</span>}
+                    <span>
+                      <span style={{ fontWeight: 600 }}>{l.name}</span> <span className="c2">{l.label}</span>
                     </span>
-                    {s.purpose ? (
-                      <span className="t-small c2">
-                        {s.purpose} <span className="c3">(as read by the model)</span>
-                      </span>
-                    ) : null}
-                    <span className="t-small c3">
-                      {s.found ? (
-                        <>
-                          Found by the model, confirmed at{" "}
-                          <span className="t-mono-s">
-                            {s.found.at.path}:{s.found.at.line}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          Found by {s.how.join(", ")}
-                          {s.firstSeen ? (
-                            <>
-                              {", "}
-                              <span className="t-mono-s">
-                                {s.firstSeen.path}:{s.firstSeen.line}
-                              </span>
-                            </>
-                          ) : null}
-                        </>
-                      )}
-                      . {s.projects === 0 ? (s.readsInDepth ? "No project declared." : "Not read by birdsI yet.") : `${plural(s.projects, "project")}, ${s.keyed} with a key.`}
+                    <span className="c3">
+                      {l.source}
+                      {l.note ? ` ${l.note}` : ""}
                     </span>
                   </span>
-                  <span className="inline-flex items-center gap-3 t-small">
-                    {s.dashboardUrl && <Out href={s.dashboardUrl}>Dashboard</Out>}
-                    {s.pricingUrl && <Out href={s.pricingUrl}>Pricing</Out>}
-                  </span>
+                  <span className="c2">{l.monthlyUsd !== null ? `${usd(l.monthlyUsd)} a month, ${usd(l.yearlyUsd ?? 0)} a year` : "no price in the words on the page"}</span>
                 </div>
               ))}
             </div>
-            {view.alsoFound.length > 0 && (
-              <div className="flex flex-col gap-1" style={{ paddingTop: 12 }}>
-                <span className="t-small c2">Also found by the model and confirmed at its line, with no part of the map to join yet:</span>
-                {view.alsoFound.map((f) => (
-                  <span key={`${f.kind}:${f.at.path}:${f.at.line}`} className="t-small c3">
-                    {FIND_KINDS[f.kind] ?? f.kind}: {f.name}. {f.detail}{" "}
-                    <span className="t-mono-s">
-                      {f.at.path}:{f.at.line}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            )}
-          </Section>
+          ) : null}
+          {money.limits.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="t-label c3">Against the limits</span>
+              {money.limits.map((l) => (
+                <span key={`${l.slug}:${l.label}`} className="t-small c2">
+                  {l.name} {l.label.toLowerCase()}: {l.used.toLocaleString("en-US")}
+                  {l.unit ? ` ${l.unit}` : ""} of {l.limit.toLocaleString("en-US")} ({l.pct}%)
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <p className="t-small c3">Subscriptions no API reports are not counted here yet. The alerts warn at 80 and 95 percent of a limit.</p>
+          <SectionLink href={`${base}/vendors`}>Every account, fact by fact</SectionLink>
+        </div>
+      </Section>
 
+      {map ? (
+        <>
           {view.crons.length > 0 && (
             <Section id="cockpit-crons" title="Crons">
               <div className="flex flex-col" style={{ borderTop: "1px solid var(--line)" }}>
@@ -641,7 +829,7 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
             </Section>
           )}
         </>
-      )}
+      ) : null}
     </div>
   );
 }

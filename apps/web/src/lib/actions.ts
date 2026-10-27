@@ -8,6 +8,7 @@ import type { z } from "zod";
 import { ApiError } from "./api";
 import { requireUser } from "./auth";
 import { answerQuestion, changePolicy, connectVendor, decideActionRequest, disconnectVendor, dismissQuestion, requestAction, resyncAllRepos, saveVision, startVendorSync } from "./ops";
+import { savePrompt } from "./prompts";
 import { dismissFinding, reopenFinding, startScan, stopScan } from "./scans";
 import { addAppProject, connectProjectKey, disconnectProjectKey, editAppProject, removeAppProject, renameApp, reuseKeyForProject, setEnvironments, tieKey, type ProjectInput } from "./apps";
 import { addAppDeadline, removeAppDeadline } from "./cockpit";
@@ -113,6 +114,16 @@ export async function saveVisionAction(repoId: string, text: string): Promise<Ac
     const user = await requireUser();
     const body = checked(SetVisionRequest, { text }, "Keep the vision under 20,000 characters.");
     await saveVision(repoId, user, body.text);
+    revalidatePath(`/app/${repoId}`);
+    return undefined;
+  });
+}
+
+export async function savePromptAction(repoId: string, section: string, text: string): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await savePrompt(repoId, user, { section, text });
+    revalidatePath(`/app/${repoId}/agent`);
     revalidatePath(`/app/${repoId}`);
     return undefined;
   });

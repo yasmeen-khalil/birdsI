@@ -354,6 +354,34 @@ export type VisionResponse = z.infer<typeof VisionResponse>;
 export const SetVisionRequest = z.object({ text: z.string().max(20_000) });
 export type SetVisionRequest = z.infer<typeof SetVisionRequest>;
 
+/** The sections of the cockpit whose model prompt the owner can add to, per app. The default text lives in the engine. */
+export const PromptSection = z.enum(["reader", "purposes", "docs", "security"]);
+export type PromptSection = z.infer<typeof PromptSection>;
+
+export const PROMPT_SECTION_LABEL: Record<PromptSection, string> = {
+  reader: "The model's reading of the code",
+  purposes: "What each service is for",
+  docs: "The docs check",
+  security: "The security pass",
+};
+
+export const PROMPT_SECTION_INTRO: Record<PromptSection, string> = {
+  reader: "What the model should know about this app when it looks for what the rules missed: its shape, the services it runs on, what to leave alone.",
+  purposes: "How this app names its features, so the one-line purposes use your words.",
+  docs: "What matters when a package is checked against its documentation: the frameworks and versions in play, what to leave alone.",
+  security: "What a security pass should weigh for this app: users and accounts, payments, children's data, admin surfaces. It steers the model's security pass, which is not on in this version. The rules and databases run regardless.",
+};
+
+export const SavePromptRequest = z.object({ section: PromptSection, text: z.string().max(4000) });
+export type SavePromptRequest = z.infer<typeof SavePromptRequest>;
+
+/** The owner's addition to one section's prompt, as the newest prompt entry of the record. */
+export const AppPrompt = z.object({ section: PromptSection, text: z.string(), updatedAt: z.string().nullable() });
+export type AppPrompt = z.infer<typeof AppPrompt>;
+
+/** The owner's additions by section, as the engine receives them. */
+export type Prompts = Partial<Record<PromptSection, string>>;
+
 export const UpdatePolicyRequest = z.object({
   allowPropose: z.boolean().optional(),
   allowWrite: z.boolean().optional(),
@@ -380,6 +408,7 @@ export const RecordKind = z.enum([
   "action_decided",
   "action_run",
   "project",
+  "prompt",
 ]);
 export type RecordKind = z.infer<typeof RecordKind>;
 
@@ -397,6 +426,7 @@ export const RECORD_KIND_LABEL: Record<RecordKind, string> = {
   action_decided: "Approval",
   action_run: "Ran",
   project: "Projects and keys",
+  prompt: "Prompt",
 };
 
 export const RecordAuthorKind = z.enum(["owner", "agent", "birdsi"]);

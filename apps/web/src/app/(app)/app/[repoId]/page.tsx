@@ -1,16 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { eventsAfter } from "@birdsi/db";
 import { STEP_LABELS } from "@birdsi/engine";
-import { CONFIDENCE_ORDER, SEVERITY_ORDER, type Confidence, type Finding, type Scan, type Severity } from "@birdsi/shared";
-import { ConfidencePill } from "@/components/Confidence";
-import { FindingRow } from "@/components/FindingRow";
+import type { Scan } from "@birdsi/shared";
 import { LocalTime } from "@/components/LocalTime";
 import { ScanAgainButton, ScanControls } from "@/components/ScanActions";
-import { SeverityMeter } from "@/components/Severity";
-import { compareFindings, findingsHeadline, plural, repoName, scanName, shortDuration, shortSha } from "@/components/format";
-import { icon14, icon20 } from "@/components/icon";
+import { plural, repoName, scanName, shortDuration, shortSha } from "@/components/format";
+import { icon14 } from "@/components/icon";
+import { AppIcon } from "@/components/Logos";
 import { CockpitSections } from "@/components/cockpit/Cockpit";
 import { PipelineStrip } from "@/components/ops/OpsParts";
 import { VisionEditor } from "@/components/ops/VisionEditor";
@@ -30,7 +28,6 @@ function languagesLine(languages: Array<{ name: string; files: number }>): strin
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}.`;
 }
 
-const SEV_BAR: Record<Severity, string | undefined> = { critical: "var(--critical)", high: "var(--high)", medium: undefined, low: "var(--text-3)" };
 
 function scanResult(s: Scan): { text: string; tone?: string } {
   if (s.status === "queued" || s.status === "running") return { text: "Running", tone: "var(--accent)" };
@@ -51,15 +48,6 @@ export default async function CockpitPage({ params }: { params: Promise<{ repoId
   const newest = scans[0] ?? null;
   const lastProblem = newest && (newest.status === "failed" || newest.status === "stopped") && (!latest || new Date(newest.createdAt) > new Date(latest.createdAt)) ? newest : null;
 
-  const all: Finding[] = result ? [...result.findings].sort(compareFindings) : [];
-  const open = all.filter((f) => f.status !== "dismissed");
-  const fixable = open.filter((f) => f.actionKind === "fix").length;
-  const bySev = Object.fromEntries(SEVERITY_ORDER.map((s) => [s, open.filter((f) => f.severity === s).length])) as Record<Severity, number>;
-  const byConf = Object.fromEntries(CONFIDENCE_ORDER.map((c) => [c, open.filter((f) => f.confidence === c).length])) as Record<Confidence, number>;
-  const byId = new Map(open.map((f) => [f.id, f]));
-  const startIds = latest?.summary?.startWith ?? [];
-  let startWith = startIds.map((id) => byId.get(id) ?? open.find((f) => f.key === id)).filter((f): f is Finding => Boolean(f));
-  if (startWith.length === 0) startWith = open.filter((f) => f.severity === "critical" || f.severity === "high").slice(0, 3);
   const deps = result?.dependencies ?? [];
   const base = `/app/${repo.id}`;
   const readRunning = ops.stages.some((s) => s.id === "reads" && s.freshness === "running");
@@ -94,7 +82,10 @@ export default async function CockpitPage({ params }: { params: Promise<{ repoId
       ) : null}
       <section className="flex flex-col justify-between gap-5 min-[901px]:flex-row min-[901px]:items-end min-[901px]:gap-10">
         <div className="flex min-w-0 flex-col gap-2.5">
-          <h1 className="t-h1 break-words">{title}</h1>
+          <div className="flex items-center gap-3">
+            <AppIcon name={title} base={cockpit.appIconBase} />
+            <h1 className="t-h1 break-words">{title}</h1>
+          </div>
           <p className="t-body c2">{description}</p>
         </div>
         <ScanControls repoId={repo.id} mapRunning={Boolean(running)} readRunning={readRunning} />
@@ -164,85 +155,6 @@ export default async function CockpitPage({ params }: { params: Promise<{ repoId
           Tracking {plural(ops.watches.length, "condition")} that could affect your services
           <ArrowRight {...icon14} />
         </Link>
-      )}
-
-      {latest && result && (
-        <h2 className="t-label c3 max-[900px]:-mb-6 min-[901px]:-mb-10" style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
-          The code
-        </h2>
-      )}
-
-      {latest && result && (
-        <section className="grid grid-cols-1 gap-y-10 min-[901px]:grid-cols-12 min-[901px]:gap-x-6">
-          <div className="flex min-w-0 flex-col gap-3.5 min-[901px]:col-span-7">
-            {open.length === 0 && <Check {...icon20} className="i i20" style={{ color: "var(--ok)" }} />}
-            <h2 className="t-display max-[900px]:text-[30px]! max-[900px]:leading-[1.12]!" style={{ fontSize: 44 }}>
-              {findingsHeadline(open.length, fixable)}
-            </h2>
-            <p className="t-body c2">
-              From the {scanName(latest.kind).toLowerCase()} of {latest.branch ?? repo.default_branch}, finished <LocalTime iso={latest.finishedAt} />
-              {shortSha(latest.commitSha) ? (
-                <>
-                  {" "}
-                  on commit{" "}
-                  <span className="t-mono" style={{ color: "var(--text)" }}>
-                    {shortSha(latest.commitSha)}
-                  </span>
-                </>
-              ) : null}
-              .{all.length > open.length ? ` ${plural(all.length - open.length, "finding")} dismissed.` : ""}
-            </p>
-          </div>
-          <aside className="flex flex-col gap-9 min-[901px]:col-span-4 min-[901px]:col-start-9">
-            <div className="grid grid-cols-2 gap-x-5 min-[901px]:grid-cols-1 min-[901px]:gap-y-9">
-              <div>
-                <h3 className="t-label c2" style={{ paddingBottom: 12 }}>
-                  By severity
-                </h3>
-                {SEVERITY_ORDER.map((s, i) => (
-                  <Link key={s} className="ledger max-[900px]:grid-cols-[minmax(0,1fr)_auto]!" href={`${base}/findings?sev=${s}`} style={i === 3 ? { borderBottom: "1px solid var(--line)" } : undefined}>
-                    <SeverityMeter severity={s} />
-                    <span className="n">{bySev[s]}</span>
-                    <span className="b max-[900px]:hidden!">
-                      <i style={{ width: `${open.length ? Math.round((bySev[s] / open.length) * 100) : 0}%`, ...(SEV_BAR[s] ? { background: SEV_BAR[s] } : {}) }} />
-                    </span>
-                  </Link>
-                ))}
-              </div>
-              <div>
-                <h3 className="t-label c2" style={{ paddingBottom: 12 }}>
-                  By confidence
-                </h3>
-                {CONFIDENCE_ORDER.map((c, i) => (
-                  <Link key={c} className="ledger max-[900px]:grid-cols-[minmax(0,1fr)_auto]!" href={`${base}/findings?conf=${c}`} style={i === 2 ? { borderBottom: "1px solid var(--line)" } : undefined}>
-                    <ConfidencePill confidence={c} />
-                    <span className="n">{byConf[c]}</span>
-                    <span className="b max-[900px]:hidden!">
-                      <i style={{ width: `${open.length ? Math.round((byConf[c] / open.length) * 100) : 0}%` }} />
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-            <Link className="btn btn-secondary self-start max-[900px]:self-stretch" href={`${base}/findings`}>
-              See all {open.length}
-            </Link>
-          </aside>
-        </section>
-      )}
-
-      {startWith.length > 0 && (
-        <section className="flex flex-col" aria-labelledby="start-with">
-          <div className="flex items-baseline justify-between gap-3" style={{ paddingBottom: 14 }}>
-            <h2 id="start-with" className="t-h2 max-[900px]:text-[24px]!">
-              Start with these
-            </h2>
-            <span className="t-small c3">The most serious first</span>
-          </div>
-          {startWith.map((f, i) => (
-            <FindingRow key={f.id} finding={f} href={`${base}/findings/${f.id}`} last={i === startWith.length - 1} />
-          ))}
-        </section>
       )}
 
       <VisionEditor repoId={repo.id} initial={ops.vision.text} updatedAt={ops.vision.updatedAt} />

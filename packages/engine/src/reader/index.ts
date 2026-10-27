@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ModelFind, ReaderStats, ScanEvent, ServiceMap } from "@birdsi/shared";
+import type { ModelFind, Prompts, ReaderStats, ScanEvent, ServiceMap } from "@birdsi/shared";
 import { isBudget } from "../checks/model-findings";
 import { runPool } from "../checks/pool";
 import { isCodeLanguage, isConfigLanguage } from "../inventory/languages";
@@ -9,7 +9,7 @@ import { isTestPath } from "../map/files";
 import type { MapContext } from "../map/index";
 import type { ModelClient } from "../models/client";
 import { batchSegments, batchText, segmentsOf, tokensOf, type Batch } from "./chunks";
-import { Finds, FINDS_JSON_SCHEMA, mapSummary, Purposes, PURPOSES_JSON_SCHEMA, PURPOSES_SYSTEM, READER_SYSTEM, type Find } from "./schema";
+import { Finds, FINDS_JSON_SCHEMA, mapSummary, Purposes, PURPOSES_JSON_SCHEMA, PURPOSES_SYSTEM, READER_SYSTEM, withOwner, type Find } from "./schema";
 import { alreadyKnown, confirmFind, mergeFind, type MergeContext } from "./verify";
 
 export interface ReadInput {
@@ -23,6 +23,8 @@ export interface ReadInput {
   /** Input tokens the reading may spend in this map. */
   maxInputTokens: number;
   concurrency: number;
+  /** The owner's additions to the prompts, by section. */
+  prompts?: Prompts;
   emit: (event: ScanEvent) => Promise<void>;
   signal: AbortSignal;
 }
@@ -57,6 +59,7 @@ export async function readWithModel(input: ReadInput): Promise<ReadResult> {
   const stats: ReaderStats = { model, filesRead: 0, filesUnchanged: 0, filesSkipped: 0, filesOverBudget: 0, batches: 0, finds: 0, confirmed: 0, dropped: 0, known: 0, carried: 0 };
   const merge: MergeContext = { map, context, model, areas: null };
   const summary = mapSummary(map);
+  const readerSystem = withOwner(READER_SYSTEM, input.prompts?.reader);
 
   // Every readable file is hashed; the ones the previous map saw unchanged are not read again.
   const previousHashes = input.previous?.fileHashes ?? {};
@@ -90,7 +93,7 @@ export async function readWithModel(input: ReadInput): Promise<ReadResult> {
   // The batches, in priority order, within the reading budget.
   const segments = toRead.flatMap((file) => segmentsOf(file.path, contents.get(file.path)!));
   const all = batchSegments(segments);
-  let tokens = tokensOf(summary.length + READER_SYSTEM.length);
+  let tokens = tokensOf(summary.length + readerSystem.length);
   const batches: Batch[] = [];
   for (const batch of all) {
     const cost = tokensOf(batch.chars);
@@ -113,7 +116,7 @@ export async function readWithModel(input: ReadInput): Promise<ReadResult> {
       const answer = await models.complete({
         tier: "nano",
         purpose: "reader",
-        system: READER_SYSTEM,
+        system: readerSystem,
         cachedContext: summary,
         user: batchText(batch),
         schema: Finds,
@@ -176,7 +179,7 @@ async function writePurposes(input: ReadInput, map: ServiceMap): Promise<void> {
     })
     .join("\n");
   try {
-    const answer = await input.models.complete({ tier: "nano", purpose: "purposes", system: PURPOSES_SYSTEM, user: `Services and the lines that use them:\n${user}`, schema: Purposes, jsonSchema: PURPOSES_JSON_SCHEMA, schemaName: "purposes", maxOutputTokens: 4000, signal: input.signal });
+    const answer = await input.models.complete({ tier: "nano", purpose: "purposes", system: withOwner(PURPOSES_SYSTEM, input.prompts?.purposes), user: `Services and the lines that use them:\n${user}`, schema: Purposes, jsonSchema: PURPOSES_JSON_SCHEMA, schemaName: "purposes", maxOutputTokens: 4000, signal: input.signal });
     const by = new Map(answer.purposes.map((p) => [p.slug, p.purpose]));
     for (const s of wanting) {
       const purpose = by.get(s.slug)?.trim();

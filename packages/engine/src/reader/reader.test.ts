@@ -14,6 +14,7 @@ const fixture = resolve(import.meta.dirname, "../../fixtures/cockpit-app");
 
 interface Call {
   purpose: string;
+  system: string;
   user: string;
 }
 
@@ -24,8 +25,8 @@ function fakeModel(finds: Find[]): { models: ModelClient; calls: Call[] } {
   const models = {
     available: true,
     modelId: () => "fake-nano",
-    complete: async (opts: { purpose: string; user: string }) => {
-      calls.push({ purpose: opts.purpose, user: opts.user });
+    complete: async (opts: { purpose: string; system: string; user: string }) => {
+      calls.push({ purpose: opts.purpose, system: opts.system, user: opts.user });
       if (opts.purpose === "reader") return { finds: passes++ === 0 ? finds : [] };
       if (opts.purpose === "purposes") return { purposes: [...opts.user.matchAll(/^- (\S+) \(/gm)].map((m) => ({ slug: m[1]!, purpose: `used for ${m[1]}` })) };
       throw new Error(`unexpected purpose ${opts.purpose}`);
@@ -99,6 +100,14 @@ describe("the model's reading of the fixture app", () => {
     expect(read.env.find((e) => e.name === "MAPBOX_TOKEN")?.found?.by).toBe("model");
     expect(read.crons).toHaveLength(3);
     expect(read.services.find((s) => s.slug === "stripe")?.purpose).toBe("used for stripe");
+  });
+
+  it("adds the owner's words to the prompts of the reading and the purposes", async () => {
+    const { inventory, map, context } = await rulesMap();
+    const { models, calls } = fakeModel([]);
+    await readWithModel({ inventory, map, context, models, previous: null, maxInputTokens: 4_000_000, concurrency: 2, prompts: { reader: "Ignore the scripts folder.", purposes: "Call users members." }, emit, signal });
+    expect(calls.find((c) => c.purpose === "reader")?.system).toContain("The owner adds, for this app: Ignore the scripts folder.");
+    expect(calls.find((c) => c.purpose === "purposes")?.system).toContain("The owner adds, for this app: Call users members.");
   });
 
   it("stops at the reading budget and counts the files that wait", async () => {

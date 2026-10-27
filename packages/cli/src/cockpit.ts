@@ -111,6 +111,15 @@ export function cockpitLines(v: CockpitView, q: Quote = plain): string[] {
     if (map.reader) lines.push(`The model (${map.reader.model}) read ${map.reader.filesRead} files in ${map.reader.batches} passes: ${map.reader.confirmed + map.reader.carried} finds confirmed at their lines, ${map.reader.dropped} dropped, ${map.reader.known} already on the map`);
     for (const s of v.services) if (s.purpose) lines.push(`  ${s.name}: ${s.purpose} (as read by the model)`);
     for (const f of v.alsoFound) lines.push(`Also found by the model, ${f.kind}: ${f.name}, ${f.detail} (${f.at.path}:${f.at.line})`);
+    if (v.security) {
+      const sev = (["critical", "high", "medium", "low"] as const).map((k) => `${k} ${v.security!.bySeverity[k] ?? 0}`).join(", ");
+      lines.push(`Security: ${v.security.total} open findings (${sev})${v.security.byCategory.length > 0 ? `: ${v.security.byCategory.map((c) => `${c.label.toLowerCase()} ${c.count}`).join(", ")}` : ""}.`);
+      if (v.security.scope) lines.push(`  Not checked: ${v.security.scope.notChecked.map((n) => n.label.toLowerCase()).join(", ")}.`);
+    }
+    if (v.money.monthlyReadUsd !== null || v.money.monthlyListUsd !== null) {
+      lines.push(`Money: ${v.money.monthlyReadUsd !== null ? `$${v.money.monthlyReadUsd} this month read from accounts ($${v.money.yearlyReadUsd} a year at this rate)` : "no account reports spend"}${v.money.monthlyListUsd !== null ? `, the plans list at $${v.money.monthlyListUsd} a month ($${v.money.yearlyListUsd} a year), not money spent` : ""}.`);
+      for (const l of v.money.limits.slice(0, 6)) lines.push(`  ${l.name} ${l.label.toLowerCase()}: ${l.used}${l.unit ? ` ${l.unit}` : ""} of ${l.limit} (${l.pct}%)`);
+    }
     if (map.roles.length > 1) lines.push(`Deployments: ${map.roles.join(", ")} by ${map.roleEnv}`);
     for (const c of v.crons) lines.push(`Cron ${c.path}: ${c.every}${c.handler ? `, ${c.handler}${c.kind === "vercel" ? (c.checksSecret ? " checks CRON_SECRET" : " does NOT check CRON_SECRET") : ""}` : c.kind === "vercel" ? ", no handler found" : `, a ${c.kind} schedule`}${c.found ? ", found by the model" : ""} (${c.source.path}:${c.source.line})`);
     for (const w of v.webhooks) lines.push(`Webhook ${w.route}${w.service ? ` from ${w.service}` : ""}: ${w.verifies ? `verifies at ${w.verifies.path}:${w.verifies.line}` : "NO verify line found"}`);
