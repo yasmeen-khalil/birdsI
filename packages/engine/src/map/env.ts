@@ -7,7 +7,7 @@ const READ = /process\.env\.([A-Z][A-Z0-9_]*)|process\.env\[\s*["']([A-Z][A-Z0-9
 const DESTRUCTURE = /\{([^{}]{1,400})\}\s*=\s*process\.env\b/g;
 const ROLE_COMPARE = /process\.env\.([A-Z][A-Z0-9_]*)\s*[!=]==?\s*["']([a-z][a-z0-9_-]{0,30})["']|["']([a-z][a-z0-9_-]{0,30})["']\s*[!=]==?\s*process\.env\.([A-Z][A-Z0-9_]*)/g;
 const OPTIONAL_NOTE = /optional|inert|unset|leave (it )?(empty|unset|blank)|not (needed|used|required)|only (when|if)|if you (want|use)|later/i;
-const PUBLIC_PREFIX = /^(NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_|PUBLIC_|REACT_APP_|NUXT_PUBLIC_)/;
+export const PUBLIC_PREFIX = /^(NEXT_PUBLIC_|VITE_|EXPO_PUBLIC_|PUBLIC_|REACT_APP_|NUXT_PUBLIC_)/;
 /** Names the platform sets by itself: never "missing" from a project. */
 const PLATFORM = /^(NODE_ENV|VERCEL|VERCEL_[A-Z0-9_]+|NEXT_PUBLIC_VERCEL_[A-Z0-9_]+|NEXT_RUNTIME|NEXT_PHASE|CI|PORT|TZ|HOSTNAME|PWD|HOME|PATH)$/;
 
@@ -105,6 +105,12 @@ async function readsIn(files: MapFiles): Promise<Read[]> {
   return out;
 }
 
+/** The deployment roles that need a name read in these areas: the product for shared, cron, webhook and declared areas, another role for its own. */
+export function rolesForAreas(area: ReadonlySet<string>, roles: MapRoles): string[] {
+  const productAreas = new Set(["shared", "cron", "webhook", "declared", ...(roles.defaultRole ? [roles.defaultRole] : [])]);
+  return roles.names.length === 0 ? [] : roles.names.filter((r) => (r === roles.defaultRole ? [...area].some((a) => productAreas.has(a)) : area.has(r)));
+}
+
 /** Which areas each file runs in, from the routes that reach it. */
 export function areasByFile(graph: Graph, roles: MapRoles): Map<string, Set<string>> {
   const byArea = new Map<string, string[]>();
@@ -155,8 +161,7 @@ export async function readEnv(files: MapFiles, graph: Graph, roles: MapRoles, ex
       for (const x of (service ? sdkAreas.get(service) : undefined) ?? []) area.add(x);
       if (area.size > 1) area.delete("unreached");
     }
-    const productAreas = new Set(["shared", "cron", "webhook", "declared", ...(roles.defaultRole ? [roles.defaultRole] : [])]);
-    const roleList = roles.names.length === 0 ? [] : roles.names.filter((r) => (r === roles.defaultRole ? [...area].some((a) => productAreas.has(a)) : area.has(r)));
+    const roleList = rolesForAreas(area, roles);
     const noteOptional = fromExample?.note ? OPTIONAL_NOTE.test(fromExample.note) : false;
     const allGuarded = mine.length > 0 && mine.every((r) => r.guarded);
     const sources: SourceLine[] = [];
@@ -181,6 +186,7 @@ export async function readEnv(files: MapFiles, graph: Graph, roles: MapRoles, ex
       areas: [...area].sort(),
       roles: roleList,
       reads: sources,
+      found: null,
     });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));

@@ -351,6 +351,24 @@ function OneSignalApp({ card }: { card: OneSignalCard }) {
   );
 }
 
+const CRON_KINDS: Record<string, string> = {
+  actions: "A GitHub Actions schedule",
+  pg_cron: "A pg_cron schedule in the database",
+  code: "A timer in the code",
+  other: "A schedule",
+};
+
+const FIND_KINDS: Record<string, string> = {
+  service: "Service",
+  env: "Env name",
+  cron: "Cron",
+  webhook: "Webhook",
+  store_app: "Store app",
+  migration: "Migration source",
+  deployment: "Deployable",
+  other: "Other",
+};
+
 function CronLine({ cron }: { cron: CronRow }) {
   return (
     <div className="flex flex-col gap-1" style={{ padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
@@ -359,8 +377,16 @@ function CronLine({ cron }: { cron: CronRow }) {
         {cron.perDay !== null && <span className="c3"> ({plural(cron.perDay, "run")} a day)</span>}
       </span>
       <span className="t-small c3">
-        {cron.handler ? <span className="t-mono-s">{cron.handler}</span> : "No handler found in the code"}
-        {cron.handler ? (cron.checksSecret ? ", checks CRON_SECRET" : <span style={{ color: "var(--critical)" }}>, does not check CRON_SECRET</span>) : null}
+        {cron.handler ? <span className="t-mono-s">{cron.handler}</span> : cron.kind === "vercel" ? "No handler found in the code" : (CRON_KINDS[cron.kind] ?? cron.kind)}
+        {cron.handler && cron.kind === "vercel" ? (cron.checksSecret ? ", checks CRON_SECRET" : <span style={{ color: "var(--critical)" }}>, does not check CRON_SECRET</span>) : null}
+        {cron.found ? (
+          <>
+            , found by the model, confirmed at{" "}
+            <span className="t-mono-s">
+              {cron.found.at.path}:{cron.found.at.line}
+            </span>
+          </>
+        ) : null}
         {cron.projects.length > 0 &&
           `. ${cron.projects.map((p) => `${p.title}: ${p.registered === null ? "not read" : p.registered ? "registered" : "not registered"}`).join(", ")}`}
         .
@@ -447,6 +473,9 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
               <>
                 {plural(view.services.length, "service")} found in the code
                 {view.map.commit ? ` at commit ${shortSha(view.map.commit)}` : ""}, mapped <LocalTime iso={view.map.mappedAt} style="relative" />.
+                {view.map.reader
+                  ? ` The model (${view.map.reader.model}) read ${plural(view.map.reader.filesRead, "file")} and confirmed ${plural(view.map.reader.confirmed + view.map.reader.carried, "find")} at their lines.`
+                  : " No model read the code for this map."}
               </>
             }
           >
@@ -458,16 +487,32 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
                       {s.name}
                       {s.plan && <span className="tag" style={{ marginLeft: 8 }}>{s.plan}</span>}
                     </span>
+                    {s.purpose ? (
+                      <span className="t-small c2">
+                        {s.purpose} <span className="c3">(as read by the model)</span>
+                      </span>
+                    ) : null}
                     <span className="t-small c3">
-                      Found by {s.how.join(", ")}
-                      {s.firstSeen ? (
+                      {s.found ? (
                         <>
-                          {", "}
+                          Found by the model, confirmed at{" "}
                           <span className="t-mono-s">
-                            {s.firstSeen.path}:{s.firstSeen.line}
+                            {s.found.at.path}:{s.found.at.line}
                           </span>
                         </>
-                      ) : null}
+                      ) : (
+                        <>
+                          Found by {s.how.join(", ")}
+                          {s.firstSeen ? (
+                            <>
+                              {", "}
+                              <span className="t-mono-s">
+                                {s.firstSeen.path}:{s.firstSeen.line}
+                              </span>
+                            </>
+                          ) : null}
+                        </>
+                      )}
                       . {s.projects === 0 ? (s.readsInDepth ? "No project declared." : "Not read by birdsI yet.") : `${plural(s.projects, "project")}, ${s.keyed} with a key.`}
                     </span>
                   </span>
@@ -478,6 +523,19 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
                 </div>
               ))}
             </div>
+            {view.alsoFound.length > 0 && (
+              <div className="flex flex-col gap-1" style={{ paddingTop: 12 }}>
+                <span className="t-small c2">Also found by the model and confirmed at its line, with no part of the map to join yet:</span>
+                {view.alsoFound.map((f) => (
+                  <span key={`${f.kind}:${f.at.path}:${f.at.line}`} className="t-small c3">
+                    {FIND_KINDS[f.kind] ?? f.kind}: {f.name}. {f.detail}{" "}
+                    <span className="t-mono-s">
+                      {f.at.path}:{f.at.line}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
           </Section>
 
           {view.crons.length > 0 && (
@@ -509,6 +567,14 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
                       ) : (
                         <span style={{ color: "var(--critical)" }}>No line that checks the sender was found in {w.file}</span>
                       )}
+                      {w.found ? (
+                        <>
+                          , found by the model, confirmed at{" "}
+                          <span className="t-mono-s">
+                            {w.found.at.path}:{w.found.at.line}
+                          </span>
+                        </>
+                      ) : null}
                       .
                     </span>
                   </div>

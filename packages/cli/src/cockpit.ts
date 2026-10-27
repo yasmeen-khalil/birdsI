@@ -86,9 +86,12 @@ export function cockpitLines(v: CockpitView, q: Quote = plain): string[] {
   }
 
   if (map) {
-    lines.push(`Services (${v.services.length}): ${v.services.map((s) => `${s.name}${s.plan ? ` [${s.plan}]` : ""}${s.projects ? ` ${s.keyed}/${s.projects} keyed` : ""}`).join(", ")}`);
+    lines.push(`Services (${v.services.length}): ${v.services.map((s) => `${s.name}${s.plan ? ` [${s.plan}]` : ""}${s.projects ? ` ${s.keyed}/${s.projects} keyed` : ""}${s.found ? " (found by the model)" : ""}`).join(", ")}`);
+    if (map.reader) lines.push(`The model (${map.reader.model}) read ${map.reader.filesRead} files in ${map.reader.batches} passes: ${map.reader.confirmed + map.reader.carried} finds confirmed at their lines, ${map.reader.dropped} dropped, ${map.reader.known} already on the map`);
+    for (const s of v.services) if (s.purpose) lines.push(`  ${s.name}: ${s.purpose} (as read by the model)`);
+    for (const f of v.alsoFound) lines.push(`Also found by the model, ${f.kind}: ${f.name}, ${f.detail} (${f.at.path}:${f.at.line})`);
     if (map.roles.length > 1) lines.push(`Deployments: ${map.roles.join(", ")} by ${map.roleEnv}`);
-    for (const c of v.crons) lines.push(`Cron ${c.path}: ${c.every}${c.handler ? `, ${c.handler}${c.checksSecret ? " checks CRON_SECRET" : " does NOT check CRON_SECRET"}` : ", no handler found"} (${c.source.path}:${c.source.line})`);
+    for (const c of v.crons) lines.push(`Cron ${c.path}: ${c.every}${c.handler ? `, ${c.handler}${c.kind === "vercel" ? (c.checksSecret ? " checks CRON_SECRET" : " does NOT check CRON_SECRET") : ""}` : c.kind === "vercel" ? ", no handler found" : `, a ${c.kind} schedule`}${c.found ? ", found by the model" : ""} (${c.source.path}:${c.source.line})`);
     for (const w of v.webhooks) lines.push(`Webhook ${w.route}${w.service ? ` from ${w.service}` : ""}: ${w.verifies ? `verifies at ${w.verifies.path}:${w.verifies.line}` : "NO verify line found"}`);
     for (const a of v.storeApps) lines.push(`Store app: ${a.platform} ${a.bundleId ?? "no bundle id"}${a.appName ? ` ${q(a.appName)}` : ""}${a.webUrl ? `, loads ${a.webUrl}` : ""}`);
     if (v.migrations && v.migrations.files > 0) lines.push(`Migrations: ${v.migrations.files} files in ${v.migrations.dir ?? "the repository"}, latest ${v.migrations.latest ?? "?"}${v.migrations.verify ? `, ${v.migrations.verify.markers} markers in ${v.migrations.verify.path}` : ", no verify.sql"}`);

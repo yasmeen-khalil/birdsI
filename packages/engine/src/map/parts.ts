@@ -64,6 +64,8 @@ export async function readCrons(files: MapFiles, units: Unit[], graph: Graph): P
         source: sourceLine(path, content, at >= 0 ? lineAt(content, at) : 1),
         handler,
         checksSecret,
+        kind: "vercel",
+        found: null,
       });
     }
   }
@@ -98,16 +100,26 @@ function webhookService(route: string, content: string): string | null {
   return null;
 }
 
+/** The line in a handler that checks the sender, or null when none was found. */
+export function verifyLineIn(file: string, content: string): SourceLine | null {
+  const lines = content.split("\n");
+  const code = (l: string) => !/^\s*(\/\/|\*|\/\*|import\b)/.test(l);
+  const strong = lines.findIndex((l) => VERIFY_STRONG.test(l) && code(l));
+  const at = strong >= 0 ? strong : lines.findIndex((l) => VERIFY_WEAK.test(l) && code(l));
+  return at >= 0 ? sourceLine(file, content, at + 1) : null;
+}
+
+export function methodsIn(content: string): string[] {
+  return [...new Set([...content.matchAll(/export\s+(?:async\s+)?(?:function|const)\s+(GET|POST|PUT|PATCH|DELETE)\b/g)].map((m) => m[1]!))];
+}
+
+export { webhookService };
+
 export async function readWebhooks(files: MapFiles, graph: Graph): Promise<MapWebhook[]> {
   const out: MapWebhook[] = [];
   for (const entry of graph.entries.filter(isWebhookRoute)) {
     const content = (await files.text(entry.file)) ?? "";
-    const lines = content.split("\n");
-    const code = (l: string) => !/^\s*(\/\/|\*|\/\*|import\b)/.test(l);
-    const strong = lines.findIndex((l) => VERIFY_STRONG.test(l) && code(l));
-    const at = strong >= 0 ? strong : lines.findIndex((l) => VERIFY_WEAK.test(l) && code(l));
-    const methods = [...content.matchAll(/export\s+(?:async\s+)?(?:function|const)\s+(GET|POST|PUT|PATCH|DELETE)\b/g)].map((m) => m[1]!);
-    out.push({ route: entry.route, file: entry.file, service: webhookService(entry.route, content), verifies: at >= 0 ? sourceLine(entry.file, content, at + 1) : null, methods: [...new Set(methods)] });
+    out.push({ route: entry.route, file: entry.file, service: webhookService(entry.route, content), verifies: verifyLineIn(entry.file, content), methods: methodsIn(content), found: null });
   }
   return out.sort((a, b) => a.route.localeCompare(b.route));
 }
@@ -121,24 +133,24 @@ export async function readStoreApps(files: MapFiles): Promise<MapStoreApp[]> {
     const pick = (key: string) => content.match(new RegExp(`["']?${key}["']?\\s*:\\s*["']([^"']+)["']`))?.[1] ?? null;
     const appId = pick("appId");
     const at = content.search(/appId/);
-    out.push({ platform: "capacitor", bundleId: appId, appName: pick("appName"), webUrl: pick("url"), source: sourceLine(path, content, at >= 0 ? lineAt(content, at) : 1) });
+    out.push({ platform: "capacitor", bundleId: appId, appName: pick("appName"), webUrl: pick("url"), source: sourceLine(path, content, at >= 0 ? lineAt(content, at) : 1), found: null });
   }
   for (const path of all.filter((p) => /\.xcodeproj\/project\.pbxproj$/.test(p))) {
     const content = await files.text(path);
     const m = content?.match(/PRODUCT_BUNDLE_IDENTIFIER = "?([A-Za-z0-9.-]+)"?;/);
-    if (content && m) out.push({ platform: "ios", bundleId: m[1]!, appName: null, webUrl: null, source: sourceLine(path, content, lineAt(content, m.index ?? 0)) });
+    if (content && m) out.push({ platform: "ios", bundleId: m[1]!, appName: null, webUrl: null, source: sourceLine(path, content, lineAt(content, m.index ?? 0)), found: null });
   }
   for (const path of all.filter((p) => /(^|\/)app\/build\.gradle(\.kts)?$/.test(p))) {
     const content = await files.text(path);
     const m = content?.match(/applicationId\s*=?\s*["']([A-Za-z0-9._]+)["']/);
-    if (content && m) out.push({ platform: "android", bundleId: m[1]!, appName: null, webUrl: null, source: sourceLine(path, content, lineAt(content, m.index ?? 0)) });
+    if (content && m) out.push({ platform: "android", bundleId: m[1]!, appName: null, webUrl: null, source: sourceLine(path, content, lineAt(content, m.index ?? 0)), found: null });
   }
   for (const path of all.filter((p) => /(^|\/)app\.json$/.test(p))) {
     const content = await files.text(path);
     if (!content || !content.includes('"expo"')) continue;
     try {
       const expo = (JSON.parse(content) as { expo?: { name?: string; ios?: { bundleIdentifier?: string }; android?: { package?: string } } }).expo;
-      if (expo?.ios?.bundleIdentifier) out.push({ platform: "expo", bundleId: expo.ios.bundleIdentifier, appName: expo.name ?? null, webUrl: null, source: sourceLine(path, content, lineAt(content, content.indexOf("bundleIdentifier"))) });
+      if (expo?.ios?.bundleIdentifier) out.push({ platform: "expo", bundleId: expo.ios.bundleIdentifier, appName: expo.name ?? null, webUrl: null, source: sourceLine(path, content, lineAt(content, content.indexOf("bundleIdentifier"))), found: null });
     } catch {
       // Not readable JSON.
     }
@@ -149,7 +161,7 @@ export async function readStoreApps(files: MapFiles): Promise<MapStoreApp[]> {
     const id = content?.match(/bundleId:\s*["']([A-Za-z0-9.-]+)["']/);
     if (content && id) {
       const name = content.match(/\bname:\s*["']([^"']+)["']/)?.[1] ?? null;
-      out.push({ platform: "ios", bundleId: id[1]!, appName: name, webUrl: null, source: sourceLine(path, content, lineAt(content, id.index ?? 0)) });
+      out.push({ platform: "ios", bundleId: id[1]!, appName: name, webUrl: null, source: sourceLine(path, content, lineAt(content, id.index ?? 0)), found: null });
     }
   }
   // One entry per store app: the files that name the same bundle id are merged, and a Capacitor config

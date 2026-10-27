@@ -139,7 +139,7 @@ export function matchEnv(name: string): CatalogEntry | null {
   return null;
 }
 
-function matchDomain(domain: string): CatalogEntry | null {
+export function matchDomain(domain: string): CatalogEntry | null {
   const d = domain.toLowerCase();
   for (const entry of CATALOG) for (const known of entry.domains) if (d === known || d.endsWith(`.${known}`)) return entry;
   return null;

@@ -10,6 +10,7 @@ function config(overrides: Partial<EngineConfig> = {}): EngineConfig {
     tokenFactory: { apiKey: "test-key", baseUrl: "https://example.test/v1/" },
     models: { nano: "small", super: "large" },
     tavilyApiKey: null,
+    reader: { enabled: true },
     github: { appId: null, privateKey: null, appSlug: null },
     budget: DEFAULT_BUDGET,
     prices: {

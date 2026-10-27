@@ -7,6 +7,14 @@ import { dirOf, MapFiles, sourceLine } from "./files";
 import { buildGraph, unitAt } from "./graph";
 import { readEnv, readExample, readRoles } from "./env";
 import { readCrons, readMigrations, readPublicSurface, readStoreApps, readWebhooks } from "./parts";
+import type { Graph, Unit } from "./graph";
+
+/** What the rules built the map from, kept so the model's reading can place its finds the same way. */
+export interface MapContext {
+  files: MapFiles;
+  graph: Graph;
+  units: Unit[];
+}
 
 const FRAMEWORKS: Array<[RegExp, string]> = [
   [/^next$/, "Next.js"],
@@ -49,6 +57,11 @@ async function readUnits(files: MapFiles): Promise<MapUnit[]> {
  * the file and line for every entry. Uses the vendors discovery already found.
  */
 export async function buildServiceMap(inventory: Inventory, rawDependencies: RawDependency[], vendors: VendorDraft[], meta: MapMeta): Promise<ServiceMap> {
+  return (await buildServiceMapWithContext(inventory, rawDependencies, vendors, meta)).map;
+}
+
+/** The map and the files, graph and units it was read from. */
+export async function buildServiceMapWithContext(inventory: Inventory, rawDependencies: RawDependency[], vendors: VendorDraft[], meta: MapMeta): Promise<{ map: ServiceMap; context: MapContext }> {
   const files = new MapFiles(inventory);
   const units = await readUnits(files);
   const unitInfo = await Promise.all(units.filter((u) => u.framework !== null || units.length === 1).map((u) => unitAt(files, u.path)));
@@ -88,10 +101,12 @@ export async function buildServiceMap(inventory: Inventory, rawDependencies: Raw
       dashboardUrl: entry?.dashboardUrl ?? null,
       pricingUrl: v.pricingUrl,
       checkedLimits: LIMITS_BY_SLUG.has(v.slug),
+      purpose: v.purpose,
+      found: null,
     };
   });
 
-  return {
+  const map: ServiceMap = {
     version: 1,
     readAt: meta.readAt ?? new Date().toISOString(),
     commit: meta.commit,
@@ -106,7 +121,11 @@ export async function buildServiceMap(inventory: Inventory, rawDependencies: Raw
     migrations: await readMigrations(files),
     publicSurface: await readPublicSurface(files, unitInfo),
     counts: { files: inventory.files.length, packages: rawDependencies.length, routes: graph.entries.filter((e) => e.kind === "route" || e.kind === "page").length },
+    reader: null,
+    modelFinds: [],
+    fileHashes: {},
   };
+  return { map, context: { files, graph, units: unitInfo } };
 }
 
 export { describeSchedule, parseMarkers } from "./parts";

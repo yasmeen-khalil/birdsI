@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AlertEmailState, AppAlert } from "./alerts";
 import { type AppProject } from "./apps";
 import { LIMITS_BY_SLUG, checkedLimit, tierFor } from "./limits";
-import { envNeededBy, missingEnv, roleForLabel, MapPublicSurface, MapStoreApp, MapWebhook, SourceLine, type StoredMap } from "./map";
+import { envNeededBy, missingEnv, roleForLabel, Found, MapPublicSurface, MapStoreApp, MapWebhook, ModelFind, ReaderStats, SourceLine, type StoredMap } from "./map";
 import { bestFacts, type Vendor } from "./ops";
 import { AdvisorLint, OneSignalNotification, OwedMigration, VercelDeployment, VercelDomain, VercelLogLine, readsInDepth, type ProjectRead, type Reading } from "./reads";
 
@@ -89,6 +89,9 @@ export const ServiceRow = z.object({
   pricingUrl: z.string().nullable(),
   checkedLimits: z.boolean(),
   firstSeen: SourceLine.nullable(),
+  /** What the app uses it for, as the model read it. Judgment. */
+  purpose: z.string().nullable(),
+  found: Found.nullable(),
 });
 export type ServiceRow = z.infer<typeof ServiceRow>;
 
@@ -100,6 +103,8 @@ export const CronRow = z.object({
   source: SourceLine,
   handler: z.string().nullable(),
   checksSecret: z.boolean(),
+  kind: z.string(),
+  found: Found.nullable(),
   /** Per Vercel project of the app: registered there, or null when that project was not read. */
   projects: z.array(z.object({ title: z.string(), registered: z.boolean().nullable() })),
 });
@@ -107,7 +112,7 @@ export type CronRow = z.infer<typeof CronRow>;
 
 export const CockpitView = z.object({
   appName: z.string(),
-  map: z.object({ mappedAt: z.string(), commit: z.string().nullable(), branch: z.string().nullable(), roles: z.array(z.string()), roleEnv: z.string().nullable(), files: z.number().int() }).nullable(),
+  map: z.object({ mappedAt: z.string(), commit: z.string().nullable(), branch: z.string().nullable(), roles: z.array(z.string()), roleEnv: z.string().nullable(), files: z.number().int(), reader: ReaderStats.nullable() }).nullable(),
   mapReason: z.string().nullable(),
   readsReason: z.string().nullable(),
   lastReadAt: z.string().nullable(),
@@ -118,6 +123,8 @@ export const CockpitView = z.object({
   /** Vendors the code uses that birdsI reads in depth, with no project declared for them yet. */
   undeclared: z.array(z.object({ slug: z.string(), name: z.string() })),
   services: z.array(ServiceRow),
+  /** Confirmed finds of the model with no part of the map to join: migration sources, second deployables, anything else. */
+  alsoFound: z.array(ModelFind),
   crons: z.array(CronRow),
   webhooks: z.array(MapWebhook),
   storeApps: z.array(MapStoreApp),
@@ -269,6 +276,8 @@ export function cockpitView(input: CockpitInput): CockpitView {
       pricingUrl: s.pricingUrl,
       checkedLimits: s.checkedLimits,
       firstSeen: s.imports[0] ?? s.sources[0] ?? null,
+      purpose: s.purpose,
+      found: s.found,
     };
   });
   const undeclared = (map?.services ?? []).filter((s) => VENDOR_NAMES[s.slug] && !declared.has(s.slug)).map((s) => ({ slug: s.slug, name: s.name }));
@@ -281,6 +290,8 @@ export function cockpitView(input: CockpitInput): CockpitView {
     source: c.source,
     handler: c.handler,
     checksSecret: c.checksSecret,
+    kind: c.kind,
+    found: c.found,
     projects: vercel
       .filter((v) => v.crons.ok ? v.crons.value.expected.some((e) => e.path === c.path) : true)
       .map((v) => ({ title: v.title, registered: v.crons.ok ? (v.crons.value.expected.find((e) => e.path === c.path)?.registered ?? false) : null })),
@@ -301,7 +312,7 @@ export function cockpitView(input: CockpitInput): CockpitView {
 
   return {
     appName: input.appName,
-    map: map && input.map ? { mappedAt: input.map.createdAt, commit: map.commit, branch: map.branch, roles: map.roles.names, roleEnv: map.roles.envName, files: map.counts.files } : null,
+    map: map && input.map ? { mappedAt: input.map.createdAt, commit: map.commit, branch: map.branch, roles: map.roles.names, roleEnv: map.roles.envName, files: map.counts.files, reader: map.reader } : null,
     mapReason: input.mapReason,
     readsReason: input.readsReason,
     lastReadAt,
@@ -311,6 +322,7 @@ export function cockpitView(input: CockpitInput): CockpitView {
     onesignal,
     undeclared,
     services,
+    alsoFound: map?.modelFinds.filter((f) => !f.merged) ?? [],
     crons,
     webhooks: map?.webhooks ?? [],
     storeApps: map?.storeApps ?? [],

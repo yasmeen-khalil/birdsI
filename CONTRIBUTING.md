@@ -28,7 +28,7 @@ Checks are independent modules in `packages/engine/src/checks/`. Implement the `
 - `proven` only when a tool, a rule or a database established it,
 - `doc_verified` only when a cited document supports it.
 
-No check reads the code with a model. `judgment` exists only for findings stored before v3.
+The reader (`packages/engine/src/reader/`) is the one place a model reads the code: it names what the rules missed, and every find is confirmed at its line before it joins the map. No check produces findings from a model's judgment, so `judgment` exists only for findings stored before v3, and a service's purpose is marked as the model's reading.
 
 ## Changing the limits list
 

@@ -4,7 +4,7 @@ import { envNeededBy, mapCountsLine, missingEnv, roleForLabel, type MapEnv, type
 const roles = { envName: "APP_ROLE", defaultRole: "app", names: ["app", "ops", "school"], sources: [] };
 
 function env(name: string, areas: string[], extra: Partial<MapEnv> = {}): MapEnv {
-  return { name, alternatives: [], public: false, service: null, declared: null, note: null, optional: false, optionalWhy: null, areas, roles: [], reads: [], ...extra };
+  return { name, alternatives: [], public: false, service: null, declared: null, note: null, optional: false, optionalWhy: null, areas, roles: [], reads: [], found: null, ...extra };
 }
 
 const map: Pick<ServiceMap, "env" | "roles"> = {

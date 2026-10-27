@@ -39,6 +39,10 @@ export interface EngineConfig {
     privateKey: string | null;
     appSlug: string | null;
   };
+  reader: {
+    /** The model's reading of the code after the rules. Off with BIRDSI_READER=off. */
+    enabled: boolean;
+  };
   /** Ceilings for one map of the code. */
   budget: ScanBudget;
   /** Prices for the usage ledger, by model id. */
@@ -56,6 +60,10 @@ export interface ScanBudget {
   maxDocsChecks: number;
   /** Docs checks in flight at once. */
   concurrency: number;
+  /** Input tokens the model's reading of the code may spend in one map. */
+  maxReadTokens: number;
+  /** Reading calls in flight at once. */
+  readConcurrency: number;
 }
 
 /** Token Factory ids, from its model catalog (read 2026-10-27). */
@@ -87,6 +95,8 @@ export const DEFAULT_BUDGET: ScanBudget = {
   maxInputTokens: 200_000,
   maxDocsChecks: 8,
   concurrency: 4,
+  maxReadTokens: 4_000_000,
+  readConcurrency: 3,
 };
 
 function env(name: string): string | null {
@@ -136,6 +146,7 @@ export function loadEngineConfig(overrides: Partial<EngineConfig> = {}): EngineC
     tokenFactory: { apiKey: env("NEBIUS_API_KEY"), baseUrl: baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/` },
     models,
     tavilyApiKey: env("TAVILY_API_KEY"),
+    reader: { enabled: env("BIRDSI_READER") !== "off" },
     github: {
       appId: env("GITHUB_APP_ID"),
       privateKey: env("GITHUB_APP_PRIVATE_KEY")?.replace(/\\n/g, "\n") ?? null,
@@ -145,6 +156,8 @@ export function loadEngineConfig(overrides: Partial<EngineConfig> = {}): EngineC
       ...DEFAULT_BUDGET,
       maxInputTokens: envInt("BIRDSI_DOCS_BUDGET_TOKENS", DEFAULT_BUDGET.maxInputTokens),
       concurrency: envInt("BIRDSI_DOCS_CONCURRENCY", DEFAULT_BUDGET.concurrency),
+      maxReadTokens: envInt("BIRDSI_READ_BUDGET_TOKENS", DEFAULT_BUDGET.maxReadTokens),
+      readConcurrency: envInt("BIRDSI_READ_CONCURRENCY", DEFAULT_BUDGET.readConcurrency),
     },
     prices,
     ...overrides,

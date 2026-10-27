@@ -4,8 +4,16 @@ import type { SourceLine } from "@birdsi/shared";
 import { maskSecrets } from "../checks/secrets";
 import type { Inventory } from "../inventory/walk";
 
-/** Files the map reads, at most this size each. */
-const MAX_BYTES = 400_000;
+/** Files the map reads, at most this size each (the inventory keeps nothing larger). */
+export const MAX_BYTES = 2 * 1024 * 1024;
+
+/** Generated or minified text: one line that runs on for thousands of characters, or almost no line breaks at all. */
+export function isMinified(content: string): boolean {
+  if (content.length < 20_000) return false;
+  const lines = content.split("\n");
+  const longest = lines.reduce((max, l) => Math.max(max, l.length), 0);
+  return longest > 5_000 || content.length / lines.length > 400;
+}
 
 /** Reads files from one snapshot once each, and turns a match into a masked source line. */
 export class MapFiles {
@@ -27,6 +35,7 @@ export class MapFiles {
     if (file && file.bytes <= MAX_BYTES) {
       try {
         content = await readFile(join(this.inventory.root, path), "utf8");
+        if (isMinified(content)) content = null;
       } catch {
         content = null;
       }

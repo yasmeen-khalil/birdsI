@@ -11,6 +11,16 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - The docs check runs on whichever provider is set, with Tavily. Without a model key the map runs without it and says so.
 - Reasoning a model wraps in think tags is dropped before an answer is parsed, and an answer cut off at the output limit is asked again shorter.
 
+### Step 2: the reader
+
+- After the rules build the map, the small model reads the code and names what the map lacks: a service, an env name read through a helper, a cron in a GitHub Actions workflow or pg_cron, a webhook outside the usual folders, a store app config, a migration source, a second deployable. Every find comes with its file, line and the line's text, and a verifier opens the file and confirms it before the find joins the map. A find whose line does not say what the model claimed is dropped and counted. Services, env names, crons, webhooks and store apps join their part of the map marked found by the model, with the confirmed line. Other kinds are listed on the cockpit as also found.
+- A find that names a catalog vendor gets the catalog's links and category. A service the catalog does not know gets a slug, the model's category and no links yet.
+- What the app uses each service for, in one sentence, read by the model from the call sites and shown as Judgment on the service, the Vendors page and the terminal.
+- The code goes to the model in passes of about 50,000 tokens with the map so far as the cached prefix, every line numbered, key shapes masked, tests, docs and data left out. Files over 2 MB and minified text are never read (the map's own rules now read files up to 2 MB too, so a 400 KB server file is no longer skipped). A reading budget per map (`BIRDSI_READ_BUDGET_TOKENS`, four million tokens) and the daily spend caps stop the reading, never the map. `BIRDSI_READER=off` turns the reading off, `BIRDSI_READ_CONCURRENCY` sets the passes in flight.
+- Every readable file is hashed into the map. The next map reads only the files that changed, and carries the previous finds of unchanged files over after confirming them again on today's files. `npx birdsi` on an unchanged app makes no model call.
+- The run shows the reading as its own step with the passes done, and ends with one line: files read, finds confirmed, dropped, carried, already on the map, left for the next map.
+- `scripts/map-app.mts` reads with the model too when a key is in `.env.local`, uses an existing output file as the previous map, and takes `--no-model`.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

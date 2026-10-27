@@ -1,9 +1,11 @@
 import { z } from "zod";
 
 /**
- * The service map: what one app is made of, read from its code by rules, no
- * model. Every entry keeps the file and line it came from. It never holds a
- * value: env entries are names only, and lines that look like keys are masked.
+ * The service map: what one app is made of, read from its code. Rules read it
+ * first, with the file and line for every entry. Then the model reads the
+ * code and names what the rules missed, and each of those entries is kept
+ * only when its line was confirmed in the file. The map never holds a value:
+ * env entries are names only, and lines that look like keys are masked.
  */
 
 export const SourceLine = z.object({
@@ -13,6 +15,14 @@ export const SourceLine = z.object({
   text: z.string(),
 });
 export type SourceLine = z.infer<typeof SourceLine>;
+
+/** An entry the model found and the verifier confirmed at its line. Null on entries the rules found. */
+export const Found = z.object({
+  by: z.literal("model"),
+  model: z.string(),
+  at: SourceLine,
+});
+export type Found = z.infer<typeof Found>;
 
 /** A deployable folder: a package.json with a framework, and where its routes live. */
 export const MapUnit = z.object({
@@ -27,7 +37,7 @@ export const MapService = z.object({
   name: z.string(),
   category: z.string(),
   /** How the map knows the app uses it. */
-  how: z.array(z.enum(["package", "import", "env", "url", "config", "projects"])),
+  how: z.array(z.enum(["package", "import", "env", "url", "config", "projects", "model"])),
   packages: z.array(z.string()),
   /** Where the code imports the vendor's SDK. */
   imports: z.array(SourceLine),
@@ -38,6 +48,9 @@ export const MapService = z.object({
   pricingUrl: z.string().nullable(),
   /** True when birdsI's checked limits list has this vendor. */
   checkedLimits: z.boolean(),
+  /** What the app uses it for, in one sentence, as the model read it from the call sites. Judgment. */
+  purpose: z.string().nullable().default(null),
+  found: Found.nullable().default(null),
 });
 export type MapService = z.infer<typeof MapService>;
 
@@ -69,6 +82,7 @@ export const MapEnv = z.object({
   /** The deployment roles whose routes reach a read of it. Empty when the app has no roles. */
   roles: z.array(z.string()),
   reads: z.array(SourceLine),
+  found: Found.nullable().default(null),
 });
 export type MapEnv = z.infer<typeof MapEnv>;
 
@@ -92,8 +106,11 @@ export const MapCron = z.object({
   source: SourceLine,
   /** The route file that handles it, or null when none was found. */
   handler: z.string().nullable(),
-  /** Whether the handler checks the CRON_SECRET bearer Vercel sends. */
+  /** Whether the handler checks the CRON_SECRET bearer Vercel sends. Meaningful for Vercel crons only. */
   checksSecret: z.boolean(),
+  /** Who runs it: Vercel from vercel.json, a GitHub Actions schedule, pg_cron in the database, a timer in the code, or something else. */
+  kind: z.enum(["vercel", "actions", "pg_cron", "code", "other"]).default("vercel"),
+  found: Found.nullable().default(null),
 });
 export type MapCron = z.infer<typeof MapCron>;
 
@@ -104,6 +121,7 @@ export const MapWebhook = z.object({
   /** The line that checks the sender: a signature, a shared secret. Null when none was found. */
   verifies: SourceLine.nullable(),
   methods: z.array(z.string()),
+  found: Found.nullable().default(null),
 });
 export type MapWebhook = z.infer<typeof MapWebhook>;
 
@@ -114,8 +132,48 @@ export const MapStoreApp = z.object({
   /** The site a Capacitor shell loads, when it loads a live site. */
   webUrl: z.string().nullable(),
   source: SourceLine,
+  found: Found.nullable().default(null),
 });
 export type MapStoreApp = z.infer<typeof MapStoreApp>;
+
+/** What the model can name that the rules missed. */
+export const FindKind = z.enum(["service", "env", "cron", "webhook", "store_app", "migration", "deployment", "other"]);
+export type FindKind = z.infer<typeof FindKind>;
+
+/** One confirmed find of the model, kept whether or not it was merged into a part of the map. */
+export const ModelFind = z.object({
+  kind: FindKind,
+  name: z.string(),
+  detail: z.string(),
+  category: z.string().nullable(),
+  schedule: z.string().nullable(),
+  at: SourceLine,
+  /** True when it became a service, env name, cron, webhook or store app above. False when it is listed here only. */
+  merged: z.boolean(),
+});
+export type ModelFind = z.infer<typeof ModelFind>;
+
+/** What the model's reading of the code did, for the cockpit and the run's note. */
+export const ReaderStats = z.object({
+  model: z.string(),
+  filesRead: z.number().int(),
+  /** Unchanged since the previous map, so not read again. */
+  filesUnchanged: z.number().int(),
+  /** Too large or minified, never sent. */
+  filesSkipped: z.number().int(),
+  /** Not read because the reading budget ran out. */
+  filesOverBudget: z.number().int(),
+  batches: z.number().int(),
+  finds: z.number().int(),
+  confirmed: z.number().int(),
+  /** Finds whose line did not say what the model claimed. */
+  dropped: z.number().int(),
+  /** Finds the map already had. */
+  known: z.number().int(),
+  /** Finds carried over from the previous map, their files unchanged. */
+  carried: z.number().int(),
+});
+export type ReaderStats = z.infer<typeof ReaderStats>;
 
 export const MigrationMarker = z.object({
   migration: z.string(),
@@ -159,6 +217,12 @@ export const ServiceMap = z.object({
   migrations: MapMigrations,
   publicSurface: MapPublicSurface,
   counts: z.object({ files: z.number().int(), packages: z.number().int(), routes: z.number().int() }),
+  /** The model's reading, or null when no model read this map. */
+  reader: ReaderStats.nullable().default(null),
+  /** Every confirmed find of the model, merged into the parts above or listed here only. */
+  modelFinds: z.array(ModelFind).default([]),
+  /** A hash per file the model may read, so the next map reads only what changed. */
+  fileHashes: z.record(z.string(), z.string()).default({}),
 });
 export type ServiceMap = z.infer<typeof ServiceMap>;
 

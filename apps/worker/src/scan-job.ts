@@ -8,6 +8,7 @@ import {
   ensureAppForRepo,
   insertDependencies,
   insertFindings,
+  latestServiceMap,
   MAPS_MIGRATION,
   recordUsage,
   releaseSnapshot,
@@ -80,8 +81,11 @@ export async function runScanJob(config: EngineConfig, job: JobRow, heartbeat: (
 
   let snapshot: Snapshot | null = null;
   const hints: ProjectHints | null = scan.snapshot_id ? (((await snapshotById(scan.snapshot_id))?.project_hints as ProjectHints | null) ?? null) : null;
+  // The previous map lets the model read only the files that changed since.
+  const previousMap = scan.repo_id ? await latestServiceMap(scan.repo_id).catch(() => null) : null;
   try {
     const result = await runScan(config, {
+      previousMap: previousMap?.map ?? null,
       snapshot: async () => {
         snapshot = await resolveSnapshot(config, scan.repo_id, scan.snapshot_id, scan.branch);
         if (snapshot.commitSha || snapshot.branch) await updateScan(scanId, { commit_sha: snapshot.commitSha, branch: snapshot.branch ?? scan.branch });

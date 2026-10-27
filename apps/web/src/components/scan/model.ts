@@ -46,7 +46,7 @@ const UNITS: Partial<Record<ScanStep, [string, string]>> = {
   secrets: ["file", "files"],
   vulnerabilities: ["package", "packages"],
   docs: ["library", "libraries"],
-  review: ["file", "files"],
+  review: ["pass", "passes"],
 };
 
 export function unitFor(step: ScanStep, n: number): string {

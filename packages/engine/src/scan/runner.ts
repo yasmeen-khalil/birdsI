@@ -9,7 +9,8 @@ import { collectDependencies } from "../inventory/manifests";
 import { prioritise } from "../inventory/priority";
 import { walkInventory, type Inventory } from "../inventory/walk";
 import { ModelClient, type BeforeCall, type Usage } from "../models/client";
-import { buildServiceMap } from "../map/index";
+import { buildServiceMapWithContext, type MapContext } from "../map/index";
+import { readerNote, readWithModel } from "../reader/index";
 import type { Snapshot } from "../source/types";
 import { discoverVendors } from "../vendors/discover";
 import { rankFindings, summarise } from "./rank";
@@ -21,8 +22,10 @@ export interface ScanInput {
   projectHints?: ProjectHints | null;
   /** Called as soon as the vendors are known, before the slower steps, so the dashboard can show them at once. */
   onVendors?: (vendors: VendorDraft[]) => Promise<void> | void;
-  /** Called with the service map as soon as it is read, inside the map step, so it is kept even if a later step stops. */
+  /** Called with the service map once it is complete: the rules' map, with the model's confirmed finds when a model read the code. Called even when a later step stops. */
   onMap?: (map: ServiceMap) => Promise<void> | void;
+  /** The previous map of the same repository, so the model reads only the files that changed. */
+  previousMap?: ServiceMap | null;
   signal?: AbortSignal;
   onEvent: (event: ScanEvent) => Promise<void>;
   onUsage?: (usage: Usage) => Promise<void> | void;
@@ -53,7 +56,7 @@ const STEP_LABELS: Record<ScanStep, string> = {
   secrets: "Looking for committed keys and unsafe settings",
   vulnerabilities: "Checking packages against the vulnerability database",
   docs: "Checking packages against their own current documentation",
-  review: "Reading the code",
+  review: "Reading the code with the model, confirming every find at its line",
   crosscheck: "Comparing files against each other",
   audit: "Judging launch readiness",
   rank: "Sorting what was found",
@@ -62,9 +65,10 @@ const STEP_LABELS: Record<ScanStep, string> = {
 /**
  * Maps one snapshot of an app's code: every file, package and outside
  * service, the service map (deployments, env names, crons, webhooks, store
- * apps, migrations, public pages), then the rule-based checks. No model reads the code; only the
- * official-docs check calls one, to compare a package's own documentation
- * with how the code imports it, and it runs only when its keys are set.
+ * apps, migrations, public pages) read by rules, then the model's reading of
+ * the code for what the rules missed, every find confirmed at its line, then
+ * the rule-based checks and the docs check. The model steps run only when a
+ * model key is set.
  */
 export async function runScan(config: EngineConfig, input: ScanInput): Promise<ScanResult> {
   const started = Date.now();
@@ -75,7 +79,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   const stats: ScanStats = { filesSeen: 0, filesRead: 0, checksRun: 0, dependencies: 0, inputTokens: 0, cachedTokens: 0, throttledCalls: 0, outputTokens: 0, costMicrodollars: 0, durationMs: 0 };
 
   const models = new ModelClient(config, {
-    maxInputTokens: budget.maxInputTokens,
+    maxInputTokens: budget.maxInputTokens + budget.maxReadTokens,
     ...(input.beforeCall ? { beforeCall: input.beforeCall } : {}),
     onUsage: async (usage) => {
       stats.inputTokens += usage.inputTokens;
@@ -88,9 +92,11 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
 
   const { active, unavailable } = checksFor(config);
   const needsFetch = typeof input.snapshot === "function";
-  const steps = orderedSteps(active, needsFetch);
+  const readerPlanned = config.reader.enabled && models.available;
+  const steps = orderedSteps(active, needsFetch, readerPlanned);
   await emit({ type: "scan_started", kind: "light", steps });
   for (const check of unavailable) await note(`${check.label}: skipped, the keys it needs are not set on this birdsI.`);
+  if (config.reader.enabled && !models.available) await note("The model's reading of the code: skipped, no model key is set on this birdsI. The map is what the rules read.");
 
   // Fetch
   let snapshot: Snapshot;
@@ -135,11 +141,14 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
 
   // Map: what each deployment needs, by rules, with the file and line for every entry.
   let map: ServiceMap | null = null;
+  let mapContext: MapContext | null = null;
   if (!signal.aborted) {
     const mapStart = Date.now();
     await emit({ type: "step_started", step: "map", label: STEP_LABELS.map });
     try {
-      map = await buildServiceMap(inventory, rawDependencies, vendors, { commit: snapshot.commitSha ?? null, branch: snapshot.branch ?? null });
+      const built = await buildServiceMapWithContext(inventory, rawDependencies, vendors, { commit: snapshot.commitSha ?? null, branch: snapshot.branch ?? null });
+      map = built.map;
+      mapContext = built.context;
       await emit({
         type: "service_map",
         services: map.services.length,
@@ -153,9 +162,31 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
     } catch (error) {
       await note(`The service map could not be read (${error instanceof Error ? error.message.slice(0, 160) : String(error)}).`);
     }
-    if (map) await input.onMap?.(map);
     await emit({ type: "step_done", step: "map", findings: 0, durationMs: Date.now() - mapStart });
   }
+
+  // The model reads the code for what the rules missed; every find is confirmed at its line before it joins the map.
+  if (readerPlanned && !signal.aborted) {
+    const readStart = Date.now();
+    await emit({ type: "step_started", step: "review", label: STEP_LABELS.review });
+    if (map && mapContext) {
+      try {
+        const read = await readWithModel({ inventory, map, context: mapContext, models, previous: input.previousMap ?? null, maxInputTokens: budget.maxReadTokens, concurrency: budget.readConcurrency, emit, signal });
+        map = read.map;
+        await note(readerNote(read.stats));
+        for (const v of vendors) {
+          const purpose = map.services.find((s) => s.slug === v.slug)?.purpose;
+          if (purpose) v.purpose = purpose;
+        }
+      } catch (error) {
+        if (!signal.aborted) await note(`The model's reading did not finish (${error instanceof Error ? error.message.slice(0, 160) : String(error)}). The map keeps what the rules read.`);
+      }
+    } else {
+      await note("The model's reading was skipped because the service map could not be read.");
+    }
+    await emit({ type: "step_done", step: "review", findings: 0, durationMs: Date.now() - readStart });
+  }
+  if (map) await input.onMap?.(map);
 
   const readCache = new Map<string, string>();
   const read = async (path: string): Promise<string> => {
@@ -226,15 +257,16 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
 
   stats.durationMs = Date.now() - started;
   stats.throttledCalls = models.throttledCalls;
-  if (stats.throttledCalls > 0) await note(`${stats.throttledCalls} docs check calls were slowed by the provider's rate limit and retried.`);
+  if (stats.throttledCalls > 0) await note(`${stats.throttledCalls} model calls were slowed by the provider's rate limit and retried.`);
   await emit({ type: "scan_done", findings: ranked.length, durationMs: stats.durationMs });
   return { findings: ranked, dependencies, summary, stats, inventory, vendors, map, snapshot };
 }
 
-function orderedSteps(active: Check[], fetch: boolean): ScanStep[] {
-  const order: ScanStep[] = ["fetch", "inventory", "dependencies", "vendors", "map", "secrets", "vulnerabilities", "docs", "rank"];
+function orderedSteps(active: Check[], fetch: boolean, reader: boolean): ScanStep[] {
+  const order: ScanStep[] = ["fetch", "inventory", "dependencies", "vendors", "map", "review", "secrets", "vulnerabilities", "docs", "rank"];
   const present = new Set<ScanStep>(["inventory", "vendors", "map", "rank"]);
   if (fetch) present.add("fetch");
+  if (reader) present.add("review");
   for (const check of active) present.add(check.step);
   return order.filter((s) => present.has(s));
 }
