@@ -17,6 +17,7 @@ import { VisionEditor } from "@/components/ops/VisionEditor";
 import { ScanProgressCard } from "@/components/scan/ScanProgressCard";
 import { inventoryOf, latestDone, recentScans, repoContext, runningOf } from "@/components/server/data";
 import { loadCockpit } from "@/lib/cockpit";
+import { loadChecklist } from "@/lib/checklist";
 import { loadInventory } from "@/lib/ops";
 import { loadScan } from "@/lib/scans";
 
@@ -45,7 +46,7 @@ export default async function CockpitPage({ params }: { params: Promise<{ repoId
   const [scans, latest] = await Promise.all([recentScans(repo.id), latestDone(repo.id)]);
   const running = runningOf(scans);
   const name = repoName(repo.full_name);
-  const [result, inventory, runningEvents, ops, cockpit] = await Promise.all([latest ? loadScan(latest.id, user) : null, latest ? inventoryOf(latest.id) : null, running ? eventsAfter(running.id, 0) : null, loadInventory(repo.id, user), loadCockpit(repo.id, user)]);
+  const [result, inventory, runningEvents, ops, cockpit, checklist] = await Promise.all([latest ? loadScan(latest.id, user) : null, latest ? inventoryOf(latest.id) : null, running ? eventsAfter(running.id, 0) : null, loadInventory(repo.id, user), loadCockpit(repo.id, user), loadChecklist(repo.id, user)]);
   const title = cockpit.appName || name;
   const newest = scans[0] ?? null;
   const lastProblem = newest && (newest.status === "failed" || newest.status === "stopped") && (!latest || new Date(newest.createdAt) > new Date(latest.createdAt)) ? newest : null;
@@ -73,6 +74,24 @@ export default async function CockpitPage({ params }: { params: Promise<{ repoId
 
   return (
     <main className="flex flex-col gap-[72px] px-16 pt-12 pb-16 max-[900px]:gap-12 max-[900px]:px-5 max-[900px]:pt-7 max-[900px]:pb-10">
+      {!checklist.complete ? (
+        <section className="panel flex flex-wrap items-center justify-between gap-3" style={{ padding: "14px 20px", marginBottom: -40 }} aria-label="Set up">
+          <span className="t-small c2">
+            <span style={{ color: "var(--text)", fontWeight: 600 }}>
+              Set up: {checklist.required.done} of {checklist.required.total} required steps done.
+            </span>{" "}
+            {(() => {
+              const next = checklist.items.find((i) => i.required && i.status !== "done");
+              return next ? `Next: ${next.title.toLowerCase()}.` : "";
+            })()}{" "}
+            birdsI builds the cockpit from what you connect, and says what each key lets it read before you make one.
+          </span>
+          <Link className="btn btn-secondary btn-sm" href={`${base}/setup`}>
+            Open the checklist
+            <ArrowRight {...icon14} />
+          </Link>
+        </section>
+      ) : null}
       <section className="flex flex-col justify-between gap-5 min-[901px]:flex-row min-[901px]:items-end min-[901px]:gap-10">
         <div className="flex min-w-0 flex-col gap-2.5">
           <h1 className="t-h1 break-words">{title}</h1>

@@ -1,4 +1,4 @@
-import { alertsLines, cockpitLines } from "../cockpit";
+import { alertsLines, cockpitLines, setupLines } from "../cockpit";
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -430,6 +430,28 @@ export async function cockpitCommand(options: PrintOptions): Promise<number> {
     return EXIT.ok;
   } catch (error) {
     throw toCliError(error, "the cockpit");
+  }
+}
+
+/** What birdsI still needs from the owner: the checklist of keys and connection steps, with what each one switches on. */
+export async function setupCommand(options: PrintOptions): Promise<number> {
+  const style = styleFor(process.stdout, options);
+  const { api } = await ApiClient.fromEnvironment();
+  api.requireAuth();
+  try {
+    const repo = await resolveRepo(api, options.repo);
+    const result = await api.setup(repo.id);
+    if (options.json) {
+      printJson(result.raw);
+      return EXIT.ok;
+    }
+    const [first, ...rest] = setupLines(result.data.checklist);
+    println(paint.bold(style, first ?? repo.fullName));
+    for (const line of rest) println(wrap(line, style, line.startsWith("    ") ? "      " : line.startsWith("- ") ? "    " : ""));
+    println(paint.dim(style, `Open it: ${api.baseUrl}/app/${repo.id}/setup`));
+    return EXIT.ok;
+  } catch (error) {
+    throw toCliError(error, "the checklist");
   }
 }
 

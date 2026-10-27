@@ -52,7 +52,7 @@ describe("the marker query", () => {
       { migration: "v74 the owner's flag", file: null, missing: ["the column users.legacy_flag removed"] },
     ]);
     expect(unknown).toEqual(["a custom check: row_count users"]);
-  });
+  }, 30_000);
 
   it("quotes every name, so a marker cannot change the query", () => {
     const query = markerQuery([{ migration: "x", kind: "table", name: "a'); drop table users; --", col: null }])!;

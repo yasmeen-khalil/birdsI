@@ -16,7 +16,7 @@ import { VERSION } from "../version";
 import { followScan, sendSnapshot, startScan } from "../workflow";
 import { LEGEND, q } from "../quote";
 import { allowedScanRoot } from "./scope";
-import { alertsLines, cockpitLines } from "../cockpit";
+import { alertsLines, cockpitLines, setupLines } from "../cockpit";
 
 type ToolResult = { content: Array<{ type: "text"; text: string }>; structuredContent?: Record<string, unknown>; isError?: boolean };
 
@@ -259,6 +259,20 @@ export function createServer(): McpServer {
     tool("that repository", async (api, args: { repoId?: string | undefined }) => {
       const { cockpit } = (await api.cockpit(await repoIdFrom(api, args.repoId))).data;
       return text([...cockpitLines(cockpit, q), "", LEGEND].join("\n"), cockpit as unknown as Record<string, unknown>);
+    }),
+  );
+
+  server.registerTool(
+    "birdsi_setup",
+    {
+      title: "What birdsI still needs from the owner",
+      description:
+        "Read only. The checklist that builds the cockpit: the map, the app, each service with the project to declare and the read key to connect (the exact clicks, what birdsI will read once connected, what it alerts on), email alerts, dates to watch. Each step says done, to do, not working or optional. The steps are the owner's: keys are pasted in the browser, never through an agent. Use it to tell the owner what is left and what it switches on.",
+      inputSchema: repoArg,
+    },
+    tool("that repository", async (api, args: { repoId?: string | undefined }) => {
+      const { checklist } = (await api.setup(await repoIdFrom(api, args.repoId))).data;
+      return text(setupLines(checklist, q).join("\n"), checklist as unknown as Record<string, unknown>);
     }),
   );
 

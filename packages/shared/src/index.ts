@@ -9,5 +9,6 @@ export * from "./map";
 export * from "./reads";
 export * from "./alerts";
 export * from "./cockpit";
+export * from "./checklist";
 export * from "./presence";
 export * from "./policy";

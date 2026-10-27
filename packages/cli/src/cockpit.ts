@@ -1,4 +1,4 @@
-import type { AlertsResponse, AppAlert, CockpitView } from "@birdsi/shared";
+import type { AlertsResponse, AppAlert, ChecklistView, CockpitView } from "@birdsi/shared";
 
 /**
  * The cockpit as lines of text, shared by `birdsi cockpit` and the
@@ -19,6 +19,27 @@ function notRead(reason: string): string {
 
 export function alertLine(a: AppAlert, q: Quote = plain): string {
   return `- [${a.severity}] ${q(a.sentence)}${a.action && !a.resolvedAt ? ` ${q(a.action)}` : ""}${a.resolvedAt ? ` (closed ${a.resolvedAt.slice(0, 10)})` : ""}`;
+}
+
+/** The checklist as lines of text, shared by `birdsi setup` and the birdsi_setup MCP tool. */
+export function setupLines(v: ChecklistView, q: Quote = plain): string[] {
+  const lines: string[] = [`${q(v.appName)}: ${v.required.done} of ${v.required.total} required steps done${v.complete ? ", the cockpit is complete" : ""}, ${v.optional.done} of ${v.optional.total} optional.`, ""];
+  let group = "";
+  for (const item of v.items) {
+    if (item.group !== group) {
+      group = item.group;
+      lines.push(group);
+    }
+    const mark = item.status === "done" ? "done" : item.status === "failed" ? "NOT WORKING" : item.status === "blocked" ? "waiting" : item.required ? "to do" : "optional";
+    lines.push(`- [${mark}] ${item.title}: ${q(item.state)}`);
+    if (item.status !== "done") {
+      for (const s of item.steps) lines.push(`    ${s}`);
+      if (item.willDo) lines.push(`    Once done: ${item.willDo}`);
+      for (const l of item.links) lines.push(`    ${l.label}: ${l.url}`);
+    }
+  }
+  lines.push("", v.mayDo);
+  return lines;
 }
 
 export function cockpitLines(v: CockpitView, q: Quote = plain): string[] {

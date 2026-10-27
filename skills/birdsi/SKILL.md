@@ -19,7 +19,7 @@ Prefer the terminal tool. It returns JSON and needs no setup beyond `npx birdsi 
 - `npx birdsi questions --json`: what the owner has not answered yet.
 - `npx birdsi record --json`: the record. Decisions, facts stated, findings marked fixed or dismissed, answers, approvals, runs, newest first, with author and reason. Read it before deciding something that may already be decided. The inventory also carries the latest twenty decisions.
 
-Through MCP (`npx birdsi mcp`) the same reads are `birdsi_inventory`, `birdsi_cockpit`, `birdsi_alerts`, `birdsi_changes_since`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_record`.
+Through MCP (`npx birdsi mcp`) the same reads are `birdsi_inventory`, `birdsi_cockpit`, `birdsi_setup` (what birdsI still needs from the owner, with what each step switches on), `birdsi_alerts`, `birdsi_changes_since`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_record`.
 
 ## How to read the facts
 
@@ -54,7 +54,7 @@ Never write a token, a key or an env value into the record.
 
 ## Every MCP tool
 
-- Reads: `birdsi_inventory`, `birdsi_cockpit` (the app now: open alerts, each Vercel, Supabase and OneSignal project as last read, the map), `birdsi_alerts` (the alert stream and the dates to watch), `birdsi_changes_since`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_record`, `birdsi_action_status`, `birdsi_repos`.
+- Reads: `birdsi_inventory`, `birdsi_cockpit` (the app now: open alerts, each Vercel, Supabase and OneSignal project as last read, the map), `birdsi_setup` (the checklist of what the owner still has to connect, and what each step lets birdsI read), `birdsi_alerts` (the alert stream and the dates to watch), `birdsi_changes_since`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_record`, `birdsi_action_status`, `birdsi_repos`.
 - Findings: `birdsi_findings`, `birdsi_finding`.
 - Maps and reads: `birdsi_scan`, `birdsi_scan_status`, `birdsi_sync_vendors` (reads the connected accounts now).
 - Asking: `birdsi_ask_owner` (a question for the owner).

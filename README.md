@@ -2,7 +2,7 @@
 
 The cockpit for your apps. birdsI maps each app from its code: the services it runs on, its deployments, crons, webhooks, store apps, migrations and the settings each deployment needs. Then it reads the vendor accounts with keys that only read, and tells you what needs you. Nothing a model says reaches you unverified: the map is read by rules that cite the file and line, and the one model call today, the optional docs check, must cite the package's own documentation.
 
-Run `npx birdsi` in an app's folder and its cockpit opens: the open alerts, each Vercel project, Supabase project and OneSignal app as birdsI last read it, and what the map read from the code. Until the package is on npm, run it from a clone: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`.
+Run `npx birdsi` in an app's folder and its cockpit opens: the open alerts, each Vercel project, Supabase project and OneSignal app as birdsI last read it, and what the map read from the code. The Set up page lists what birdsI still needs from you, service by service: the project to declare, the key to make with the exact clicks, what each key lets birdsI read and alert on, and what birdsI may do with it (read only in this phase). Until the package is on npm, run it from a clone: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`.
 
 birdsI is its owner's cockpit for their own apps first. A product for others comes later.
 
@@ -21,7 +21,7 @@ A coding agent can read the code. It cannot see what the app runs on or what the
 
 1. **A skill.** `skills/birdsi/SKILL.md` tells an agent when to read birdsI and how to read its facts.
 2. **The terminal tool with `--json`.** `npx birdsi inventory --json`, `changes --json`, `vendors --json`, `questions --json`, `record --json`.
-3. **The MCP server.** `npx birdsi mcp`: `birdsi_inventory`, `birdsi_cockpit`, `birdsi_alerts`, `birdsi_changes_since`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, the record tools, the findings tools, and the map and read tools.
+3. **The MCP server.** `npx birdsi mcp`: `birdsi_inventory`, `birdsi_cockpit`, `birdsi_setup`, `birdsi_alerts`, `birdsi_changes_since`, `birdsi_vendor`, `birdsi_vision`, `birdsi_questions`, `birdsi_ask_owner`, `birdsi_request_action`, `birdsi_action_status`, the record tools, the findings tools, and the map and read tools.
 
 An agent can ask the owner and propose, and only the owner approves, in the browser. `npx birdsi policy --hint` prints a Claude Code hook that stops account-changing shell commands and routes them through approvals.
 

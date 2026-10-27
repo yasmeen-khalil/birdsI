@@ -3,6 +3,7 @@ import {
   ActionsResponse,
   AlertsResponse,
   ApiError,
+  ChecklistResponse,
   CockpitResponse,
   ChangesResponse,
   PolicyResponse,
@@ -216,6 +217,10 @@ export class ApiClient {
 
   cockpit(repoId: string): Promise<Result<CockpitResponse>> {
     return this.request("GET", `/repos/${enc(repoId)}/cockpit`, { schema: CockpitResponse });
+  }
+
+  setup(repoId: string): Promise<Result<ChecklistResponse>> {
+    return this.request("GET", `/repos/${enc(repoId)}/setup`, { schema: ChecklistResponse });
   }
 
   alerts(repoId: string): Promise<Result<AlertsResponse>> {

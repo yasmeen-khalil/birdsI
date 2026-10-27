@@ -2,7 +2,7 @@ import { Command, CommanderError, Option } from "commander";
 import { toCliError } from "./api";
 import { dismissCommand, explainCommand, findingsCommand, fixedCommand, reposCommand } from "./commands/findings";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth";
-import { alertsCommand, approvalsCommand, changesCommand, cockpitCommand, decideCommand, exportCommand, inventoryCommand, questionsCommand, recordCommand, vendorsCommand, visionCommand } from "./commands/ops";
+import { alertsCommand, approvalsCommand, changesCommand, cockpitCommand, decideCommand, exportCommand, inventoryCommand, questionsCommand, recordCommand, setupCommand, vendorsCommand, visionCommand } from "./commands/ops";
 import { scanCommand } from "./commands/scan";
 import { CliError, EXIT } from "./exit";
 import { installInterruptHandler } from "./interrupt";
@@ -157,6 +157,14 @@ export function buildProgram(): Command {
     .addOption(jsonOption())
     .addOption(asciiOption())
     .action(run((options: { repo?: string; json?: boolean; ascii?: boolean }) => cockpitCommand(options)));
+
+  program
+    .command("setup")
+    .description("what birdsI still needs from you for this app: the project to declare and the read key to connect per service, with the exact clicks and what each one switches on")
+    .addOption(repoOption())
+    .addOption(jsonOption())
+    .addOption(asciiOption())
+    .action(run((options: { repo?: string; json?: boolean; ascii?: boolean }) => setupCommand(options)));
 
   program
     .command("alerts")

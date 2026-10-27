@@ -28,6 +28,12 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - Every map ends with a scope statement in its summary: what was checked, with each check's reach in one sentence, what was not checked and why (a key not set, the reading turned off, and always that no model judges the code's own logic in this version), and which model took part. The findings page shows it, `birdsi findings` prints it, and the MCP scan summary carries it.
 - The editable prompt per section moves to step 5, with the sections themselves.
 
+### Step 4: the checklist
+
+- A Set up page per app, first in the nav after the cockpit, built from the map: the map itself, the model's reading, the app record, each service birdsI can read with two steps (declare the project, connect a read key) and for each the exact clicks to make the key, what birdsI will read once it is connected and what it will alert on, the vendors it cannot read yet with links only, email alerts, the dates no API reports, and the coding agent. Each step says done, to do, not working (a key that stopped working, with the vendor's words), waiting (a migration) or optional, and where to do it. The page says once what birdsI may do with what you connect: read only in this phase, nothing changed at a vendor, writes later behind your approval.
+- The cockpit shows a strip with the required steps done and the next one until the checklist is complete.
+- `npx birdsi setup` prints the same list, `GET /api/v1/repos/:id/setup` returns it, and agents read it with the `birdsi_setup` MCP tool. The steps are the owner's: keys are pasted in the browser, never through an agent.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.
