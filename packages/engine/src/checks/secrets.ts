@@ -53,6 +53,7 @@ export const secretsCheck: Check = {
   id: "secrets",
   step: "secrets",
   label: "Looking for keys and passwords committed to the code",
+  scope: "Every file of the inventory against 21 key shapes (cloud, payment, model, database and token keys, private key blocks, connection strings with a password), and env files checked into the repository.",
   available: () => true,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     const findings: FindingDraft[] = [];

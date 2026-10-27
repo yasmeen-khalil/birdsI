@@ -41,6 +41,10 @@ export const FindingCategory = z.enum([
   "gap",
   "docs",
   "config",
+  /** Two things doing one job: a package never imported, two services for one purpose. */
+  "redundancy",
+  /** Left behind: a declared env name nothing reads, files no route reaches. */
+  "stale",
 ]);
 export type FindingCategory = z.infer<typeof FindingCategory>;
 
@@ -190,8 +194,23 @@ export const ScanStats = z.object({
 });
 export type ScanStats = z.infer<typeof ScanStats>;
 
+/** What one map checked and did not check, said plainly, so the security section is honest about its scope. */
+export const ScanScope = z.object({
+  checked: z.array(z.object({ id: z.string(), label: z.string(), detail: z.string() })),
+  notChecked: z.array(z.object({ id: z.string(), label: z.string(), why: z.string() })),
+  model: z.object({
+    provider: z.string().nullable(),
+    model: z.string().nullable(),
+    readTheCode: z.boolean(),
+    docsCheck: z.boolean(),
+  }),
+});
+export type ScanScope = z.infer<typeof ScanScope>;
+
 export const ScanSummary = z.object({
   headline: z.string(),
+  /** Null on maps from before the scope statement. */
+  scope: ScanScope.nullable().default(null),
   bySeverity: z.record(Severity, z.number().int().nonnegative()),
   byConfidence: z.record(Confidence, z.number().int().nonnegative()),
   fixable: z.number().int().nonnegative(),

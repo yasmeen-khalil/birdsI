@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Dependency, FindingDraft, ProjectHints, ScanEvent, ScanStats, ScanStep, ScanSummary, ServiceMap, VendorDraft } from "@birdsi/shared";
+import type { Dependency, FindingDraft, ProjectHints, ScanEvent, ScanScope, ScanStats, ScanStep, ScanSummary, ServiceMap, VendorDraft } from "@birdsi/shared";
 import { checksFor } from "../checks/registry";
 import type { Check, CheckContext } from "../checks/types";
 import { toDependency } from "../checks/vulnerabilities";
@@ -53,6 +53,7 @@ const STEP_LABELS: Record<ScanStep, string> = {
   dependencies: "Listing packages and their latest versions",
   vendors: "Finding the services the app runs on",
   map: "Mapping deployments, crons, webhooks, store apps and migrations",
+  gaps: "Checking the map for gaps, redundancies and stale code",
   secrets: "Looking for committed keys and unsafe settings",
   vulnerabilities: "Checking packages against the vulnerability database",
   docs: "Checking packages against their own current documentation",
@@ -166,6 +167,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   }
 
   // The model reads the code for what the rules missed; every find is confirmed at its line before it joins the map.
+  let readerLine: string | null = null;
   if (readerPlanned && !signal.aborted) {
     const readStart = Date.now();
     await emit({ type: "step_started", step: "review", label: STEP_LABELS.review });
@@ -173,7 +175,8 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
       try {
         const read = await readWithModel({ inventory, map, context: mapContext, models, previous: input.previousMap ?? null, maxInputTokens: budget.maxReadTokens, concurrency: budget.readConcurrency, emit, signal });
         map = read.map;
-        await note(readerNote(read.stats));
+        readerLine = readerNote(read.stats);
+        await note(readerLine);
         for (const v of vendors) {
           const purpose = map.services.find((s) => s.slug === v.slug)?.purpose;
           if (purpose) v.purpose = purpose;
@@ -208,6 +211,8 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
     rawDependencies,
     dependencies,
     filesToRead,
+    map,
+    mapContext,
     models,
     read,
     emit,
@@ -245,7 +250,20 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
   }
 
   const ranked = rankFindings(findings);
-  const summary = summarise(ranked, ranked.map((f) => f.key));
+  const scope: ScanScope = {
+    checked: [
+      ...(map ? [{ id: "map", label: STEP_LABELS.map, detail: `${map.counts.files} files, ${map.counts.packages} packages and ${map.counts.routes} routes read by rules: services, env names per deployment, crons, webhooks, store apps, migrations and public pages, each with its file and line.` }] : []),
+      ...(readerLine ? [{ id: "reader", label: STEP_LABELS.review, detail: readerLine }] : []),
+      ...active.map((c) => ({ id: c.id, label: c.label, detail: c.scope })),
+    ],
+    notChecked: [
+      ...(readerPlanned ? [] : [{ id: "reader", label: STEP_LABELS.review, why: config.reader.enabled ? "No model key is set on this birdsI." : "Turned off with BIRDSI_READER=off." }]),
+      ...unavailable.map((c) => ({ id: c.id, label: c.label, why: c.needs ? `It needs ${c.needs}.` : "The keys it needs are not set." })),
+      { id: "logic", label: "The code's own logic", why: "No model judges authorization, input handling or business rules in this version. Everything above is a rule, a database or a cited document." },
+    ],
+    model: { provider: config.provider, model: models.available ? models.modelId("nano") : null, readTheCode: readerLine !== null, docsCheck: active.some((c) => c.id === "docs") },
+  };
+  const summary = summarise(ranked, ranked.map((f) => f.key), scope);
   if (signal.aborted) {
     stats.durationMs = Date.now() - started;
     return { findings: ranked, dependencies, summary, stats, inventory, vendors, map, snapshot };
@@ -263,7 +281,7 @@ export async function runScan(config: EngineConfig, input: ScanInput): Promise<S
 }
 
 function orderedSteps(active: Check[], fetch: boolean, reader: boolean): ScanStep[] {
-  const order: ScanStep[] = ["fetch", "inventory", "dependencies", "vendors", "map", "review", "secrets", "vulnerabilities", "docs", "rank"];
+  const order: ScanStep[] = ["fetch", "inventory", "dependencies", "vendors", "map", "review", "gaps", "secrets", "vulnerabilities", "docs", "rank"];
   const present = new Set<ScanStep>(["inventory", "vendors", "map", "rank"]);
   if (fetch) present.add("fetch");
   if (reader) present.add("review");

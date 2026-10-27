@@ -21,6 +21,13 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - The run shows the reading as its own step with the passes done, and ends with one line: files read, finds confirmed, dropped, carried, already on the map, left for the next map.
 - `scripts/map-app.mts` reads with the model too when a key is in `.env.local`, uses an existing output file as the previous map, and takes `--no-model`.
 
+### Step 3: the gap rules and the scope statement
+
+- A new Proven check reads the map against itself: a Vercel cron with no handler file, a cron handler that never reads `CRON_SECRET`, a webhook route with no line that checks the sender, an SDK in use with no key named in the code or the example env file, an env name declared in the example file that nothing reads and no SDK could read, packages listed in dependencies that nothing imports (tooling left out), files under the app's source folders that no page, route or entry reaches, and two services for one job (email, payments, sign-in, analytics, error tracking). Each finding carries the file and line it rests on and what resolves it. The two cockpit warnings that were red text only, a cron without the secret check and a webhook without a sender check, are findings now, so the terminal, the MCP tools and the findings page carry them.
+- Two new categories: redundancy and stale.
+- Every map ends with a scope statement in its summary: what was checked, with each check's reach in one sentence, what was not checked and why (a key not set, the reading turned off, and always that no model judges the code's own logic in this version), and which model took part. The findings page shows it, `birdsi findings` prints it, and the MCP scan summary carries it.
+- The editable prompt per section moves to step 5, with the sections themselves.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

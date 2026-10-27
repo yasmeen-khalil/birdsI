@@ -45,6 +45,10 @@ export async function findingsCommand(scanIdArg: string | undefined, options: Pr
   println(paint.dim(style, `${KIND_WORD[scan.kind]} ${scan.id}, ${statusWord}${scan.branch ? `, ${scan.branch}` : ""}`));
   println(paint.bold(style, countsLine(active.length, fixable, active.length - fixable)));
   if (scan.summary?.headline) println(wrap(scan.summary.headline, style, ""));
+  if (scan.summary?.scope) {
+    println(paint.dim(style, wrap(`Checked: ${scan.summary.scope.checked.map((c) => c.label.toLowerCase()).join(", ")}.`, style, "")));
+    println(paint.dim(style, wrap(`Not checked: ${scan.summary.scope.notChecked.map((n) => `${n.label.toLowerCase()} (${n.why})`).join(" ")}`, style, "")));
+  }
   println();
   println(formatFindingsList(findings, style));
   return EXIT.ok;

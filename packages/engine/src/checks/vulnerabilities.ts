@@ -30,6 +30,7 @@ export const vulnerabilitiesCheck: Check = {
   id: "vulnerabilities",
   step: "vulnerabilities",
   label: "Checking every package against the OSV vulnerability database",
+  scope: "Every package in the manifests and lockfiles, at the version in use, against the OSV database of published vulnerabilities.",
   available: () => true,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     const deps = ctx.rawDependencies.filter((d) => /^\d/.test(d.version));

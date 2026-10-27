@@ -21,6 +21,7 @@ export const freshnessCheck: Check = {
   id: "freshness",
   step: "dependencies",
   label: "Comparing each package with its latest release",
+  scope: "Every direct package against its latest release on the registry, reported when two or more major versions behind.",
   available: () => true,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     const findings: FindingDraft[] = [];

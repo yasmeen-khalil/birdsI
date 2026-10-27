@@ -14,6 +14,7 @@ export const ScanStep = z.enum([
   "dependencies",
   "vendors",
   "map",
+  "gaps",
   "secrets",
   "vulnerabilities",
   "docs",

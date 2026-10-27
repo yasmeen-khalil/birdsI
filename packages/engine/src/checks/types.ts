@@ -1,7 +1,8 @@
-import type { Dependency, FindingDraft, ScanEvent, ScanStep } from "@birdsi/shared";
+import type { Dependency, FindingDraft, ScanEvent, ScanStep, ServiceMap } from "@birdsi/shared";
 import type { EngineConfig, ScanBudget } from "../config";
 import type { Inventory, InventoryFile } from "../inventory/walk";
 import type { RawDependency } from "../inventory/manifests";
+import type { MapContext } from "../map/index";
 import type { ModelClient } from "../models/client";
 import type { Snapshot } from "../source/types";
 
@@ -15,6 +16,9 @@ export interface CheckContext {
   dependencies: Dependency[];
   /** Code files in priority order, within budget, searched when a check needs to see how the code uses a package. */
   filesToRead: InventoryFile[];
+  /** The service map, complete with the model's confirmed finds, or null when it could not be read. */
+  map: ServiceMap | null;
+  mapContext: MapContext | null;
   models: ModelClient;
   /** Reads a file from the snapshot, windowed to the budget's byte cap. */
   read: (path: string) => Promise<string>;
@@ -37,5 +41,9 @@ export interface Check {
   label: string;
   /** True when the check can run with the current configuration (keys present). */
   available: (config: EngineConfig) => boolean;
+  /** What it covers, in one plain sentence, for the scope statement of every map. */
+  scope: string;
+  /** What it needs when it is not available, for the scope statement. */
+  needs?: string;
   run: (ctx: CheckContext) => Promise<FindingDraft[]>;
 }

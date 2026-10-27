@@ -10,6 +10,7 @@ export const configCheck: Check = {
   id: "config",
   step: "secrets",
   label: "Checking repository settings and ignored files",
+  scope: "Env files tracked in git, a missing .gitignore or one that leaves out node_modules or .env, and GitHub Actions workflows that run a pull request's code with the repository's secrets.",
   available: () => true,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     const findings: FindingDraft[] = [];

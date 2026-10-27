@@ -31,6 +31,8 @@ export const docsCheck: Check = {
   id: "docs",
   step: "docs",
   label: "Checking packages against their current documentation",
+  scope: "Up to eight main packages against their own current documentation, found by Tavily on the package's registry domains and cited in every finding.",
+  needs: "a model key (NEBIUS_API_KEY or ANTHROPIC_API_KEY) and TAVILY_API_KEY",
   available: (config) => config.tavilyApiKey !== null && config.provider !== null,
   async run(ctx: CheckContext): Promise<FindingDraft[]> {
     if (!ctx.config.tavilyApiKey) return [];

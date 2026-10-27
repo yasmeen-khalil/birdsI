@@ -30,6 +30,7 @@ afterAll(async () => {
 beforeEach(() => {
   delete process.env["ANTHROPIC_API_KEY"];
   delete process.env["TAVILY_API_KEY"];
+  delete process.env["NEBIUS_API_KEY"];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL) => {

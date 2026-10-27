@@ -151,6 +151,34 @@ export default async function FindingsPage({ params, searchParams }: { params: P
         )}
       </section>
 
+      {scan.summary?.scope ? (
+        <section className="panel mt-7 flex flex-col gap-3" style={{ padding: "18px 22px" }} aria-label="What this map checked">
+          <h2 className="t-label">What this map checked</h2>
+          <ul className="flex flex-col gap-1.5">
+            {scan.summary.scope.checked.map((c) => (
+              <li key={c.id} className="t-small c2">
+                <span style={{ color: "var(--text)" }}>{c.label}.</span> {c.detail}
+              </li>
+            ))}
+          </ul>
+          <h3 className="t-label" style={{ marginTop: 6 }}>
+            Not checked
+          </h3>
+          <ul className="flex flex-col gap-1.5">
+            {scan.summary.scope.notChecked.map((n) => (
+              <li key={n.id} className="t-small c2">
+                <span style={{ color: "var(--text)" }}>{n.label}.</span> {n.why}
+              </li>
+            ))}
+          </ul>
+          <p className="t-small c3">
+            {scan.summary.scope.model.model
+              ? `Model: ${scan.summary.scope.model.model} on ${scan.summary.scope.model.provider === "nebius" ? "Nebius Token Factory" : "Anthropic"}, ${scan.summary.scope.model.readTheCode ? "read the code" : "did not read the code"}${scan.summary.scope.model.docsCheck ? " and ran the docs check" : ""}.`
+              : "No model took part in this map."}
+          </p>
+        </section>
+      ) : null}
+
       <section className="mt-9 flex flex-wrap items-center gap-x-9 gap-y-4" style={{ padding: "18px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }} aria-label="Filters">
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Severity">
           <span className="t-small c3" style={{ marginRight: 4 }}>

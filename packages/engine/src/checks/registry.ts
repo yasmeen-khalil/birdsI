@@ -2,6 +2,7 @@ import type { EngineConfig } from "../config";
 import { configCheck } from "./config";
 import { docsCheck } from "./docs";
 import { freshnessCheck } from "./freshness";
+import { gapsCheck } from "./gaps";
 import { secretsCheck } from "./secrets";
 import type { Check } from "./types";
 import { vulnerabilitiesCheck } from "./vulnerabilities";
@@ -11,7 +12,7 @@ import { vulnerabilitiesCheck } from "./vulnerabilities";
  * earlier ones. All of them are rules or databases except the docs check,
  * which reads a package's own current documentation and must cite it.
  */
-export const ALL_CHECKS: readonly Check[] = [secretsCheck, configCheck, vulnerabilitiesCheck, freshnessCheck, docsCheck];
+export const ALL_CHECKS: readonly Check[] = [gapsCheck, secretsCheck, configCheck, vulnerabilitiesCheck, freshnessCheck, docsCheck];
 
 export function checksFor(config: EngineConfig): { active: Check[]; unavailable: Check[] } {
   const active: Check[] = [];

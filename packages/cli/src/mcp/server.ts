@@ -67,6 +67,10 @@ function summarize(result: ScanResponse, top = 10): string {
   if (scan.summary) {
     const s = scan.summary.bySeverity;
     lines.push(`By severity: critical ${s.critical ?? 0}, high ${s.high ?? 0}, medium ${s.medium ?? 0}, low ${s.low ?? 0}.`);
+    if (scan.summary.scope) {
+      lines.push(`Checked: ${scan.summary.scope.checked.map((c) => `${c.label} (${c.detail})`).join(" ")}`);
+      lines.push(`Not checked: ${scan.summary.scope.notChecked.map((n) => `${n.label}: ${n.why}`).join(" ")}`);
+    }
   }
   if (scan.error) lines.push(`Error: ${scan.error}`);
   if (ordered.length > 0) {

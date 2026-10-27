@@ -1,4 +1,4 @@
-import { CONFIDENCE_ORDER, SEVERITY_ORDER, type Confidence, type FindingDraft, type ScanSummary, type Severity } from "@birdsi/shared";
+import { CONFIDENCE_ORDER, SEVERITY_ORDER, type Confidence, type FindingDraft, type ScanScope, type ScanSummary, type Severity } from "@birdsi/shared";
 
 /**
  * Orders and de-duplicates findings and writes the summary. Deterministic,
@@ -39,7 +39,7 @@ function tokens(s: string): string[] {
     .filter((w) => w.length > 3);
 }
 
-export function summarise(findings: FindingDraft[], ids: string[]): ScanSummary {
+export function summarise(findings: FindingDraft[], ids: string[], scope: ScanScope | null = null): ScanSummary {
   const bySeverity = Object.fromEntries(SEVERITY_ORDER.map((s) => [s, 0])) as Record<Severity, number>;
   const byConfidence = Object.fromEntries(CONFIDENCE_ORDER.map((c) => [c, 0])) as Record<Confidence, number>;
   let fixable = 0;
@@ -55,7 +55,7 @@ export function summarise(findings: FindingDraft[], ids: string[]): ScanSummary 
     .filter((x) => x.f.severity === "critical" || x.f.severity === "high")
     .slice(0, 3)
     .map((x) => x.id);
-  return { headline: headline(findings.length, bySeverity), bySeverity, byConfidence, fixable, needsYou, startWith };
+  return { headline: headline(findings.length, bySeverity), scope, bySeverity, byConfidence, fixable, needsYou, startWith };
 }
 
 function headline(total: number, bySeverity: Record<Severity, number>): string {
