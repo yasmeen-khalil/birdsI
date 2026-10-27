@@ -2,7 +2,7 @@
 
 The cockpit for your apps. birdsI maps each app from its code: the services it runs on, its deployments, crons, webhooks, store apps, migrations and the settings each deployment needs. Then it reads the vendor accounts with keys that only read, and tells you what needs you. Nothing a model says reaches you unverified: the map is read by rules that cite the file and line, and the one model call today, the optional docs check, must cite the package's own documentation.
 
-Run `npx birdsi` in an app's folder and its cockpit opens: what needs you, the services and dependencies by what each is for with its docs and its key, the live reads of each Vercel project, Supabase project and OneSignal app, the last map and what it checked, security with every finding's severity under an honest scope statement, money read from the accounts beside the plans' list prices, and the code's crons, webhooks, store apps, migrations and public pages. The Set up page lists what birdsI still needs from you, service by service: the project to declare, the key to make with the exact clicks, what each key lets birdsI read and alert on, and what birdsI may do with it (read only in this phase). Until the package is on npm, run it from a clone: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`.
+Run `npx birdsi` in an app's folder and its cockpit opens: what needs you, the services and dependencies by what each is for with its docs and its key, the live reads of each Vercel project, Supabase project and OneSignal app, the last map and what it checked, security with every finding's severity under an honest scope statement, money as far as it is known (spend read from the accounts, list prices where no spend is read, and what you entered for what no API reports), and the code's crons, webhooks, store apps, migrations and public pages. The Set up page lists what birdsI still needs from you, service by service: the project to declare, the key to make with the exact clicks, what each key lets birdsI read and alert on, and what birdsI may do with it (read only in this phase). Until the package is on npm, run it from a clone: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`.
 
 birdsI is its owner's cockpit for their own apps first. A product for others comes later.
 
@@ -54,7 +54,7 @@ npm install
 cp .env.example .env.local     # fill in the keys. apps/web/.env.local is a symlink to it
 ```
 
-Database: apply every file under `supabase/migrations/` to your Supabase project, in filename order (paste each into the SQL editor, or `supabase db push`). Then paste `supabase/verify.sql` and run it: every row should say OK.
+Database: apply every file under `supabase/migrations/` to your Supabase project, in filename order (paste each into the SQL editor, or `supabase db push`), twelve files today. Then paste `supabase/verify.sql` and run it: every row should say OK.
 
 Run the web app and the worker in two terminals:
 

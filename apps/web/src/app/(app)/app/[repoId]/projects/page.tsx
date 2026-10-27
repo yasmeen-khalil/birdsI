@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ExternalLink } from "lucide-react";
 import { latestServiceMap, vendorsForRepo } from "@birdsi/db";
 import { DeadlineControls } from "@/components/alerts/DeadlineControls";
+import { EntryControls } from "@/components/alerts/EntryControls";
 import { PROJECT_VENDORS, PROJECT_VENDOR_BY_SLUG, type AppProject } from "@birdsi/shared";
 import { AddProjectForm, AppNameForm, EnvironmentsForm, ProjectActions, ProjectDetailsForm, TieKeyControl, type VendorChoice } from "@/components/apps/ProjectControls";
 import { LocalTime } from "@/components/LocalTime";
@@ -10,7 +11,7 @@ import { safeUrl } from "@/components/format";
 import { icon14 } from "@/components/icon";
 import { repoContext } from "@/components/server/data";
 import { loadApp } from "@/lib/apps";
-import { loadAlerts } from "@/lib/cockpit";
+import { loadAlerts, loadEntries } from "@/lib/cockpit";
 
 export const metadata: Metadata = { title: "Projects and keys" };
 
@@ -67,7 +68,7 @@ function KeyStatus({ project }: { project: AppProject }) {
 export default async function ProjectsPage({ params }: { params: Promise<{ repoId: string }> }) {
   const { repoId } = await params;
   const { user, repo } = await repoContext(repoId);
-  const [{ app, untiedKeys }, vendors, stored, alertData] = await Promise.all([loadApp(repo.id, user), vendorsForRepo(repo.id), latestServiceMap(repo.id).catch(() => null), loadAlerts(repo.id, user)]);
+  const [{ app, untiedKeys }, vendors, stored, alertData, entriesData] = await Promise.all([loadApp(repo.id, user), vendorsForRepo(repo.id), latestServiceMap(repo.id).catch(() => null), loadAlerts(repo.id, user), loadEntries(repo.id, user)]);
   const roles = stored?.map.roles ?? null;
 
   if (!app) {
@@ -217,6 +218,18 @@ export default async function ProjectsPage({ params }: { params: Promise<{ repoI
         ) : (
           <DeadlineControls repoId={repo.id} deadlines={alertData.deadlines} vendors={vendors.map((v) => ({ slug: v.slug, name: v.name })).sort((a, b) => a.name.localeCompare(b.name))} />
         )}
+      </section>
+
+      <section className="flex flex-col gap-4" aria-labelledby="entries-title" style={{ maxWidth: 820 }}>
+        <div className="flex flex-col gap-1.5">
+          <h2 id="entries-title" className="t-h2 max-[900px]:text-[24px]!">
+            What no API reports
+          </h2>
+          <p className="t-body c2" style={{ maxWidth: 720 }}>
+            Subscriptions, fees and credits birdsI cannot read with any key: the Apple Developer fee, a push plan paid for the year, a cloud credit. Each counts in the money section, marked as entered by you and kept apart from what is read, and a renewal date warns like a date to watch.
+          </p>
+        </div>
+        {entriesData.reason ? <p className="t-small c3">{entriesData.reason}</p> : <EntryControls repoId={repo.id} entries={entriesData.entries} vendors={vendors.map((v) => ({ slug: v.slug, name: v.name })).sort((a, b) => a.name.localeCompare(b.name))} />}
       </section>
     </main>
   );

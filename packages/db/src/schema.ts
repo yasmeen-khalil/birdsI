@@ -1,6 +1,6 @@
 import { getDb } from "./client";
 
-type Feature = "jobs.priority" | "workers" | "record_entries" | "agent_policies.allow_write" | "apps" | "connections.app_project_id" | "service_maps" | "project_reads" | "alerts";
+type Feature = "jobs.priority" | "workers" | "record_entries" | "agent_policies.allow_write" | "apps" | "connections.app_project_id" | "service_maps" | "project_reads" | "alerts" | "app_entries";
 
 const known = new Map<Feature, { ok: boolean; at: number }>();
 const RECHECK_MS = 10 * 60_000;
@@ -26,6 +26,8 @@ function probe(feature: Feature) {
       return db.from("project_reads").select("id").limit(1);
     case "alerts":
       return db.from("alerts").select("id").limit(1);
+    case "app_entries":
+      return db.from("app_entries").select("id").limit(1);
   }
 }
 

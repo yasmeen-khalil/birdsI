@@ -682,28 +682,35 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
       <Section
         id="cockpit-money"
         title="Money"
-        intro={money.monthlyReadUsd !== null ? `${usd(money.monthlyReadUsd)} this month, read from the accounts that report spend, ${usd(money.yearlyReadUsd ?? 0)} a year at this month's rate.` : "No connected account reports spend yet. Connect Stripe, Anthropic or a Vercel team token to read it."}
+        intro={money.monthlyUsd !== null ? `About ${usd(money.monthlyUsd)} a month, ${usd(money.yearlyUsd ?? 0)} a year, as far as it is known: spend read from the accounts that report it, the plan's list price where none does, and what you entered by hand.` : "Nothing known yet. Connect an account that reports spend (Stripe, Anthropic, a Vercel team token), or enter what no API reports on the Projects page."}
       >
         <div className="flex flex-col gap-4">
-          {money.monthlyListUsd !== null ? (
+          {money.monthlyReadUsd !== null || money.monthlyListUsd !== null || money.monthlyManualUsd !== null ? (
             <p className="t-small c2" style={{ maxWidth: 760 }}>
-              The plans the accounts are on list at {usd(money.monthlyListUsd)} a month, {usd(money.yearlyListUsd ?? 0)} a year. A list price from the checked limits list, not money spent.
+              {[
+                money.monthlyReadUsd !== null ? `${usd(money.monthlyReadUsd)} a month read from the accounts, ${usd(money.yearlyReadUsd ?? 0)} a year at this month's rate.` : null,
+                money.monthlyListUsd !== null ? `The plans the accounts are on list at ${usd(money.monthlyListUsd)} a month, counted only where no spend is read.` : null,
+                money.monthlyManualUsd !== null ? `${usd(money.monthlyManualUsd)} a month entered by you, ${usd(money.yearlyManualUsd ?? 0)} a year.` : null,
+              ]
+                .filter(Boolean)
+                .join(" ")}
             </p>
           ) : null}
           {money.lines.length > 0 ? (
             <div className="flex flex-col" style={{ borderTop: "1px solid var(--line)" }}>
               {money.lines.map((l) => (
-                <div key={`${l.slug}:${l.kind}:${l.label}`} className="flex flex-wrap items-start justify-between gap-3 t-small" style={{ padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+                <div key={`${l.slug}:${l.kind}:${l.label}`} className="flex flex-wrap items-start justify-between gap-3 t-small" style={{ padding: "10px 0", borderBottom: "1px solid var(--line)", opacity: l.counted ? 1 : 0.75 }}>
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span>
                       <span style={{ fontWeight: 600 }}>{l.name}</span> <span className="c2">{l.label}</span>
+                      {l.kind === "manual" ? <span className="tag" style={{ marginLeft: 8 }}>by you</span> : null}
                     </span>
                     <span className="c3">
                       {l.source}
                       {l.note ? ` ${l.note}` : ""}
                     </span>
                   </span>
-                  <span className="c2">{l.monthlyUsd !== null ? `${usd(l.monthlyUsd)} a month, ${usd(l.yearlyUsd ?? 0)} a year` : "no price in the words on the page"}</span>
+                  <span className="c2">{l.monthlyUsd !== null ? `${usd(l.monthlyUsd)} a month, ${usd(l.yearlyUsd ?? 0)} a year${l.counted ? "" : ", not counted"}` : "no amount a month"}</span>
                 </div>
               ))}
             </div>
@@ -719,8 +726,11 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
               ))}
             </div>
           ) : null}
-          <p className="t-small c3">Subscriptions no API reports are not counted here yet. The alerts warn at 80 and 95 percent of a limit.</p>
-          <SectionLink href={`${base}/vendors`}>Every account, fact by fact</SectionLink>
+          <p className="t-small c3">The alerts warn at 80 and 95 percent of a limit. A renewal date you entered warns from 30 days before, like a date to watch.</p>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <SectionLink href={`${base}/projects#entries-title`}>Add what no API reports</SectionLink>
+            <SectionLink href={`${base}/vendors`}>Every account, fact by fact</SectionLink>
+          </div>
         </div>
       </Section>
 

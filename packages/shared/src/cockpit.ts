@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AlertEmailState, AppAlert } from "./alerts";
 import { type AppProject } from "./apps";
 import { Confidence, ScanScope, SEVERITY_ORDER, Severity, type Dependency, type Finding } from "./domain";
+import { AppEntry, entryAmountWords, entryMonthlyUsd } from "./entries";
 import { CATEGORY_ORDER, VENDOR_CATEGORY_LABEL, iconUrlFor } from "./icons";
 import { LIMITS_BY_SLUG, checkedLimit, tierFor } from "./limits";
 import { envNeededBy, missingEnv, roleForLabel, Found, MapPublicSurface, MapStoreApp, MapWebhook, ModelFind, ReaderStats, SourceLine, type StoredMap } from "./map";
@@ -152,6 +153,8 @@ export const MoneyLine = z.object({
   yearlyUsd: z.number().nullable(),
   source: z.string(),
   note: z.string().nullable(),
+  /** True when it is part of the cost of running: read spend, a list price where no spend is read, an entered subscription or fee. */
+  counted: z.boolean(),
 });
 export type MoneyLine = z.infer<typeof MoneyLine>;
 
@@ -159,14 +162,22 @@ export const LimitLine = z.object({ slug: z.string(), name: z.string(), label: z
 export type LimitLine = z.infer<typeof LimitLine>;
 
 export const MoneySummary = z.object({
+  /** The cost of running, as far as it is known: read spend where an account reports it, else the plan's list price, plus what the owner entered. Null when nothing is known. */
+  monthlyUsd: z.number().nullable(),
+  yearlyUsd: z.number().nullable(),
   /** Money read from accounts this month, and the same every month for a year. Null when no account reports spend. */
   monthlyReadUsd: z.number().nullable(),
   yearlyReadUsd: z.number().nullable(),
   /** The list prices of the plans the accounts are on, from the checked limits list. Not money spent. */
   monthlyListUsd: z.number().nullable(),
   yearlyListUsd: z.number().nullable(),
+  /** Subscriptions and fees the owner entered. */
+  monthlyManualUsd: z.number().nullable(),
+  yearlyManualUsd: z.number().nullable(),
   lines: z.array(MoneyLine),
   limits: z.array(LimitLine),
+  /** Everything entered by hand, credits and notes included, for the quiet block of the money section. */
+  entries: z.array(AppEntry),
 });
 export type MoneySummary = z.infer<typeof MoneySummary>;
 
@@ -234,6 +245,8 @@ export interface CockpitInput {
   findings?: Finding[];
   scope?: ScanScope | null;
   scanFinishedAt?: string | null;
+  /** What the owner entered by hand. */
+  entries?: AppEntry[];
 }
 
 /** Packages that work from the command line, a config file or the framework: the devtools. */
@@ -437,13 +450,13 @@ export function cockpitView(input: CockpitInput): CockpitView {
   for (const v of input.vendors) {
     const facts = bestFacts(v.facts);
     const spend = facts.find((f) => f.kind === "cost" && f.metric === "spend_month" && f.numeric !== null && f.source === "connector");
-    if (spend) moneyLines.push({ slug: v.slug, name: v.name, kind: "read", label: spend.label, monthlyUsd: spend.numeric, yearlyUsd: Math.round(spend.numeric! * 12 * 100) / 100, source: "Read from the account this month", note: "A year at this month's rate." });
+    if (spend) moneyLines.push({ slug: v.slug, name: v.name, kind: "read", label: spend.label, monthlyUsd: spend.numeric, yearlyUsd: Math.round(spend.numeric! * 12 * 100) / 100, source: "Read from the account this month", note: "A year at this month's rate.", counted: true });
     const plan = facts.find((f) => f.kind === "plan");
     const limits = LIMITS_BY_SLUG.get(v.slug);
     const tier = plan && limits ? tierFor(limits, plan.value) : null;
     if (plan && tier) {
       const monthly = listPricePerMonth(tier.price);
-      moneyLines.push({ slug: v.slug, name: v.name, kind: "list", label: `${tier.name} plan`, monthlyUsd: monthly, yearlyUsd: monthly === null ? null : Math.round(monthly * 12 * 100) / 100, source: `${FACT_SOURCE_LABEL[plan.source]}. List price from the checked limits list, read ${limits!.verifiedOn}.`, note: monthly === null ? tier.price : "A list price, not money spent." });
+      moneyLines.push({ slug: v.slug, name: v.name, kind: "list", label: `${tier.name} plan`, monthlyUsd: monthly, yearlyUsd: monthly === null ? null : Math.round(monthly * 12 * 100) / 100, source: `${FACT_SOURCE_LABEL[plan.source]}. List price from the checked limits list, read ${limits!.verifiedOn}.`, note: spend ? "A list price, not counted: the account's own spend is read." : "A list price, counted until the account's spend can be read.", counted: !spend && monthly !== null });
     }
     for (const f of facts) {
       if (f.kind !== "usage" || f.numeric === null) continue;
@@ -452,17 +465,40 @@ export function cockpitView(input: CockpitInput): CockpitView {
       limitLines.push({ slug: v.slug, name: v.name, label: f.label, used: f.numeric, limit, unit: f.unit, pct: Math.min(999, Math.round((f.numeric / limit) * 100)) });
     }
   }
-  const sum = (kind: MoneyLine["kind"], field: "monthlyUsd" | "yearlyUsd") => {
-    const list = moneyLines.filter((l) => l.kind === kind && l[field] !== null);
+  const entries = input.entries ?? [];
+  for (const e of entries) {
+    const monthly = entryMonthlyUsd(e);
+    const words = entryAmountWords(e);
+    moneyLines.push({
+      slug: e.vendor ?? `entry-${e.id}`,
+      name: e.vendor ? (input.vendors.find((v) => v.slug === e.vendor)?.name ?? e.vendor) : e.label,
+      kind: "manual",
+      label: e.vendor ? e.label : e.kind === "credit" ? "Credit" : e.kind === "fee" ? "Fee" : e.kind === "note" ? "Note" : "Subscription",
+      monthlyUsd: monthly,
+      yearlyUsd: monthly === null ? null : Math.round(monthly * 12 * 100) / 100,
+      source: `Entered by you${e.renewsOn ? `, renews ${e.renewsOn}` : ""}.`,
+      note: monthly === null ? (words ? `${words}, not counted in the monthly cost.` : (e.note ?? null)) : e.note,
+      counted: monthly !== null,
+    });
+  }
+  const sum = (lines: MoneyLine[], field: "monthlyUsd" | "yearlyUsd") => {
+    const list = lines.filter((l) => l[field] !== null);
     return list.length > 0 ? Math.round(list.reduce((a, l) => a + l[field]!, 0) * 100) / 100 : null;
   };
+  const ofKind = (kind: MoneyLine["kind"]) => moneyLines.filter((l) => l.kind === kind);
+  const counted = moneyLines.filter((l) => l.counted);
   const money: MoneySummary = {
-    monthlyReadUsd: sum("read", "monthlyUsd"),
-    yearlyReadUsd: sum("read", "yearlyUsd"),
-    monthlyListUsd: sum("list", "monthlyUsd"),
-    yearlyListUsd: sum("list", "yearlyUsd"),
-    lines: moneyLines.sort((a, b) => a.name.localeCompare(b.name) || a.kind.localeCompare(b.kind)),
+    monthlyUsd: sum(counted, "monthlyUsd"),
+    yearlyUsd: sum(counted, "yearlyUsd"),
+    monthlyReadUsd: sum(ofKind("read"), "monthlyUsd"),
+    yearlyReadUsd: sum(ofKind("read"), "yearlyUsd"),
+    monthlyListUsd: sum(ofKind("list"), "monthlyUsd"),
+    yearlyListUsd: sum(ofKind("list"), "yearlyUsd"),
+    monthlyManualUsd: sum(ofKind("manual"), "monthlyUsd"),
+    yearlyManualUsd: sum(ofKind("manual"), "yearlyUsd"),
+    lines: moneyLines.sort((a, b) => Number(b.counted) - Number(a.counted) || a.name.localeCompare(b.name) || a.kind.localeCompare(b.kind)),
     limits: limitLines.sort((a, b) => b.pct - a.pct),
+    entries,
   };
   const undeclared = (map?.services ?? []).filter((s) => VENDOR_NAMES[s.slug] && !declared.has(s.slug)).map((s) => ({ slug: s.slug, name: s.name }));
 

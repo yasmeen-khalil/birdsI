@@ -41,6 +41,13 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - Prompts per section, on the Agent page: for the model's reading of the code, the purposes, the docs check and the security pass, birdsI's default is shown and stays, and what you add for this app is used by the next map and kept in the record (kind `prompt`, the newest per section). The security pass is not on in this version, and its prompt says so.
 - `birdsi cockpit` and the `birdsi_cockpit` MCP tool carry the security and money summaries. `GET /api/v1/repos/:id/cockpit` returns the new sections.
 
+### Step 6: what no API reports, and the cost of running
+
+- A quiet section on the Projects page, What no API reports: a subscription paid elsewhere, a yearly fee, a credit that runs out, a note, each with an amount and how often, a renewal or end date, a vendor and a note. Migration `20261027000000_manual_entries.sql`, table `app_entries`, with its marker in `verify.sql`.
+- The money section now says the cost of running as far as it is known: about so much a month and so much a year, from spend read from the accounts that report it, the plan's list price where none does (counted until the account's spend can be read, then shown as not counted), and what you entered, marked by you and kept apart. A yearly amount is spread over twelve months. A credit, a note or a one-time amount is listed and never counted.
+- A renewal date you entered joins the alerts like a date to watch, from 30 days before.
+- The Set up page has an optional step for it, and the terminal's cockpit says the cost in one line with its three parts.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

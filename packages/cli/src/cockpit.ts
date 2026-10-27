@@ -116,8 +116,8 @@ export function cockpitLines(v: CockpitView, q: Quote = plain): string[] {
       lines.push(`Security: ${v.security.total} open findings (${sev})${v.security.byCategory.length > 0 ? `: ${v.security.byCategory.map((c) => `${c.label.toLowerCase()} ${c.count}`).join(", ")}` : ""}.`);
       if (v.security.scope) lines.push(`  Not checked: ${v.security.scope.notChecked.map((n) => n.label.toLowerCase()).join(", ")}.`);
     }
-    if (v.money.monthlyReadUsd !== null || v.money.monthlyListUsd !== null) {
-      lines.push(`Money: ${v.money.monthlyReadUsd !== null ? `$${v.money.monthlyReadUsd} this month read from accounts ($${v.money.yearlyReadUsd} a year at this rate)` : "no account reports spend"}${v.money.monthlyListUsd !== null ? `, the plans list at $${v.money.monthlyListUsd} a month ($${v.money.yearlyListUsd} a year), not money spent` : ""}.`);
+    if (v.money.monthlyUsd !== null) {
+      lines.push(`Money: about $${v.money.monthlyUsd} a month, $${v.money.yearlyUsd} a year, as far as it is known: ${[v.money.monthlyReadUsd !== null ? `$${v.money.monthlyReadUsd} read from accounts this month` : null, v.money.monthlyListUsd !== null ? `list prices $${v.money.monthlyListUsd} a month (counted only where no spend is read)` : null, v.money.monthlyManualUsd !== null ? `$${v.money.monthlyManualUsd} a month entered by you` : null].filter(Boolean).join(", ")}.`);
       for (const l of v.money.limits.slice(0, 6)) lines.push(`  ${l.name} ${l.label.toLowerCase()}: ${l.used}${l.unit ? ` ${l.unit}` : ""} of ${l.limit} (${l.pct}%)`);
     }
     if (map.roles.length > 1) lines.push(`Deployments: ${map.roles.join(", ")} by ${map.roleEnv}`);

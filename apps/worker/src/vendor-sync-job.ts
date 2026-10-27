@@ -1,4 +1,4 @@
-import { alertsAvailable, decryptSecret, deadlinesForApp, expireAskedFacts, factsForVendors, keysForRepo, latestServiceMap, markConnectionProbed, readsAvailable, replaceFacts, repoWithInstallation, saveProjectRead, setAlertEmail, setVendorsSyncedAt, syncAlerts, toVendor, userById, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
+import { alertsAvailable, decryptSecret, deadlinesForApp, entriesForApp, expireAskedFacts, factsForVendors, keysForRepo, latestServiceMap, markConnectionProbed, readsAvailable, replaceFacts, repoWithInstallation, saveProjectRead, setAlertEmail, setVendorsSyncedAt, syncAlerts, toVendor, userById, vendorsForRepo, type FactInput, type JobRow } from "@birdsi/db";
 import { appAlerts, CONNECTOR_BY_SLUG, MAX_VENDORS_PER_SCAN, readProject, settingsForProject, type ConnectorFact, type EngineConfig } from "@birdsi/engine";
 import { emailEnv, sendAlertEmail } from "./alert-email";
 import { planReads } from "./read-plan";
@@ -97,7 +97,8 @@ export async function runVendorSyncJob(_config: EngineConfig, job: JobRow, heart
         map,
         reads: readsNow,
         vendors: withFacts,
-        deadlines: await deadlinesForApp(app.id),
+        // The dates to watch, and every renewal the owner entered by hand, which warns the same way.
+        deadlines: [...(await deadlinesForApp(app.id)), ...(await entriesForApp(app.id)).filter((e) => e.renewsOn).map((e) => ({ id: e.id, appId: e.appId, vendor: e.vendor, label: `${e.label} renews`, dueOn: e.renewsOn!, note: e.note, createdAt: e.createdAt }))],
         now: new Date(),
       });
       const opened = await syncAlerts(app.id, drafts, checked);

@@ -140,7 +140,7 @@ export async function deadlinesForApp(appId: string): Promise<AppDeadline[]> {
   return ((data ?? []) as DeadlineRow[]).map(toDeadline);
 }
 
-async function ownedApp(appId: string, userId: string): Promise<void> {
+export async function ownedApp(appId: string, userId: string): Promise<void> {
   const { data, error } = await getDb().from("apps").select("owner_user_id").eq("id", appId).maybeSingle();
   if (error) throw new Error(`ownedApp: ${error.message}`);
   if (!data) throw new NotFoundError("app");

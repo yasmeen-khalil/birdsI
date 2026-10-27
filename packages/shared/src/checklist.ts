@@ -124,6 +124,8 @@ export interface ChecklistInput {
   email: AlertEmailState;
   /** Dates to watch the owner has added. */
   deadlines: number;
+  /** What the owner entered by hand, when the table exists. */
+  entries?: number;
 }
 
 function kindWords(vendor: string): string {
@@ -305,6 +307,20 @@ export function checklistView(input: ChecklistInput): ChecklistView {
     links: [],
     where: "/projects",
   });
+  if (input.entries !== undefined) {
+    items.push({
+      id: "entries",
+      group: "Money",
+      title: "Add what no API reports",
+      status: input.entries > 0 ? "done" : "optional",
+      required: false,
+      state: input.entries > 0 ? `${input.entries} ${input.entries === 1 ? "entry" : "entries"} by hand.` : "A subscription paid elsewhere, a yearly fee, a credit that runs out: nothing entered yet.",
+      steps: input.entries > 0 ? [] : ["Projects > What no API reports > add the kind, the amount and how often, and the renewal date if there is one."],
+      willDo: "Counted in the money section as entered by you, kept apart from what is read, and a renewal date warns from 30 days before like a date to watch.",
+      links: [],
+      where: "/projects",
+    });
+  }
   items.push({
     id: "agent",
     group: "Your coding agent",

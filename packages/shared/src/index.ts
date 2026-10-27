@@ -11,5 +11,6 @@ export * from "./alerts";
 export * from "./cockpit";
 export * from "./checklist";
 export * from "./icons";
+export * from "./entries";
 export * from "./presence";
 export * from "./policy";

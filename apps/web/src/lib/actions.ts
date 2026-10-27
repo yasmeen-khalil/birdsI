@@ -11,7 +11,7 @@ import { answerQuestion, changePolicy, connectVendor, decideActionRequest, disco
 import { savePrompt } from "./prompts";
 import { dismissFinding, reopenFinding, startScan, stopScan } from "./scans";
 import { addAppProject, connectProjectKey, disconnectProjectKey, editAppProject, removeAppProject, renameApp, reuseKeyForProject, setEnvironments, tieKey, type ProjectInput } from "./apps";
-import { addAppDeadline, removeAppDeadline } from "./cockpit";
+import { addAppDeadline, addAppEntry, removeAppEntry, removeAppDeadline } from "./cockpit";
 
 /**
  * Server actions used by the web pages. Each one resolves the signed-in
@@ -327,6 +327,26 @@ export async function addDeadlineAction(repoId: string, input: { label: string; 
     await addAppDeadline(repoId, user, input);
     revalidatePath(`/app/${repoId}/projects`);
     revalidatePath(`/app/${repoId}/alerts`);
+    return undefined;
+  });
+}
+
+export async function addEntryAction(repoId: string, input: { kind: string; label: string; amountUsd: number | null; period: string | null; renewsOn: string | null; vendor: string | null; note: string | null }): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await addAppEntry(repoId, user, input);
+    revalidatePath(`/app/${repoId}/projects`);
+    revalidatePath(`/app/${repoId}`);
+    return undefined;
+  });
+}
+
+export async function removeEntryAction(repoId: string, entryId: string): Promise<ActionResult> {
+  return run(async () => {
+    const user = await requireUser();
+    await removeAppEntry(repoId, user, entryId);
+    revalidatePath(`/app/${repoId}/projects`);
+    revalidatePath(`/app/${repoId}`);
     return undefined;
   });
 }

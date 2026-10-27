@@ -3,6 +3,8 @@ import { AddDeadlineRequest, alertEmailState, cockpitView, readsInDepth, type Al
 import { loadApp } from "./apps";
 import { loadVendors } from "./ops";
 import { loadLatestScan } from "./scans";
+import { addEntry, ENTRIES_MIGRATION, entriesAvailable, entriesForApp, removeEntry } from "@birdsi/db";
+import { AddEntryRequest, type AppEntry, type EntriesResponse } from "@birdsi/shared";
 import { ApiError } from "./api";
 import { note, ownerAuthor } from "./record";
 
@@ -76,7 +78,7 @@ export async function removeAppDeadline(repoId: string, user: UserRow, deadlineI
  */
 export async function loadCockpit(repoId: string, user: UserRow): Promise<CockpitView> {
   const repo = await repoForUser(repoId, user.id);
-  const [appData, mapData, readsData, alertData, vendorData, latestScan] = await Promise.all([loadApp(repo.id, user), loadServiceMap(repo.id, user), loadReads(repo.id, user), loadAlerts(repo.id, user), loadVendors(repo.id, user), loadLatestScan(repo.id, user)]);
+  const [appData, mapData, readsData, alertData, vendorData, latestScan, entriesData] = await Promise.all([loadApp(repo.id, user), loadServiceMap(repo.id, user), loadReads(repo.id, user), loadAlerts(repo.id, user), loadVendors(repo.id, user), loadLatestScan(repo.id, user), loadEntries(repo.id, user)]);
   const reads = new Map<string, ProjectRead>(readsData.reads.map((r) => [r.projectId, r]));
   const name = appData.app?.name ?? repo.full_name.split("/").pop() ?? repo.full_name;
   return cockpitView({
@@ -96,5 +98,36 @@ export async function loadCockpit(repoId: string, user: UserRow): Promise<Cockpi
     findings: latestScan?.findings,
     scope: latestScan?.scan.summary?.scope ?? null,
     scanFinishedAt: latestScan?.scan.finishedAt ?? null,
+    entries: entriesData.entries,
   });
+}
+
+/** What the owner entered by hand for this app, or why there is nothing yet. */
+export async function loadEntries(repoId: string, user: UserRow): Promise<EntriesResponse> {
+  const repo = await repoForUser(repoId, user.id);
+  if (!(await appsAvailable())) return { entries: [], reason: "Apps switch on when the migration 20261018000100_apps_projects.sql has run." };
+  if (!(await entriesAvailable())) return { entries: [], reason: `Manual entries switch on when the migration ${ENTRIES_MIGRATION} has run in the Supabase SQL editor.` };
+  const app = await ensureAppForRepo(repo);
+  if (!app) return { entries: [], reason: "This app has no record yet." };
+  return { entries: await entriesForApp(app.id), reason: null };
+}
+
+export async function addAppEntry(repoId: string, user: UserRow, input: unknown): Promise<AppEntry> {
+  const parsed = AddEntryRequest.safeParse(input);
+  if (!parsed.success) throw new ApiError(400, "bad_request", parsed.error.issues[0]?.message ?? "Give a label of 2 to 120 characters, and an amount that is a number.");
+  if (parsed.data.renewsOn && Number.isNaN(Date.parse(`${parsed.data.renewsOn}T00:00:00Z`))) throw new ApiError(400, "bad_request", "That date does not exist.");
+  if ((parsed.data.kind === "subscription" || parsed.data.kind === "fee") && (parsed.data.amountUsd === null || parsed.data.period === null)) throw new ApiError(400, "bad_request", "A subscription or a fee needs an amount and how often it is paid.");
+  const repo = await repoForUser(repoId, user.id);
+  if (!(await entriesAvailable())) throw new ApiError(503, "not_ready", `Manual entries switch on when the migration ${ENTRIES_MIGRATION} has run.`);
+  const app = await ensureAppForRepo(repo);
+  if (!app) throw new ApiError(503, "not_ready", "Apps switch on when the migration 20261018000100_apps_projects.sql has run.");
+  const added = await addEntry(app.id, user.id, parsed.data);
+  await note(repo.id, ownerAuthor(user), { kind: "project", subject: `entry:${added.id}`, text: `Entered by hand: ${added.label}${added.amountUsd !== null ? `, $${added.amountUsd}${added.period ? ` ${added.period === "once" ? "once" : `a ${added.period}`}` : ""}` : ""}${added.renewsOn ? `, renews ${added.renewsOn}` : ""}.` });
+  return added;
+}
+
+export async function removeAppEntry(repoId: string, user: UserRow, entryId: string): Promise<void> {
+  const repo = await repoForUser(repoId, user.id);
+  const removed = await removeEntry(entryId, user.id);
+  await note(repo.id, ownerAuthor(user), { kind: "project", subject: `entry:${removed.id}`, text: `Removed the entry ${removed.label}.` });
 }

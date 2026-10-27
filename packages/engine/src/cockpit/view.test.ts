@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { cockpitView, listPricePerMonth, type AppProject, type Finding, type ProjectRead, type ServiceMap, type StoredMap, type Vendor, type VercelRead } from "@birdsi/shared";
+import { cockpitView, entryMonthlyUsd, listPricePerMonth, type AppEntry, type AppProject, type Finding, type ProjectRead, type ServiceMap, type StoredMap, type Vendor, type VercelRead } from "@birdsi/shared";
 import { collectDependencies } from "../inventory/manifests";
 import { walkInventory } from "../inventory/walk";
 import { buildServiceMap } from "../map/index";
@@ -159,7 +159,11 @@ describe("the cockpit's sections", () => {
       { ecosystem: "npm" as const, name: "stripe", versionInUse: "14.0.0", latestVersion: "17.0.0", manifestPath: "package.json", direct: true, vulnerabilities: [], docsCheck: { status: "current" as const, checkedAt: "2026-10-27T09:00:00.000Z", doc: { url: "https://docs.stripe.com/api", title: "Stripe API", excerpt: "" } } },
       { ecosystem: "npm" as const, name: "eslint", versionInUse: "9.0.0", latestVersion: "9.1.0", manifestPath: "package.json", direct: true, vulnerabilities: [], docsCheck: null },
     ];
-    const view = cockpitView({ appName: "Cockpit", environments: ["production"], projects: [], map: stored, mapReason: null, reads: new Map(), readsReason: null, alerts: [], alertsReason: null, email, vendors, dependencies, findings, scope: null, scanFinishedAt: "2026-10-27T10:00:00.000Z" });
+    const entries: AppEntry[] = [
+      { id: "e1", appId: "a", vendor: "apple", kind: "subscription", label: "Apple Developer Program", amountUsd: 99, period: "year", renewsOn: "2027-03-01", note: null, createdAt: "2026-10-27T00:00:00.000Z" },
+      { id: "e2", appId: "a", vendor: null, kind: "credit", label: "Google Cloud credit", amountUsd: 300, period: "once", renewsOn: "2026-12-08", note: "Ends in December", createdAt: "2026-10-27T00:00:00.000Z" },
+    ];
+    const view = cockpitView({ appName: "Cockpit", environments: ["production"], projects: [], map: stored, mapReason: null, reads: new Map(), readsReason: null, alerts: [], alertsReason: null, email, vendors, dependencies, findings, scope: null, scanFinishedAt: "2026-10-27T10:00:00.000Z", entries });
 
     expect(view.purposeGroups.map((g) => g.label)[0]).toBe("Hosting");
     expect(view.purposeGroups.flatMap((g) => g.services.map((s) => s.slug))).toEqual(expect.arrayContaining(["vercel", "stripe", "clerk"]));
@@ -179,8 +183,24 @@ describe("the cockpit's sections", () => {
     expect(read).toMatchObject({ slug: "vercel", monthlyUsd: 12.5, yearlyUsd: 150 });
     expect(view.money.monthlyReadUsd).toBe(12.5);
     expect(view.money.yearlyReadUsd).toBe(150);
-    expect(view.money.lines.some((l) => l.kind === "list" && l.slug === "vercel")).toBe(true);
+    const list = view.money.lines.find((l) => l.kind === "list" && l.slug === "vercel")!;
+    expect(list.counted).toBe(false);
+    const manual = view.money.lines.filter((l) => l.kind === "manual");
+    expect(manual.find((l) => l.name === "Apple Developer Program" || l.slug === "apple")).toMatchObject({ monthlyUsd: 8.25, yearlyUsd: 99, counted: true });
+    expect(manual.find((l) => l.label === "Credit")).toMatchObject({ monthlyUsd: null, counted: false });
+    expect(view.money.monthlyManualUsd).toBe(8.25);
+    expect(view.money.monthlyUsd).toBe(20.75);
+    expect(view.money.yearlyUsd).toBe(249);
+    expect(view.money.entries).toHaveLength(2);
     expect(view.money.limits[0]).toMatchObject({ slug: "vercel", used: 500_000, limit: 1_000_000, pct: 50 });
+  });
+
+  it("spreads a yearly amount over the months, and counts no credit, note or one-time amount", () => {
+    expect(entryMonthlyUsd({ kind: "subscription", amountUsd: 99, period: "year" })).toBe(8.25);
+    expect(entryMonthlyUsd({ kind: "fee", amountUsd: 20, period: "month" })).toBe(20);
+    expect(entryMonthlyUsd({ kind: "fee", amountUsd: 20, period: "once" })).toBeNull();
+    expect(entryMonthlyUsd({ kind: "credit", amountUsd: 300, period: "once" })).toBeNull();
+    expect(entryMonthlyUsd({ kind: "note", amountUsd: null, period: null })).toBeNull();
   });
 
   it("reads a list price from the words on the checked list", () => {
