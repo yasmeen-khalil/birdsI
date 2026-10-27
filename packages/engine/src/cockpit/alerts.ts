@@ -129,6 +129,7 @@ export function appAlerts(input: AlertInput): AlertResult {
   deadlineAlerts(drafts, input);
   driftAlerts(drafts, checked, input);
   factAlerts(drafts, checked, input);
+  webhookAlerts(drafts, checked, input);
 
   const order = { critical: 0, warning: 1, notice: 2 } as const;
   drafts.sort((a, b) => order[a.severity] - order[b.severity] || a.kind.localeCompare(b.kind) || a.dedupeKey.localeCompare(b.dedupeKey));
@@ -449,6 +450,98 @@ function factAlerts(drafts: AlertDraft[], checked: Set<string>, input: AlertInpu
         });
       }
     }
+  }
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url.includes("://") ? url : `https://${url}`).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function pathOf(url: string): string | null {
+  try {
+    return new URL(url).pathname.replace(/\/+$/, "") || "/";
+  } catch {
+    return null;
+  }
+}
+
+function routePath(route: string): string {
+  return route.replace(/\/+$/, "") || "/";
+}
+
+/** The app's hostnames as the Vercel reads know them: each project's production address and its domains. */
+function appHosts(input: AlertInput): Set<string> {
+  const hosts = new Set<string>();
+  for (const read of input.reads.values()) {
+    if (read.vendor !== "vercel") continue;
+    if (read.project.ok && read.project.value.productionUrl) hosts.add(hostOf(read.project.value.productionUrl));
+    if (read.domains.ok) for (const d of read.domains.value) hosts.add(d.name.toLowerCase());
+  }
+  hosts.delete("");
+  return hosts;
+}
+
+/**
+ * The code's Stripe webhook routes against the endpoints registered at
+ * Stripe, when the Stripe key read them this time. A route no enabled
+ * endpoint points at gets nothing from Stripe. An enabled endpoint pointing
+ * at one of the app's hosts with no route behind it fails on every event.
+ * The hosts come from the Vercel reads. Without one, paths alone are compared.
+ */
+function webhookAlerts(drafts: AlertDraft[], checked: Set<string>, input: AlertInput): void {
+  const stripe = input.vendors.find((v) => v.slug === "stripe");
+  const map = input.map;
+  if (!stripe || !map) return;
+  const read = stripe.facts.filter((f) => f.source === "connector");
+  if (!read.some((f) => f.metric === "webhook_endpoints" || f.metric.startsWith("webhook_endpoints:"))) return;
+  checked.add("webhook_unregistered:stripe");
+  checked.add("webhook_unhandled:stripe");
+  const hosts = appHosts(input);
+  const routes = map.webhooks.filter((w) => w.service === "stripe");
+  const registered = read
+    .filter((f) => f.metric.startsWith("webhook_endpoint:"))
+    .map((f) => ({ url: f.value, host: hostOf(f.value), path: pathOf(f.value), enabled: (f.numeric ?? 0) > 0 }));
+  const dashboard = "https://dashboard.stripe.com/webhooks";
+  for (const route of routes) {
+    const path = routePath(route.route);
+    const matches = registered.filter((e) => e.path === path && (hosts.size === 0 || hosts.has(e.host)));
+    if (matches.some((e) => e.enabled)) continue;
+    const disabled = matches.find((e) => !e.enabled);
+    const where = hosts.size > 0 ? ` for ${[...hosts].slice(0, 3).join(", ")}` : "";
+    const address = hosts.size > 0 ? `https://${[...hosts][0]}${route.route}` : `the app's address followed by ${route.route}`;
+    drafts.push({
+      kind: "webhook_unregistered",
+      severity: "warning",
+      projectId: null,
+      sentence: disabled
+        ? `The code handles Stripe webhooks at ${route.route} (${route.file}), and the endpoint Stripe has for it (${disabled.url}) is disabled, so Stripe sends it nothing.`
+        : `The code handles Stripe webhooks at ${route.route} (${route.file}), but ${registered.length === 0 ? "no endpoint is registered at Stripe" : `none of the ${registered.length === 1 ? "endpoint" : `${registered.length} endpoints`} registered at Stripe${where} points there`}, so Stripe sends it nothing.`,
+      action: disabled ? "Enable the endpoint in the Stripe dashboard, or remove it and the route together." : `Add an endpoint at Stripe for ${address}, with the events the handler reads, and set its signing secret in the project's environment.`,
+      details: { route: route.route, file: route.file, endpoints: registered.map((e) => ({ url: e.url, enabled: e.enabled })), hosts: [...hosts] },
+      source: { label: route.file, url: dashboard, path: route.file, line: null },
+      dedupeKey: `webhook_unregistered:stripe:${route.route}`,
+      scope: "webhook_unregistered:stripe",
+    });
+  }
+  if (hosts.size === 0) return;
+  for (const e of registered.filter((x) => x.enabled && hosts.has(x.host) && x.path !== null)) {
+    // A route for another service at that path still receives the events: whether it checks the sender is the gap rule's question.
+    if (map.webhooks.some((w) => routePath(w.route) === e.path)) continue;
+    drafts.push({
+      kind: "webhook_unhandled",
+      severity: "warning",
+      projectId: null,
+      sentence: `Stripe sends events to ${e.url}, but the code has no webhook route at ${e.path}, so every delivery fails and Stripe keeps retrying it for days.`,
+      action: "Point the endpoint at the route the code has, or disable it in the Stripe dashboard when the route is gone for good.",
+      details: { url: e.url, path: e.path, routes: routes.map((r) => r.route) },
+      source: { label: "Stripe webhook endpoint", url: dashboard, path: null, line: null },
+      dedupeKey: `webhook_unhandled:stripe:${e.url}`,
+      scope: "webhook_unhandled:stripe",
+    });
   }
 }
 

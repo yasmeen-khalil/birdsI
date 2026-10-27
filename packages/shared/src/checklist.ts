@@ -106,9 +106,9 @@ export const VENDOR_ABILITIES: Record<string, VendorAbility> = {
     keySteps: ["github.com > Settings > Developer settings > Personal access tokens > Fine-grained tokens > Generate: only this repository. Repository permissions, read: Metadata, Actions, Dependabot alerts, Secret scanning alerts, Code scanning alerts. Account permissions, read: Plan.", "Paste it on Projects > the GitHub repository > Connect key."],
   },
   stripe: {
-    reads: "The available balance and this month's charges, net of refunds, before Stripe's fees.",
-    alerts: "None yet. Balance and charges show on the Vendors page and count in the money section.",
-    keySteps: ["dashboard.stripe.com/apikeys > Create restricted key: read access to Balance and Charges, nothing else.", "Paste it on Projects > the Stripe account > Connect key."],
+    reads: "The available balance, this month's charges net of refunds before Stripe's fees, and the webhook endpoints registered at Stripe, checked against the webhook routes in the code.",
+    alerts: "A Stripe webhook route in the code that no enabled endpoint at Stripe points at, an enabled endpoint pointing at the app with no route behind it.",
+    keySteps: ["dashboard.stripe.com/apikeys > Create restricted key: read access to Balance, Charges and Webhook Endpoints, nothing else.", "Paste it on Projects > the Stripe account > Connect key."],
   },
   anthropic: {
     reads: "This month's cost and token usage, from the usage and cost reports.",

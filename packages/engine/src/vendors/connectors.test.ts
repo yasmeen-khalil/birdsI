@@ -30,6 +30,40 @@ describe("the Stripe connector", () => {
   });
 });
 
+describe("the Stripe connector, webhook endpoints", () => {
+  it("lists the endpoints registered at Stripe, one fact each with its state, and names the permission when the key may not read them", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL) => {
+        const url = String(input);
+        if (url.includes("/v1/balance")) return json({ available: [{ amount: 0, currency: "usd" }], pending: [], livemode: true });
+        if (url.includes("/v1/charges")) return json({ data: [], has_more: false });
+        if (url.includes("/v1/webhook_endpoints")) return json({ data: [{ id: "we_1", url: "https://shop.example.com/api/webhooks/stripe", status: "enabled", enabled_events: ["checkout.session.completed", "invoice.paid"], livemode: true }, { id: "we_2", url: "https://old.example.com/hook", status: "disabled", enabled_events: ["*"], livemode: true }] });
+        return json({}, 404);
+      }),
+    );
+    const facts = await CONNECTOR_BY_SLUG.get("stripe")!.probe("rk_live_abcdefgh", {});
+    expect(facts.find((f) => f.metric === "webhook_endpoints")).toMatchObject({ numeric: 2, value: "2 registered: https://shop.example.com/api/webhooks/stripe (enabled), https://old.example.com/hook (disabled)" });
+    expect(facts.find((f) => f.metric === "webhook_endpoint:we_1")).toMatchObject({ numeric: 1, value: "https://shop.example.com/api/webhooks/stripe", label: "Webhook endpoint, enabled" });
+    expect(facts.find((f) => f.metric === "webhook_endpoint:we_1")?.evidence?.note).toBe("2 events: checkout.session.completed, invoice.paid");
+    expect(facts.find((f) => f.metric === "webhook_endpoint:we_2")).toMatchObject({ numeric: 0, label: "Webhook endpoint, disabled" });
+    expect(facts.find((f) => f.metric === "webhook_endpoint:we_2")?.evidence?.note).toBe("Every event.");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL) => {
+        const url = String(input);
+        if (url.includes("/v1/balance")) return json({ available: [], pending: [], livemode: true });
+        if (url.includes("/v1/charges")) return json({ data: [], has_more: false });
+        return json({ error: { type: "invalid_request_error", message: "This API key does not have the required permissions." } }, 403);
+      }),
+    );
+    const refused = await CONNECTOR_BY_SLUG.get("stripe")!.probe("rk_live_abcdefgh", {});
+    expect(refused.find((f) => f.metric === "webhooks_access")?.value).toContain("Webhook Endpoints: Read");
+    expect(refused.some((f) => f.metric.startsWith("webhook_endpoint:"))).toBe(false);
+  });
+});
+
 describe("the Vercel connector", () => {
   it("never assumes a plan for an account read without a team id", async () => {
     vi.stubGlobal(

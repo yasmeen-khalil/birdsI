@@ -63,6 +63,11 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - New alerts from those reads: a failed workflow run on the default branch, an open secret scanning alert (critical), an open Dependabot or code scanning alert of critical or high severity, a version App Review rejected, a build that did not process. Each closes when a later read no longer finds it, and a read that fails leaves it as it was.
 - A vendor you declare a project for on the Projects page gets a row in the map even when the code never names it (an App Store record, say), marked as found through the Projects page, so its account is read like any other.
 
+### Step 9: the code's webhooks against Stripe
+
+- The Stripe key (now with Webhook Endpoints: Read) also reads the endpoints registered at Stripe: each shows on the Vendors page with its state and events.
+- Every hour the cockpit compares them with the Stripe webhook routes in the map, on the app's hosts as the Vercel reads know them. A route no enabled endpoint points at opens a warning (Stripe sends it nothing), and so does an enabled endpoint pointing at the app with no route behind it (every delivery fails). A disabled endpoint is said to be disabled. Without a host, paths alone are compared, and an endpoint birdsI cannot place is never flagged. A read that fails leaves the alerts as they were.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

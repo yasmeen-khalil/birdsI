@@ -328,7 +328,7 @@ const supadata: Connector = {
 const stripe: Connector = {
   slug: "stripe",
   name: "Stripe",
-  tokenHint: "A restricted key with read access to Balance and Charges.",
+  tokenHint: "A restricted key with read access to Balance, Charges and Webhook Endpoints.",
   tokenUrl: "https://dashboard.stripe.com/apikeys",
   fields: [],
   async probe(token, _settings, signal) {
@@ -369,6 +369,21 @@ const stripe: Connector = {
       const net = (gross - refunded) / 100;
       facts.push(fact("billing", "revenue_month", "Revenue this month, after refunds", `${net.toFixed(2)} ${currency}${complete ? "" : " (the first 1,000 charges)"}`, net, currency, null, { note: "Paid charges created this month, minus what was refunded. Stripe's fees are not taken off." }));
       facts.push(fact("usage", "charges_month", "Paid charges this month", String(count), count, "charges"));
+    }
+    // The webhook endpoints registered at Stripe, so the cockpit can check them against the webhook routes in the code.
+    const hooks = await getJson<{ data?: Array<{ id: string; url?: string; status?: string; enabled_events?: string[]; livemode?: boolean }> } | { error?: { message?: string } }>("https://api.stripe.com/v1/webhook_endpoints?limit=100", auth, signal);
+    const list = hooks.status < 400 && hooks.body && "data" in hooks.body && Array.isArray(hooks.body.data) ? hooks.body.data : null;
+    if (list) {
+      const dashboard = balance.body?.livemode === false ? "https://dashboard.stripe.com/test/webhooks" : "https://dashboard.stripe.com/webhooks";
+      facts.push(fact("usage", "webhook_endpoints", "Webhook endpoints", list.length === 0 ? "None registered" : `${list.length} registered: ${list.map((h) => `${h.url ?? "?"} (${h.status ?? "unknown"})`).join(", ")}`, list.length, "endpoints", null, { url: dashboard, note: "What Stripe sends events to, checked against the webhook routes in the code." }));
+      for (const h of list) {
+        const events = h.enabled_events ?? [];
+        const enabled = h.status === "enabled";
+        facts.push(fact("status", `webhook_endpoint:${h.id}`, `Webhook endpoint, ${enabled ? "enabled" : "disabled"}${h.livemode === false ? ", test mode" : ""}`, h.url ?? "", enabled ? 1 : 0, null, null, { url: dashboard, note: events.includes("*") ? "Every event." : `${events.length} ${events.length === 1 ? "event" : "events"}: ${events.slice(0, 8).join(", ")}${events.length > 8 ? ` and ${events.length - 8} more` : ""}` }));
+      }
+    } else {
+      const said = hooks.body && "error" in hooks.body ? hooks.body.error?.message : undefined;
+      facts.push(fact("status", "webhooks_access", "Webhook endpoints", hooks.status === 401 || hooks.status === 403 ? "Not read: give the restricted key Webhook Endpoints: Read, so the cockpit can check them against the webhook routes in the code." : `Not read: Stripe answered HTTP ${hooks.status}${said ? ` (${said})` : ""}.`, null, null, null, { url: "https://dashboard.stripe.com/apikeys" }));
     }
     return facts;
   },
