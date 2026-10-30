@@ -30,7 +30,7 @@ function stored(services: Array<{ slug: string; name: string }>, reader = false)
       migrations: { style: null, dir: null, files: [], verify: null, record: null },
       publicSurface: { sitemap: null, robots: null, llmsTxt: null },
       counts: { files: 1, packages: 1, routes: 1 },
-      reader: reader ? { model: "nano", filesRead: 10, filesUnchanged: 0, filesSkipped: 0, filesOverBudget: 0, batches: 1, finds: 2, confirmed: 2, dropped: 0, known: 0, carried: 0 } : null,
+      reader: reader ? { model: "nano", filesRead: 10, filesUnchanged: 0, filesSkipped: 0, filesOverBudget: 0, batches: 1, finds: 2, confirmed: 2, dropped: 0, split: 0, known: 0, carried: 0 } : null,
       modelFinds: [],
       fileHashes: {},
     },

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ModelFind, Prompts, ReaderStats, ScanEvent, ServiceMap } from "@birdsi/shared";
-import { isBudget } from "../checks/model-findings";
+import { isBudget, isOutputLimit } from "../checks/model-findings";
 import { runPool } from "../checks/pool";
 import { isCodeLanguage, isConfigLanguage } from "../inventory/languages";
 import { prioritise } from "../inventory/priority";
@@ -10,7 +10,7 @@ import type { MapContext } from "../map/index";
 import type { ModelClient } from "../models/client";
 import { batchSegments, batchText, segmentsOf, tokensOf, type Batch } from "./chunks";
 import { Finds, FINDS_JSON_SCHEMA, mapSummary, Purposes, PURPOSES_JSON_SCHEMA, PURPOSES_SYSTEM, READER_SYSTEM, withOwner, type Find } from "./schema";
-import { alreadyKnown, confirmFind, mergeFind, type MergeContext } from "./verify";
+import { alreadyKnown, cleanPath, confirmFind, mergeFind, type MergeContext } from "./verify";
 
 export interface ReadInput {
   inventory: Inventory;
@@ -56,7 +56,7 @@ function sha1(text: string): string {
 export async function readWithModel(input: ReadInput): Promise<ReadResult> {
   const { map, context, models, signal } = input;
   const model = models.modelId("nano");
-  const stats: ReaderStats = { model, filesRead: 0, filesUnchanged: 0, filesSkipped: 0, filesOverBudget: 0, batches: 0, finds: 0, confirmed: 0, dropped: 0, known: 0, carried: 0 };
+  const stats: ReaderStats = { model, filesRead: 0, filesUnchanged: 0, filesSkipped: 0, filesOverBudget: 0, batches: 0, finds: 0, confirmed: 0, dropped: 0, split: 0, known: 0, carried: 0 };
   const merge: MergeContext = { map, context, model, areas: null };
   const summary = mapSummary(map);
   const readerSystem = withOwner(READER_SYSTEM, input.prompts?.reader);
@@ -110,7 +110,7 @@ export async function readWithModel(input: ReadInput): Promise<ReadResult> {
   const finds: Find[] = [];
   let done = 0;
   let stopped = false;
-  await runPool(batches, input.concurrency, async (batch) => {
+  const readBatch = async (batch: Batch): Promise<void> => {
     if (stopped || signal.aborted) return;
     try {
       const answer = await models.complete({
@@ -122,15 +122,37 @@ export async function readWithModel(input: ReadInput): Promise<ReadResult> {
         schema: Finds,
         jsonSchema: FINDS_JSON_SCHEMA,
         schemaName: "finds",
-        maxOutputTokens: 6000,
+        // The reader thinks first: without it Nemotron Nano proposed a hundred times more finds on
+        // a 400-file app, nearly all dropped. The budget holds the thinking and the answer (at 6,000
+        // tokens, 5 of 37 passes were cut short).
+        thinking: true,
+        maxOutputTokens: 16_000,
         signal,
       });
-      finds.push(...answer.finds);
+      finds.push(...answer.finds.map((f) => ({ ...f, path: cleanPath(f.path) })));
     } catch (error) {
       if (signal.aborted) return;
       // The daily spend limit stops the reading quietly: what was read stays, the rest waits for the next map.
-      if (isBudget(error)) stopped = true;
-      else await input.emit({ type: "note", text: `One batch of the model's reading did not finish (${error instanceof Error ? error.message.slice(0, 160) : String(error)}).` });
+      if (isBudget(error)) {
+        stopped = true;
+        return;
+      }
+      // The thinking ran past the budget: the same files in two halves, each thought over on its own.
+      // How long the model thinks varies by pass more than by size, so a smaller pass usually fits.
+      if (isOutputLimit(error) && batch.segments.length > 1) {
+        stats.split += 1;
+        const half = Math.ceil(batch.segments.length / 2);
+        for (const part of [batch.segments.slice(0, half), batch.segments.slice(half)]) {
+          await readBatch({ segments: part, chars: part.reduce((n, s) => n + s.chars, 0) });
+        }
+        return;
+      }
+      await input.emit({ type: "note", text: `One batch of the model's reading did not finish (${error instanceof Error ? error.message.slice(0, 160) : String(error)}).` });
+    }
+  };
+  await runPool(batches, input.concurrency, async (batch) => {
+    try {
+      await readBatch(batch);
     } finally {
       done += 1;
       await input.emit({ type: "step_progress", step: "review", done, total: batches.length });
@@ -197,6 +219,7 @@ export function readerNote(stats: ReaderStats): string {
   if (stats.filesUnchanged > 0) parts.push(`${stats.filesUnchanged} unchanged since the previous map were not read again`);
   parts.push(`${stats.confirmed} ${stats.confirmed === 1 ? "find" : "finds"} confirmed at their lines`);
   if (stats.carried > 0) parts.push(`${stats.carried} carried over`);
+  if (stats.split > 0) parts.push(`${stats.split} ${stats.split === 1 ? "pass" : "passes"} read again in halves after the model's thinking ran past the budget`);
   if (stats.dropped > 0) parts.push(`${stats.dropped} dropped because the line did not say what was claimed`);
   if (stats.known > 0) parts.push(`${stats.known} already on the map`);
   if (stats.filesOverBudget > 0) parts.push(`${stats.filesOverBudget} files left for the next map, over this map's reading budget`);

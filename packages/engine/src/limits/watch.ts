@@ -127,6 +127,8 @@ export async function watchLimits(input: WatchInput): Promise<LimitsDrift[]> {
           schema: Changes,
           jsonSchema: CHANGES_JSON_SCHEMA,
           schemaName: "changes",
+          // A judgment call: what a changed page says now. Thinking on, as in the first live run (2026-10-30, three pages, none cut short).
+          thinking: true,
           maxOutputTokens: 3000,
         });
         proposal = answer.changes.map((c) => `${c.change}${c.now ? ` The page now says: ${c.now}` : " The page no longer states it."}`).join(" ") || null;

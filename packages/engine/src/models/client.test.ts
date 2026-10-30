@@ -23,6 +23,8 @@ function config(overrides: Partial<EngineConfig> = {}): EngineConfig {
 
 interface ReplyOptions {
   finishReason?: string;
+  /** Text the provider put in the message's reasoning field. */
+  reasoning?: string;
   promptTokens?: number;
   completionTokens?: number;
   cachedTokens?: number;
@@ -30,7 +32,7 @@ interface ReplyOptions {
 
 function reply(content: string, options: ReplyOptions = {}): Response {
   const body = {
-    choices: [{ message: { content }, finish_reason: options.finishReason ?? "stop" }],
+    choices: [{ message: { content, ...(options.reasoning !== undefined ? { reasoning: options.reasoning } : {}) }, finish_reason: options.finishReason ?? "stop" }],
     usage: {
       prompt_tokens: options.promptTokens ?? 100,
       completion_tokens: options.completionTokens ?? 10,
@@ -50,7 +52,7 @@ const ANSWER_SCHEMA = { type: "object", properties: { ok: { type: "boolean" } },
 interface Call {
   url: string;
   headers: Record<string, string>;
-  body: { model: string; messages: Array<{ role: string; content: string }>; response_format: { type: string; json_schema?: { name: string } } };
+  body: { model: string; messages: Array<{ role: string; content: string }>; response_format: { type: string; json_schema?: { name: string } }; chat_template_kwargs?: { enable_thinking: boolean } };
 }
 
 function fakeFetch(responses: Response[]): { fetch: typeof fetch; calls: Call[] } {
@@ -65,8 +67,8 @@ function fakeFetch(responses: Response[]): { fetch: typeof fetch; calls: Call[] 
   return { fetch: fetchImpl, calls };
 }
 
-function ask(client: ModelClient, tier?: "nano" | "super"): Promise<{ ok: boolean }> {
-  return client.complete({ ...(tier ? { tier } : {}), purpose: "test", system: "Answer the question.", user: "Is it ok?", schema: Answer, jsonSchema: ANSWER_SCHEMA, schemaName: "answer" });
+function ask(client: ModelClient, tier?: "nano" | "super", thinking?: boolean): Promise<{ ok: boolean }> {
+  return client.complete({ ...(tier ? { tier } : {}), ...(thinking !== undefined ? { thinking } : {}), purpose: "test", system: "Answer the question.", user: "Is it ok?", schema: Answer, jsonSchema: ANSWER_SCHEMA, schemaName: "answer" });
 }
 
 describe("ModelClient on Token Factory", () => {
@@ -83,6 +85,7 @@ describe("ModelClient on Token Factory", () => {
     expect(call.body.model).toBe("small");
     expect(call.body.response_format).toEqual({ type: "json_schema", json_schema: { name: "answer", schema: ANSWER_SCHEMA } });
     expect(call.body.messages[0]!.content).toContain("JSON schema");
+    expect(call.body.chat_template_kwargs).toEqual({ enable_thinking: false });
     expect(usages).toEqual([{ model: "small", inputTokens: 1100, cachedTokens: 1000, outputTokens: 10, costMicrodollars: 20, purpose: "test" }]);
     expect(client.inputTokensSpent).toBe(1100);
   });
@@ -112,6 +115,32 @@ describe("ModelClient on Token Factory", () => {
     await expect(ask(client)).resolves.toEqual({ ok: true });
     await expect(ask(client)).resolves.toEqual({ ok: false });
     expect(calls.map((c) => c.body.response_format.type)).toEqual(["json_schema", "json_object", "json_object"]);
+  });
+
+  it("leaves thinking on for a call that asks for it", async () => {
+    const { fetch, calls } = fakeFetch([reply('{"ok":true}')]);
+    await ask(new ModelClient(config(), { fetch }), undefined, true);
+    expect(calls[0]!.body.chat_template_kwargs).toBeUndefined();
+  });
+
+  it("fails at once, without asking again, when a thinking call is cut off at the output limit", async () => {
+    const { fetch, calls } = fakeFetch([reply("", { finishReason: "length" }), reply('{"ok":true}')]);
+    await expect(ask(new ModelClient(config(), { fetch }), undefined, true)).rejects.toMatchObject({ name: "OutputLimitError" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("calls without the thinking switch once a model refuses it, and remembers it", async () => {
+    const { fetch, calls } = fakeFetch([failure(400, "chat_template_kwargs: enable_thinking is not a template variable"), reply('{"ok":true}'), reply('{"ok":false}')]);
+    const client = new ModelClient(config(), { fetch });
+    await expect(ask(client)).resolves.toEqual({ ok: true });
+    await expect(ask(client)).resolves.toEqual({ ok: false });
+    expect(calls.map((c) => c.body.chat_template_kwargs)).toEqual([{ enable_thinking: false }, undefined, undefined]);
+    expect(calls.map((c) => c.body.response_format.type)).toEqual(["json_schema", "json_schema", "json_schema"]);
+  });
+
+  it("reads an answer the provider put in the reasoning field", async () => {
+    const { fetch } = fakeFetch([reply("", { reasoning: '{"ok":true}' })]);
+    await expect(ask(new ModelClient(config(), { fetch }))).resolves.toEqual({ ok: true });
   });
 
   it("asks again when the answer does not match the schema", async () => {

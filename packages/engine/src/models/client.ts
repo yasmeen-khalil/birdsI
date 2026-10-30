@@ -35,11 +35,25 @@ export interface CompleteOptions<T> {
   /** The name the schema is sent under to Token Factory. */
   schemaName?: string;
   maxOutputTokens?: number;
+  /**
+   * Lets the model think before it answers. On for judgment calls (the reader,
+   * the docs check, the limits watch), whose output budget must hold the
+   * thinking and the answer; a call whose thinking runs past the budget fails
+   * with OutputLimitError so the caller can send less. Off, the default, for
+   * writing calls (a service's purpose, a failed deployment explained), where
+   * thinking only spends the budget.
+   */
+  thinking?: boolean;
   signal?: AbortSignal;
 }
 
 export class BudgetExceededError extends Error {
   override name = "BudgetExceededError";
+}
+
+/** A thinking call whose thinking ran past the output budget: the caller sends less, it is not asked again as it was. */
+export class OutputLimitError extends Error {
+  override name = "OutputLimitError";
 }
 
 export type Fetch = typeof fetch;
@@ -63,7 +77,7 @@ interface RawReply {
 
 /** The shape of a Token Factory chat completion, read field by field. */
 interface ChatCompletion {
-  choices?: Array<{ message?: { content?: string | null }; finish_reason?: string }>;
+  choices?: Array<{ message?: { content?: string | null; reasoning?: string | null }; finish_reason?: string }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } };
 }
 
@@ -77,7 +91,8 @@ const TOKEN_FACTORY_TIMEOUT_MS = 180_000;
  * Anthropic sit behind the same calls, chosen by the provider the config
  * selected. Every call is counted against the map's budget and priced into
  * the usage ledger, and the caller can refuse a call once a daily limit is
- * reached. Today only the docs check uses it.
+ * reached. The reader, the purposes, the docs check, the failed-deployment
+ * explainer and the limits watch all come through it.
  */
 export class ModelClient {
   private readonly anthropic: Anthropic | null;
@@ -86,6 +101,8 @@ export class ModelClient {
   private throttled = 0;
   /** Models for which Token Factory refused the strict schema format, answered in plain JSON mode from then on. */
   private readonly plainJson = new Set<string>();
+  /** Models for which Token Factory refused the thinking switch, called without it from then on. */
+  private readonly keepsThinking = new Set<string>();
 
   constructor(
     private readonly config: EngineConfig,
@@ -172,6 +189,8 @@ export class ModelClient {
       const reply = this.config.provider === "nebius" ? await this.completeTokenFactory(model, opts, system, repair) : await this.completeAnthropic(model, opts, system, repair);
       await this.record(model, opts.purpose, reply.usage);
       if (reply.cutOff) {
+        // A thinking call that ran past the budget is not asked again as it was: the same text brings the same thinking. The caller sends less.
+        if (opts.thinking) throw new OutputLimitError(`The model's thinking ran past the output budget before it answered (${opts.purpose}).`);
         lastError = new Error("The answer stopped at the output limit before it was complete.");
         continue;
       }
@@ -218,17 +237,32 @@ export class ModelClient {
     ];
     if (repair) messages.push({ role: "user", content: repair });
     const strict = !this.plainJson.has(model);
+    const quiet = !this.keepsThinking.has(model);
     const body = {
       model,
       messages,
       temperature: 0.1,
       max_tokens: opts.maxOutputTokens ?? 4096,
       response_format: strict ? { type: "json_schema", json_schema: { name: opts.schemaName ?? "answer", schema: opts.jsonSchema } } : { type: "json_object" },
+      // Thinking is on by default on the Nemotron models and spends the output budget before the
+      // answer. A judgment call keeps it and brings the budget, and when the thinking runs past the
+      // budget the call fails with OutputLimitError and the caller sends less (see complete). A
+      // writing call switches it off with the chat template's own switch, honoured by both Nemotron
+      // models. The documented reasoning_effort field is not sent: "none" leaves Nemotron 3 Nano's
+      // content empty with the answer in the reasoning field, "minimal" bounds nothing, and "low"
+      // bounded one pass and not a map (13 of 50 calls still cut, 2026-10-30). Answering without
+      // thinking after a cut was tried too: it floods the verifier with ten times the finds.
+      ...(opts.thinking || !quiet ? {} : { chat_template_kwargs: { enable_thinking: false } }),
     };
     const response = await this.postWithRetries(url, key, body, opts.signal);
     if (!response.ok) {
       const reason = await errorReason(response);
       // A model that takes no schema still answers in JSON mode; the schema stays in the prompt.
+      // A model whose template has no thinking switch is called without it, and its think tags are dropped on reading.
+      if (response.status === 400 && quiet && /chat_template_kwargs|enable_thinking/i.test(reason)) {
+        this.keepsThinking.add(model);
+        return this.completeTokenFactory(model, opts, system, repair);
+      }
       if (response.status === 400 && strict && /response_format|json_schema|schema/i.test(reason)) {
         this.plainJson.add(model);
         return this.completeTokenFactory(model, opts, system, repair);
@@ -240,7 +274,8 @@ export class ModelClient {
     const usage = data.usage ?? {};
     const cached = usage.prompt_tokens_details?.cached_tokens ?? 0;
     return {
-      text: choice?.message?.content ?? "",
+      // A provider that routes the whole answer to the reasoning field still answers.
+      text: choice?.message?.content || choice?.message?.reasoning || "",
       usage: { inputTokens: Math.max(0, (usage.prompt_tokens ?? 0) - cached), cacheReadTokens: cached, outputTokens: usage.completion_tokens ?? 0 },
       cutOff: choice?.finish_reason === "length",
     };

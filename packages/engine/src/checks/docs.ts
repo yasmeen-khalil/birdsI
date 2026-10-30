@@ -71,7 +71,9 @@ export const docsCheck: Check = {
             ].join("\n\n"),
             schema: ModelFindings,
             jsonSchema: MODEL_FINDINGS_JSON_SCHEMA,
-            maxOutputTokens: 4000,
+            // A judgment call: the model thinks first, and the budget holds the thinking and the answer.
+            thinking: true,
+            maxOutputTokens: 10_000,
             signal: ctx.signal,
           });
           const kept = filterModelFindings(result.findings, 0.6, knownPaths).filter((f) => f.docUrl && allowed.has(f.docUrl) && f.docQuote);

@@ -93,6 +93,10 @@ export function isBudget(error: unknown): boolean {
   return error instanceof Error && error.name === "BudgetExceededError";
 }
 
+export function isOutputLimit(error: unknown): boolean {
+  return error instanceof Error && error.name === "OutputLimitError";
+}
+
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
 }

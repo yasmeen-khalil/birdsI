@@ -12,7 +12,7 @@ export const Find = z.object({
   schedule: z.string().max(60).nullable().describe("For a cron: the schedule exactly as written, cron syntax when it is cron syntax. Null for anything else"),
   path: z.string().describe("The file, exactly as its heading shows it"),
   line: z.number().int().positive().describe("The line number shown at the start of the line"),
-  quote: z.string().max(200).describe("That line's text, copied exactly"),
+  quote: z.string().max(200).describe("That line's text, copied exactly, with any double quote mark written as a single quote mark"),
 });
 export type Find = z.infer<typeof Find>;
 
@@ -38,7 +38,7 @@ Report an entry only when the code you are shown proves it and the map does not 
 - deployment: a second deployable the map lacks: a Dockerfile, fly.toml, a Railway or Render config, a second app in the repository.
 - other: anything else that makes the app run and the map lacks.
 
-For every entry give the file exactly as its heading shows it, the line number shown at the start of the line, and that line's text copied exactly. An entry whose line does not say what you claim is dropped. Prefer the line that names the thing: the import, the env read, the schedule, the route. When nothing is missing, return an empty list. Never report what the map already has, and never guess from a file name alone.`;
+For every entry give the file exactly as its heading shows it, the line number shown at the start of the line, and that line's text copied exactly, with any double quote mark written as a single quote mark. An entry whose line does not say what you claim is dropped. Prefer the line that names the thing: the import, the env read, the schedule, the route. When nothing is missing, return an empty list. Never report what the map already has, and never guess from a file name alone.`;
 
 export const PURPOSES_SYSTEM = `You write one plain sentence per service saying what this app uses it for, from the lines of code shown and nothing else. Name the feature or the job in the app's own terms, for example: sends the daily digest emails, or stores uploaded photos. When the lines do not say what it is for, answer null for that service. Keep every sentence under twenty words. Do not use emojis, em dashes, semicolons or exclamation marks.`;
 

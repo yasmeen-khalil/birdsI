@@ -8,39 +8,82 @@ import { cleanSlug, matchDomain, matchEnv, matchPackage } from "../vendors/disco
 import type { Find } from "./schema";
 
 const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+/**
+ * Spacing and quote marks set aside: a model copies "2023" as '2023' or as
+ * curly quotes, and under schema-constrained decoding Nemotron writes a double
+ * quote mark as a mangled character reference ($#34#91;), so quote marks and
+ * such references are dropped from both sides before the quote is looked for.
+ */
+const same = (s: string) => norm(s).replace(/(?:[$&]?#\d+;?)+\$?/g, "").replace(/[\u2018\u2019\u201c\u201d'"`]/g, "");
+/** How far from the claimed line the quoted text may sit: the model reads numbered lines and still names a neighbour. */
+const LINE_WINDOW = 2;
 const flat = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 const words = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+
+/** The path as the model copied it from the heading, without the heading's marks or its "(lines 1 to 28 of 28)". */
+export function cleanPath(path: string): string {
+  return path.replace(/^#+\s*/, "").replace(/\s*\(lines \d+ to \d+ of \d+\)\s*$/, "").trim();
+}
 
 /**
  * The find's line, when the file has it and the line says what the find
  * claims: the quoted text is on that line, and the thing named is on it too
  * (an env name as a whole token, a schedule as written, a service by name).
+ * The quote is the evidence and the number is the model's bookkeeping: when
+ * the quoted text sits on a neighbouring line (the model often names the
+ * line above or below the one it copied), the find is confirmed at the line
+ * that has it, and that is the line recorded.
  */
 export function confirmFind(find: Find, content: string | null): SourceLine | null {
   if (!content) return null;
-  const raw = content.split("\n")[find.line - 1];
-  if (raw === undefined) return null;
-  const line = norm(raw);
-  const masked = norm(maskSecrets(raw));
-  const quote = norm(find.quote);
-  if (quote.length < 2 || !(line.includes(quote) || masked.includes(quote))) return null;
-  if (!mentions(line, find)) return null;
-  return { path: find.path, line: find.line, text: maskSecrets(raw.trim()).slice(0, 200) };
+  const lines = content.split("\n");
+  const quote = same(find.quote);
+  if (quote.length < 2) return null;
+  const order = [0];
+  for (let d = 1; d <= LINE_WINDOW; d++) order.push(-d, d);
+  for (const offset of order) {
+    const number = find.line + offset;
+    const raw = lines[number - 1];
+    if (raw === undefined) continue;
+    if (!(same(raw).includes(quote) || same(maskSecrets(raw)).includes(quote))) continue;
+    if (!mentions(norm(raw), find)) continue;
+    return { path: find.path, line: number, text: maskSecrets(raw.trim()).slice(0, 200) };
+  }
+  return null;
 }
 
+/** An import or require from the app's own files: a relative path or a path alias, not a package. */
+const OWN_IMPORT = /\b(?:from|require\s*\(|import\s*\()\s*["'`](?:\.{1,2}\/|@\/|~\/|#)/;
+
 function mentions(line: string, find: Find): boolean {
-  if (find.kind === "env") return new RegExp(`(^|[^A-Za-z0-9_])${find.name}([^A-Za-z0-9_]|$)`).test(line);
+  if (find.kind === "env") {
+    // The name must be read as an env name on the line: through an env object, or as a quoted string a
+    // helper reads. A bare identifier on an import line is a constant that happens to be upper case.
+    const name = find.name;
+    const asEnv = new RegExp(`(?:env|environ|ENV)\\s*(?:\\.|\\[\\s*["'\`]|\\.get\\(\\s*["'\`])\\s*${name}([^A-Za-z0-9_]|$)`).test(line);
+    const quoted = new RegExp(`["'\`]${name}["'\`]`).test(line);
+    return asEnv || quoted;
+  }
+  // A service comes from a package or a call to its API, never from an import of the app's own files.
+  if (find.kind === "service" && OWN_IMPORT.test(line)) return false;
   if (find.kind === "other") return true;
   if (find.kind === "cron" && find.schedule && line.includes(find.schedule)) return true;
+  // A timer loop has no name of its own: the line that sets the interval is the proof.
+  if (find.kind === "cron" && /\b(setInterval|cron\.schedule|schedule)\s*\(/.test(line)) return true;
   const inLine = flat(line);
   const name = flat(find.name);
   if (name.length >= 3 && inLine.includes(name)) return true;
+  // Every word of the name, not just one: "supabase-v73.sql" is not on a line about supabase-v70.sql.
   const lower = line.toLowerCase();
-  if (words(find.name).some((w) => lower.includes(w))) return true;
-  // A route, a config or a deployable is named by its file as often as by a line in it.
+  const named = words(find.name);
+  if (named.length > 0 && named.every((w) => lower.includes(w))) return true;
+  // A route, a config or a deployable is named by its file as often as by a line in it: by a whole
+  // part of the path ("ios", not "com" inside "components"), and a store app only by a store config.
   if (find.kind === "webhook" || find.kind === "store_app" || find.kind === "migration" || find.kind === "deployment") {
+    if (find.kind === "store_app" && !storePlatform(find.path)) return false;
     const path = find.path.toLowerCase();
-    return words(find.name).some((w) => path.includes(w)) || (find.kind === "webhook" && path.includes("webhook"));
+    const parts = new Set(path.split(/[^a-z0-9]+/));
+    return words(find.name).some((w) => parts.has(w)) || (find.kind === "webhook" && path.includes("webhook"));
   }
   return false;
 }
@@ -86,7 +129,8 @@ export function alreadyKnown(map: ServiceMap, find: Find, at: SourceLine): boole
     case "env":
       return map.env.some((e) => e.name === find.name || e.alternatives.includes(find.name));
     case "cron":
-      return map.crons.some((c) => (c.source.path === at.path && c.source.line === at.line) || (find.schedule !== null && c.schedule === find.schedule && (c.path === find.name || c.source.path === at.path)));
+      // A Vercel cron is declared in vercel.json and handled by a route file: a find in that file names the same cron.
+      return map.crons.some((c) => (c.source.path === at.path && c.source.line === at.line) || c.handler === at.path || (find.schedule !== null && c.schedule === find.schedule && (c.path === find.name || c.source.path === at.path)));
     case "webhook":
       return map.webhooks.some((w) => w.file === at.path || normRoute(w.route) === normRoute(find.name));
     case "store_app":

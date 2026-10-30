@@ -168,6 +168,8 @@ export const ReaderStats = z.object({
   confirmed: z.number().int(),
   /** Finds whose line did not say what the model claimed. */
   dropped: z.number().int(),
+  /** Passes the model's thinking ran past the budget on, read again in two halves. */
+  split: z.number().int().default(0),
   /** Finds the map already had. */
   known: z.number().int(),
   /** Finds carried over from the previous map, their files unchanged. */
