@@ -80,7 +80,7 @@ birdsI becomes the cockpit for its owner's apps: one page per app, read from the
 
 ### Step 7: the documents and the owner's clicks
 
-- The owner's steps for v3 in one place (private): the seven migrations in order and `verify.sql`, the keys v3 no longer reads, a key per vendor with the exact clicks (a Vercel token scoped to the team, a Supabase personal access token scoped to the project with Read permissions only, a OneSignal App API key) and where each goes, the alert email key, the dates to watch, and a walk through Flowsophy's cockpit and then Lamp Post's.
+- The setup steps for v3 in one place: the seven migrations in order and `verify.sql`, the keys v3 no longer reads, a key per vendor with the exact clicks (a Vercel token scoped to the team, a Supabase personal access token scoped to the project with Read permissions only, a OneSignal App API key) and where each goes, the alert email key, the dates to watch.
 - The security policy says what the alert email holds and what the MCP tools may do. The feature map, the architecture and the security notes describe the cockpit end to end.
 
 ### Step 6: the cockpit
@@ -128,7 +128,7 @@ birdsI becomes the cockpit for its owner's apps: one page per app, read from the
 - Each map is kept, dated, with its commit and branch, the newest 30 per app (`20261018000200_service_maps.sql`). `GET /api/v1/repos/:id/map` returns the newest with the dates of the ones before.
 - The live map and the terminal show the map's totals. The Projects page names the deployments the code serves and checks a Vercel project labelled with one against that deployment's needs.
 - `scripts/map-app.mts` maps an app on this computer (its last commit) and writes the map as JSON. Flowsophy, Lamp Post and Vaultaire were mapped with it on 2026-10-18.
-- Two services the owner's apps use joined the catalog: MetalpriceAPI (Vaultaire's metal prices) and App Store Connect (any app with an Xcode project).
+- Two services joined the catalog: MetalpriceAPI (metal prices) and App Store Connect (any app with an Xcode project).
 
 ### Step 2: apps, and keys tied to projects
 
