@@ -10,8 +10,8 @@ Built for the Nebius x NVIDIA Global AI Hackathon, Best Apps and Agents track: t
 
 ## Try it
 
-- **The demo page**, DEMO_URL/demo: the cockpit of the sample app in `samples/corner-bakery` (a bakery's online ordering with a few problems left in on purpose), readable without signing in.
-- **Your own app**: sign in with GitHub at DEMO_URL, then run `npx birdsi` in the app's folder (from a clone of this repository until the package is on npm: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`). The Set up page lists what to connect and what each key lets birdsI read.
+- **The demo page**, https://birdsi.vercel.app/demo: the cockpit of the sample app in `samples/corner-bakery` (a bakery's online ordering with a few problems left in on purpose), readable without signing in.
+- **Your own app**: sign in with GitHub at https://birdsi.vercel.app, then run `npx birdsi` in the app's folder (from a clone of this repository until the package is on npm: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`). The Set up page lists what to connect and what each key lets birdsI read.
 - **Inside a coding agent**: `claude mcp add birdsi -- npx -y birdsi mcp`, then ask for the cockpit.
 
 ## What it does

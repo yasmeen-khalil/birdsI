@@ -17,7 +17,7 @@ The key you set picks the provider (`NEBIUS_API_KEY`), and `BIRDSI_MODEL_NANO` a
 
 **What the judges can try.**
 
-- The demo page, DEMO_URL/demo: the cockpit of the sample app in `samples/corner-bakery`, readable without signing in. It shows what the rules found, what the model added (marked as the model's, confirmed at file and line), the accounts behind it, the security section with its honest scope statement, the money section, and the open alerts: a webhook that never checks its sender, a cron that skips its secret, env names declared and never read, a package never imported, and whatever the connected accounts say that day.
+- The demo page, https://birdsi.vercel.app/demo: the cockpit of the sample app in `samples/corner-bakery`, readable without signing in. It shows what the rules found, what the model added (marked as the model's, confirmed at file and line), the accounts behind it, the security section with its honest scope statement, the money section, and the open alerts: a webhook that never checks its sender, a cron that skips its secret, env names declared and never read, a package never imported, and whatever the connected accounts say that day.
 - Sign in with GitHub and add an app of your own: run `npx birdsi` in its folder (from a clone of this repository: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`), and the Set up page lists what to connect and what each key lets birdsI read before you make one.
 - `npx birdsi cockpit` in the terminal, or `npx birdsi mcp` inside a coding agent, gives the same view.
 
