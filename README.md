@@ -2,7 +2,7 @@
 
 The cockpit for your apps. birdsI maps each app from its code: the services it runs on, its deployments, crons, webhooks, store apps, migrations and the settings each deployment needs. Then it reads the vendor accounts with keys that only read, and tells you what needs you. Nothing a model says reaches you unverified: the map is read by rules that cite the file and line, and the one model call today, the optional docs check, must cite the package's own documentation.
 
-Run `npx birdsi` in an app's folder and its cockpit opens: what needs you, the services and dependencies by what each is for with its docs and its key, the live reads of each Vercel project, Supabase project and OneSignal app, the last map and what it checked, security with every finding's severity under an honest scope statement, money as far as it is known (spend read from the accounts, list prices where no spend is read, and what you entered for what no API reports), and the code's crons, webhooks, store apps, migrations and public pages. The Set up page lists what birdsI still needs from you, service by service: the project to declare, the key to make with the exact clicks, what each key lets birdsI read and alert on, and what birdsI may do with it (read only in this phase). Until the package is on npm, run it from a clone: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`.
+Run `npx birdsi` in an app's folder and its cockpit opens: what needs you, the services and dependencies by what each is for with its docs and its key, the live reads of each Vercel project, Supabase project and OneSignal app, the last map and what it checked, security with every finding's severity under an honest scope statement, money as far as it is known (spend read from the accounts, list prices where no spend is read, and what you entered for what no API reports), and the code's crons, webhooks, store apps, migrations and public pages. The Set up page lists what birdsI still needs from you, service by service: the project to declare, the key to make with the exact clicks, what each key lets birdsI read and alert on, and what birdsI may do with it (read only in this phase).
 
 birdsI is its owner's cockpit for their own apps first. A product for others comes later.
 
@@ -11,7 +11,7 @@ Built for the Nebius x NVIDIA Global AI Hackathon, Best Apps and Agents track: t
 ## Try it
 
 - **The demo page**, https://birdsi.vercel.app/demo: the cockpit of the sample app in `samples/corner-bakery` (a bakery's online ordering with a few problems left in on purpose), readable without signing in.
-- **Your own app**: sign in with GitHub at https://birdsi.vercel.app, then run `npx birdsi` in the app's folder (from a clone of this repository until the package is on npm: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`). The Set up page lists what to connect and what each key lets birdsI read.
+- **Your own app**: sign in with GitHub at https://birdsi.vercel.app, then run `npx birdsi` in the app's folder (or from a clone of this repository: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`). The Set up page lists what to connect and what each key lets birdsI read.
 - **Inside a coding agent**: `claude mcp add birdsi -- npx -y birdsi mcp`, then ask for the cockpit.
 
 ## What it does
@@ -47,7 +47,7 @@ apps/worker      background worker: maps the code and reads the accounts (any No
 packages/engine  the engine: source adapters, inventory, discovery, checks, connectors, alert rules
 packages/shared  domain types, API schemas, the checked limits list, UI copy
 packages/db      Supabase data access, job queue, usage ledger
-packages/cli     the `birdsi` CLI and MCP server (not on npm yet)
+packages/cli     the `birdsi` CLI and MCP server (on npm as `birdsi`)
 supabase/        database migrations and verify.sql
 samples/         corner-bakery, the sample app the demo page maps
 ```
