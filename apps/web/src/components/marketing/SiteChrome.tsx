@@ -49,7 +49,7 @@ export function SiteFooter() {
         </span>
         <span className="t-small c3">Licensed under MPL 2.0.</span>
       </div>
-      <p className="t-small c2 min-[901px]:col-span-5 min-[901px]:col-start-5">Maps, account reads and alerts run without a model. The optional docs check reads a package&apos;s own documentation through Tavily and compares it with the code on Claude. Your code is never used to train models.</p>
+      <p className="t-small c2 min-[901px]:col-span-5 min-[901px]:col-start-5">Rules build the map, and account reads and alerts run without a model. A model then reads the code for what the rules missed, and each find is checked at its file and line. Your code is never used to train models.</p>
       <nav className="t-small flex flex-wrap gap-x-6 gap-y-2 min-[901px]:col-span-3 min-[901px]:col-start-10 min-[901px]:justify-end" style={{ fontSize: 13 }} aria-label="Footer">
         <Link href="/terms" style={{ color: "var(--text-2)" }}>
           Terms

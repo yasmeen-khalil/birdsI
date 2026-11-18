@@ -39,7 +39,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider>
-      <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable} h-full`}>
+      <html lang="en" data-scroll-behavior="smooth" className={`${serif.variable} ${sans.variable} ${mono.variable} h-full`}>
         <body className="min-h-full">{children}</body>
       </html>
     </ClerkProvider>

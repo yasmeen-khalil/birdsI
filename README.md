@@ -1,10 +1,8 @@
 # birdsI
 
-The cockpit for your apps. birdsI maps each app from its code: the services it runs on, its deployments, crons, webhooks, store apps, migrations and the settings each deployment needs. Then it reads the vendor accounts with keys that only read, and tells you what needs you. Nothing a model says reaches you unverified: the map is read by rules that cite the file and line, and the one model call today, the optional docs check, must cite the package's own documentation.
+The cockpit for your apps. birdsI maps each app from its code: the services it runs on, its deployments, crons, webhooks, store apps, migrations and the settings each deployment needs. Then it reads the vendor accounts with keys that only read, and tells you what needs you. Nothing a model says reaches you unverified: the map is read by rules that cite the file and line, every find a model adds is confirmed at its file and line, and the optional docs check must cite the package's own documentation.
 
-Run `npx birdsi` in an app's folder and its cockpit opens: what needs you, the services and dependencies by what each is for with its docs and its key, the live reads of each Vercel project, Supabase project and OneSignal app, the last map and what it checked, security with every finding's severity under an honest scope statement, money as far as it is known (spend read from the accounts, list prices where no spend is read, and what you entered for what no API reports), and the code's crons, webhooks, store apps, migrations and public pages. The Set up page lists what birdsI still needs from you, service by service: the project to declare, the key to make with the exact clicks, what each key lets birdsI read and alert on, and what birdsI may do with it (read only in this phase).
-
-birdsI is its owner's cockpit for their own apps first. A product for others comes later.
+Run `npx birdsi` in an app's folder and its cockpit opens: what needs you, the services and dependencies by what each is for with its docs and its key, the live reads of each Vercel project, Supabase project and OneSignal app, the last map and what it checked, security with every finding's severity under an honest scope statement, money as far as it is known (spend read from the accounts, list prices where no spend is read, and what you entered for what no API reports), and the code's crons, webhooks, store apps, migrations and public pages. The Set up page lists what birdsI still needs from you, service by service: the project to declare, the key to make with the exact clicks, what each key lets birdsI read and alert on, and what birdsI may do with it (read only).
 
 Built for the Nebius x NVIDIA Global AI Hackathon, Best Apps and Agents track: the model behind birdsI is NVIDIA Nemotron 3 on Nebius Token Factory, reading the code after the rules and behind a verifier, with Tavily finding the current documentation and watching the pricing pages. HACKATHON.md says exactly where each call is made and what the judges can try.
 
@@ -56,8 +54,6 @@ samples/         corner-bakery, the sample app the demo page maps
 
 Requirements: Node 22 or newer, a Supabase project, a Clerk application (GitHub sign-in). A model key (`NEBIUS_API_KEY` for Nemotron on Nebius Token Factory, or `ANTHROPIC_API_KEY` for Claude) and a Tavily key are optional: together they switch on the docs check. A GitHub App is optional.
 
-The repository is private today. Making it public is the owner's decision. With access:
-
 ```bash
 git clone https://github.com/yasmeen-khalil/birdsI.git
 cd birdsI
@@ -65,7 +61,7 @@ npm install
 cp .env.example .env.local     # fill in the keys. apps/web/.env.local is a symlink to it
 ```
 
-Database: apply every file under `supabase/migrations/` to your Supabase project, in filename order (paste each into the SQL editor, or `supabase db push`), thirteen files today. Then paste `supabase/verify.sql` and run it: every row should say OK.
+Database: apply every file under `supabase/migrations/` to your Supabase project, in filename order (paste each into the SQL editor, or `supabase db push`). Then paste `supabase/verify.sql` and run it: every row should say OK.
 
 Run the web app and the worker in two terminals:
 

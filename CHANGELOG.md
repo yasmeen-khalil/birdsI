@@ -85,6 +85,13 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - The web app at https://birdsi.vercel.app runs this version since 2026-11-03.
 
 
+### The landing page in plainer words (2026-11-17)
+
+- The landing page says what birdsI does in fewer words: a new headline and introduction, shorter section text, and a second sign-in button at the end of the page. The section numbers and the "One page per app" label are gone.
+- The landing text and the footer no longer say that no model reads the code: since v4 a model reads it after the rules, and each find is confirmed at its file and line.
+- The links at the top of the landing page glide to their section, unless the browser asks for reduced motion.
+- README.md no longer says the repository is private, and its opening no longer calls the docs check the only model call.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

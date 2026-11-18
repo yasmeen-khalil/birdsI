@@ -371,6 +371,11 @@ a.q, button.q { display: block; padding: 0; border: 0; cursor: pointer; }
 .instrument .btn-quiet:hover { color: var(--text); background: var(--raised); }
 
 /* Section rule: a hairline with an index readout at its left edge. */
+/* In-page links glide to their section, unless the person asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
 .sect-rule { display: flex; align-items: center; gap: 14px; color: var(--text-3); }
 .sect-rule::after { content: ""; flex: 1; height: 1px; background: var(--line-strong); }
 
