@@ -30,7 +30,7 @@ export default async function ScanPage({ params }: { params: Promise<{ repoId: s
         initialCursor={events[events.length - 1]?.seq ?? 0}
         stepLabels={STEP_LABELS}
         heading={`Mapping ${name}`}
-        intro="Every file, package and outside service, the deployments, crons, webhooks, store apps and migrations, and the rule-based checks. No model reads the code."
+        intro="Every file, package and outside service, the deployments, crons, webhooks, store apps and migrations, and the rule-based checks. A model then reads the code for what the rules missed, and each find is confirmed at its line."
         expectedSeconds={MAP_SECONDS}
         scanError={scan.error}
         leaveNote="Safe to close this page. birdsI keeps going."

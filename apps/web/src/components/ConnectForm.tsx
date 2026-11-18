@@ -64,7 +64,7 @@ export function ConnectForm({ repos }: { repos: ConnectRepo[] }) {
       </fieldset>
 
       <p className="t-small c2" style={{ marginTop: 24 }}>
-        The map reads every file, package and outside service, the deployments, crons, webhooks, store apps and migrations, in about a minute. No model reads the code.
+        The map reads every file, package and outside service, the deployments, crons, webhooks, store apps and migrations, in about a minute. Rules read first, then a model reads the code for what they missed.
       </p>
 
       <div className="flex flex-col-reverse items-stretch gap-3 min-[901px]:flex-row min-[901px]:items-center min-[901px]:justify-between" style={{ marginTop: 40 }}>

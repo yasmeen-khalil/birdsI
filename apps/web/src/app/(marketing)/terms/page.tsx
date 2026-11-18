@@ -5,7 +5,7 @@ import { LegalList, LegalP, LegalPage, LegalSection } from "@/components/marketi
 /** Who runs this instance of birdsI. A self-hosted copy names its own operator here. */
 const OPERATOR_NAME = "yasmeen-khalil";
 const OPERATOR_URL = "https://github.com/yasmeen-khalil";
-const EFFECTIVE_DATE = "18 October 2026";
+const EFFECTIVE_DATE = "17 November 2026";
 
 export const metadata: Metadata = { title: "Terms" };
 
@@ -28,7 +28,7 @@ export default function TermsPage() {
         <LegalP>
           birdsI maps the code of the apps you connect: the outside services (vendors) each one runs on, its deployments, crons, webhooks, store apps, migrations and the names of the settings it needs. It checks the code against vulnerability databases and, when set up, against each main package&apos;s own current documentation. With keys you give it for your vendor accounts, it reads status, plans and usage, and turns what goes wrong into alerts. It writes no code and opens no pull requests.
         </LegalP>
-        <LegalP>Every finding says how sure birdsI is: Proven, Doc-verified, or Judgment. Judgment findings were an AI model&apos;s reading of your code, kept from before birdsI stopped reading code with a model, and may be wrong.</LegalP>
+        <LegalP>Every finding says how sure birdsI is: Proven, Doc-verified, or Judgment. Judgment marks an AI model&apos;s reading of your code that no rule confirms, such as what your app uses a service for, and it may be wrong.</LegalP>
       </LegalSection>
 
       <LegalSection title="Your code stays yours">

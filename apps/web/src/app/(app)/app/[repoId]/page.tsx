@@ -141,7 +141,7 @@ export default async function CockpitPage({ params }: { params: Promise<{ repoId
           <h2 id="no-scans" className="t-h2" style={{ fontSize: 23 }}>
             {name} is not mapped yet
           </h2>
-          <p className="t-small c2">The map reads every file, package and outside service the app runs on, in about a minute, with no model. Then birdsI reads the accounts you connect.</p>
+          <p className="t-small c2">The map reads every file, package and outside service the app runs on, in about a minute. Rules read first, then a model reads the code for what they missed. Then birdsI reads the accounts you connect.</p>
           <div className="flex justify-end">
             <ScanAgainButton repoId={repo.id} label="Map the code" />
           </div>

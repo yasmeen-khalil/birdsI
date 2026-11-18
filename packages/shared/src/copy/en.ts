@@ -13,7 +13,7 @@ export const en = {
   confidenceExplained: {
     proven: "A fixed rule or tool found it, not a model. Run it again and you get the same answer.",
     doc_verified: "Checked against the current official docs, which are cited so you can read them too.",
-    judgment: "A model's reading of the code, from before birdsI stopped reading code with a model. Check it before acting.",
+    judgment: "A model's reading of the code, which no rule confirms. Check it before acting.",
   },
   severity: {
     critical: "Critical",

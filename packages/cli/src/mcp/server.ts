@@ -77,7 +77,7 @@ function summarize(result: ScanResponse, top = 10): string {
     lines.push("", ordered.length > top ? `Top ${top} findings:` : "Findings:");
     for (const f of ordered.slice(0, top)) lines.push(compactFinding(f));
     if (ordered.length > top) lines.push(`${ordered.length - top} more: call birdsi_findings with scanId ${scan.id}.`);
-    lines.push("", "Confidence: Proven means a fixed rule or database found it. Doc-verified means checked against the package's own current docs, which are cited. Judgment marks a model's reading of the code from before birdsI stopped reading code with a model. Verify it before acting on it.", LEGEND);
+    lines.push("", "Confidence: Proven means a fixed rule or database found it. Doc-verified means checked against the package's own current docs, which are cited. Judgment marks a model's reading of the code that no rule confirms. Verify it before acting on it.", LEGEND);
   } else if (scan.summary?.headline) {
     lines.push("", LEGEND);
   }
@@ -122,7 +122,7 @@ export function createServer(): McpServer {
     {
       title: "Map a local folder",
       description:
-        "Uploads a snapshot of a local folder (env files, keys and what .gitignore leaves out stay local) and maps it: the services the app runs on, its deployments, crons, webhooks, store apps, migrations and env names, plus rule-based checks for exposed keys, published vulnerabilities and packages far behind. No model reads the code. The upload is deleted once the map has run. Waits up to 4 minutes by default and returns the counts and the top findings with their ids. The accounts are read again after every map.",
+        "Uploads a snapshot of a local folder (env files, keys and what .gitignore leaves out stay local) and maps it: the services the app runs on, its deployments, crons, webhooks, store apps, migrations and env names, plus rule-based checks for exposed keys, published vulnerabilities and packages far behind. A model reads the code after the rules, and each of its finds is confirmed at its file and line. The upload is deleted once the map has run. Waits up to 4 minutes by default and returns the counts and the top findings with their ids. The accounts are read again after every map.",
       inputSchema: {
         path: z.string().describe("Absolute path of the folder to map: the folder this agent was started in, or a folder inside its git repository."),
         wait: z.boolean().optional().describe("Wait up to 4 minutes for the map to finish (default true). With false, returns the map's id at once. Follow it with birdsi_scan_status."),

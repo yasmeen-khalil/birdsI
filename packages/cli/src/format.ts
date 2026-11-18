@@ -97,7 +97,7 @@ export const CONFIDENCE_WORD: Record<Confidence, string> = {
 export const CONFIDENCE_MEANING: Record<Confidence, string> = {
   proven: "A fixed rule or tool found this, not a model. Same answer every run.",
   doc_verified: "Checked against the current official docs, cited below.",
-  judgment: "A model's reading of the code, from before birdsI stopped reading code with a model. Check it before acting.",
+  judgment: "A model's reading of the code, which no rule confirms. Check it before acting.",
 };
 
 export function severityWord(severity: Severity): string {

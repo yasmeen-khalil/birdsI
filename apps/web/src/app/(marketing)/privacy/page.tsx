@@ -5,7 +5,7 @@ import { LegalList, LegalP, LegalPage, LegalSection } from "@/components/marketi
 /** Who runs this instance of birdsI. A self-hosted copy names its own operator here. */
 const OPERATOR_NAME = "yasmeen-khalil";
 const OPERATOR_URL = "https://github.com/yasmeen-khalil";
-const EFFECTIVE_DATE = "18 October 2026";
+const EFFECTIVE_DATE = "17 November 2026";
 
 export const metadata: Metadata = { title: "Privacy policy" };
 
@@ -26,7 +26,8 @@ export default function PrivacyPage() {
             "Code uploaded by the terminal tool is deleted as soon as its map has run. Your environment files and private keys are never uploaded at all.",
             "The map keeps file paths, line numbers, short excerpts with secrets masked, and the names of the settings your code reads. It never keeps their values.",
             "Keys you give birdsI for your vendor accounts are stored encrypted and used only to read those accounts.",
-            "No AI model reads your code to make the map. The optional docs check sends the lines around a package's import to an AI model provider. Nothing is used to train models.",
+            "An AI model reads your code, after fixed rules have built the map, to find what the rules missed. Secrets are masked before any code is sent, and tests, docs and data files are left out. Your code is never used to train models.",
+            "A new account waits for the operator's approval. Until it is approved it can use nothing, and birdsI keeps only its sign-in details and the time it asked.",
             "You can disconnect a repository or delete everything from Settings at any time.",
           ]}
         />
@@ -36,7 +37,7 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             <>
-              <b>Your account.</b> Your GitHub username and user id, the email address on your GitHub account, and whether you want alerts by email. With email on and a sending key on birdsI, each read that opens alerts sends you one email. Sign-in itself is handled by Clerk.
+              <b>Your account.</b> Your GitHub username and user id, the email address on your GitHub account, whether you want alerts by email, whether the operator has approved your account, and when you asked and when it was decided. With email on and a sending key on birdsI, each read that opens alerts sends you one email. Sign-in itself is handled by Clerk.
             </>,
             <>
               <b>Apps and repositories you connect.</b> Their names, default branches, and the GitHub App installation that grants read access.
@@ -54,7 +55,7 @@ export default function PrivacyPage() {
               <b>The record.</b> Decisions, facts, approvals, questions and answers written by you or your coding agent, and the vision you write for an app.
             </>,
             <>
-              <b>Usage records.</b> Which AI model was called for the docs check, how much text it read and wrote, and when. These enforce the daily limits.
+              <b>Usage records.</b> Which AI model was called and for what (reading the code, saying what a service is used for, explaining a failed deployment, the docs check), how much text it read and wrote, and when. These enforce the daily limits.
             </>,
             <>
               <b>Keys and tokens.</b> Terminal and MCP tokens are stored only as one-way hashes. Vendor account keys you connect are stored encrypted on birdsI&apos;s servers.
@@ -88,7 +89,13 @@ export default function PrivacyPage() {
               <b>Vendors you connect</b>, such as Vercel, Supabase and OneSignal, receive read requests made with your key.
             </>,
             <>
-              <b>Anthropic</b> runs the Claude model behind the optional docs check. It receives a few lines of code around where a package is imported, and pages of that package&apos;s own documentation. <b>Tavily</b> finds those pages, from search queries built from package names, not your source files.
+              <b>Nebius</b> runs the AI models that read your code, NVIDIA Nemotron 3 on its Token Factory service. After the rules have built the map, the model receives your source files in passes, with secrets masked and every line numbered, and without tests, docs, data files, environment files or private keys. It names what the rules missed, and birdsI confirms each find at its file and line before showing it. The same model writes one sentence on what your app uses each service for, explains a failed deployment from its error lines with secrets masked, and runs the optional docs check on a few lines of code around where a package is imported. Nebius says in its terms that it does not use what it receives to train models. It may keep what it receives for a time to run its service.
+            </>,
+            <>
+              <b>Anthropic</b> runs the Claude models, which do the same work and receive the same things when this birdsI is set to use Claude in place of Nemotron. Anthropic says in its terms that it does not use what its API receives to train models.
+            </>,
+            <>
+              <b>Tavily</b> finds the documentation pages for the docs check, from search queries built from package names, not your source files.
             </>,
             <>
               <b>OSV</b> and <b>deps.dev</b> receive the names and versions of your packages, to check them for known problems. The <b>npm</b>, <b>PyPI</b> and <b>crates.io</b> registries receive package names, to look up their latest versions.
@@ -118,7 +125,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="Deleting your data">
         <LegalP>
-          In <Link href="/settings">Settings</Link> you can disconnect a repository, remove a vendor key, revoke terminal and MCP tokens, and delete your account. Deleting your account removes your apps, maps, findings, readings, keys, record and tokens and disconnects every repository. Usage records remain without your name or email, so the daily limits still count them if you sign in again.
+          In <Link href="/settings">Settings</Link> you can disconnect a repository, remove a vendor key, revoke terminal and MCP tokens, and delete your account. An account that is waiting for approval can delete itself on the request page. Deleting your account removes your apps, maps, findings, readings, keys, record and tokens and disconnects every repository. Usage records remain without your name or email, so the daily limits still count them if you sign in again.
         </LegalP>
       </LegalSection>
 

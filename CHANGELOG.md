@@ -85,6 +85,11 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - The web app at https://birdsi.vercel.app runs this version since 2026-11-03.
 
 
+### The privacy policy and terms say which model reads the code (2026-11-17)
+
+- The privacy policy, effective 17 November 2026, says an AI model reads the code after the rules, names Nebius (NVIDIA Nemotron 3 on Token Factory) and Anthropic (Claude) as the model providers with what each receives, lists every purpose a model is called for in the usage records, and describes the approval step for a new account.
+- The terms, the app pages, the terminal tool, the MCP tool text, the CLI README and the skill file no longer say that no model reads the code, and Judgment is described as a model's reading that no rule confirms.
+
 ### Access by approval (2026-11-17)
 
 - A new account starts as pending. It can sign in with GitHub and ask for access on one page, and nothing else: every page of the app sends it back to that page, every API call answers 403 `pending_approval` whether it comes with a browser session or a token, and every server action refuses it.

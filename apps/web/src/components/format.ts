@@ -8,7 +8,7 @@ export const CONFIDENCE_LABEL: Record<Confidence, string> = { proven: "Proven", 
 export const CONFIDENCE_MEANING: Record<Confidence, string> = {
   proven: "A fixed rule or tool found this, not a model. Map again and you get the same answer.",
   doc_verified: "Checked against the package's own current documentation for the version you use, which is cited.",
-  judgment: "A model's reading of the code, from before birdsI stopped reading code with a model. Read the evidence before you act on it.",
+  judgment: "A model's reading of the code, which no rule confirms. Read the evidence before you act on it.",
 };
 /** Expected run time of a map in seconds, used for "of about" lines. */
 export const MAP_SECONDS = 60;
