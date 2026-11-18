@@ -9,7 +9,13 @@ export interface UserRow {
   email_updates: boolean;
   created_at: string;
   deleted_at: string | null;
+  /** Only an approved account can use birdsI. A new account starts as pending. */
+  access: UserAccess;
+  access_requested_at: string | null;
+  access_decided_at: string | null;
 }
+
+export type UserAccess = "pending" | "approved" | "denied";
 
 /** Creates or refreshes the local user for a Clerk identity. */
 export async function upsertUser(input: { clerkUserId: string; githubLogin: string | null; githubUserId: number | null; email: string | null }): Promise<UserRow> {
@@ -37,6 +43,45 @@ export async function userById(id: string): Promise<UserRow | null> {
   const { data, error } = await db.from("users").select().eq("id", id).is("deleted_at", null).maybeSingle();
   if (error) throw new Error(`userById: ${error.message}`);
   return (data as UserRow | null) ?? null;
+}
+
+/** A pending account asks for access. Asking twice changes nothing, and a decided account is left as it is. */
+export async function requestAccess(userId: string): Promise<void> {
+  const db = getDb();
+  const { error } = await db.from("users").update({ access_requested_at: new Date().toISOString() }).eq("id", userId).eq("access", "pending").is("access_requested_at", null);
+  if (error) throw new Error(`requestAccess: ${error.message}`);
+}
+
+/** Every account that asked for access or was decided, newest request first. For the owner's page only. */
+export async function accessList(): Promise<UserRow[]> {
+  const db = getDb();
+  const { data, error } = await db.from("users").select().is("deleted_at", null).or("access_requested_at.not.is.null,access.neq.pending").order("access_requested_at", { ascending: false, nullsFirst: false }).limit(500);
+  if (error) throw new Error(`accessList: ${error.message}`);
+  return (data ?? []) as UserRow[];
+}
+
+/** How many accounts are waiting for the owner's decision. */
+export async function accessWaitingCount(): Promise<number> {
+  const db = getDb();
+  const { count, error } = await db.from("users").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("access", "pending").not("access_requested_at", "is", null);
+  if (error) throw new Error(`accessWaitingCount: ${error.message}`);
+  return count ?? 0;
+}
+
+/** The owner's decision on one account. Returns false when no such account exists. */
+export async function decideAccess(userId: string, access: "approved" | "denied"): Promise<boolean> {
+  const db = getDb();
+  const { data, error } = await db.from("users").update({ access, access_decided_at: new Date().toISOString() }).eq("id", userId).is("deleted_at", null).select("id");
+  if (error) throw new Error(`decideAccess: ${error.message}`);
+  return (data ?? []).length > 0;
+}
+
+/** The ids of the approved accounts, for the worker's schedule. */
+export async function approvedUserIds(): Promise<string[]> {
+  const db = getDb();
+  const { data, error } = await db.from("users").select("id").eq("access", "approved").is("deleted_at", null).limit(10000);
+  if (error) throw new Error(`approvedUserIds: ${error.message}`);
+  return ((data ?? []) as Array<{ id: string }>).map((r) => r.id);
 }
 
 export async function updateUserPreferences(userId: string, prefs: { emailUpdates?: boolean }): Promise<void> {

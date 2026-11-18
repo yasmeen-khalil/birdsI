@@ -1,12 +1,15 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { upsertUser, userByClerkId, type UserRow } from "@birdsi/db";
 import { cache } from "react";
+import { AccessError, hasAccess } from "./access";
 
 /**
- * The signed-in user's local row, created on first sight. Cached per request.
- * Returns null when nobody is signed in; pages redirect, API routes 401.
+ * Whoever is signed in, approved or not, with their local row created on
+ * first sight. Cached per request. Only the sign-in gate itself uses this:
+ * the page where a person asks for access, and the checks below. Everything
+ * else calls currentUserRow or requireUser, which need an approved account.
  */
-export const currentUserRow = cache(async (): Promise<UserRow | null> => {
+export const signedInUserUngated = cache(async (): Promise<UserRow | null> => {
   const { userId } = await auth();
   if (!userId) return null;
   const existing = await userByClerkId(userId);
@@ -21,8 +24,19 @@ export const currentUserRow = cache(async (): Promise<UserRow | null> => {
   });
 });
 
+/**
+ * The signed-in user when their account is approved, null otherwise. To a
+ * caller, an account waiting for approval looks like nobody is signed in.
+ */
+export const currentUserRow = cache(async (): Promise<UserRow | null> => {
+  const user = await signedInUserUngated();
+  return user && hasAccess(user) ? user : null;
+});
+
+/** For server actions: an approved account, or an error. */
 export async function requireUser(): Promise<UserRow> {
-  const user = await currentUserRow();
+  const user = await signedInUserUngated();
   if (!user) throw new Error("Not signed in");
+  if (!hasAccess(user)) throw new AccessError();
   return user;
 }

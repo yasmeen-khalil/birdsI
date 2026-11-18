@@ -2,11 +2,12 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { approveDeviceLogin, deleteRepo, deleteUser, denyDeviceLogin, purgeSnapshotsForUser, revokeToken, updateUserPreferences } from "@birdsi/db";
+import { approveDeviceLogin, decideAccess, deleteRepo, deleteUser, requestAccess, denyDeviceLogin, purgeSnapshotsForUser, revokeToken, updateUserPreferences } from "@birdsi/db";
 import { AnswerQuestionRequest, RequestActionRequest, SetVisionRequest } from "@birdsi/shared";
 import type { z } from "zod";
 import { ApiError } from "./api";
-import { requireUser } from "./auth";
+import { ACCESS_PENDING_MESSAGE, AccessError, hasAccess, isOwner } from "./access";
+import { requireUser, signedInUserUngated } from "./auth";
 import { answerQuestion, changePolicy, connectVendor, decideActionRequest, disconnectVendor, dismissQuestion, requestAction, resyncAllRepos, saveVision, startVendorSync } from "./ops";
 import { savePrompt } from "./prompts";
 import { dismissFinding, reopenFinding, startScan, stopScan } from "./scans";
@@ -25,6 +26,7 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
     return { ok: true, data: await fn() };
   } catch (error) {
     if (error instanceof ApiError) return { ok: false, message: error.message, code: error.code };
+    if (error instanceof AccessError) return { ok: false, message: ACCESS_PENDING_MESSAGE, code: "pending_approval" };
     if (error instanceof Error && error.message === "Not signed in") return { ok: false, message: "Sign in to continue.", code: "unauthorized" };
     console.error(error);
     return { ok: false, message: "birdsI hit an error. Try again in a moment." };
@@ -216,6 +218,52 @@ export async function deleteAccountAction(typed: string): Promise<ActionResult> 
   });
   if (result.ok) redirect("/deleted");
   return result;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * A signed-in account that is not approved asks for access. One of the two
+ * actions such an account can run, with withdrawRequestAction below: both
+ * touch its own row and nothing else.
+ */
+export async function requestAccessAction(): Promise<ActionResult> {
+  return run(async () => {
+    const user = await signedInUserUngated();
+    if (!user) throw new Error("Not signed in");
+    if (hasAccess(user)) return undefined;
+    await requestAccess(user.id);
+    revalidatePath("/pending");
+    return undefined;
+  });
+}
+
+/** An account that is not approved deletes itself. An approved account deletes itself in Settings, by typing its name. */
+export async function withdrawRequestAction(): Promise<ActionResult> {
+  const result = await run(async () => {
+    const user = await signedInUserUngated();
+    if (!user) throw new Error("Not signed in");
+    if (hasAccess(user)) throw new ApiError(400, "approved", "This account is approved. Delete it in Settings.");
+    await purgeSnapshotsForUser(user.id);
+    await deleteUser(user.id);
+    return undefined;
+  });
+  if (result.ok) redirect("/deleted");
+  return result;
+}
+
+/** The owner approves or denies an account. Anyone else gets the same answer as for a page that does not exist. */
+export async function decideAccessAction(userId: string, decision: "approved" | "denied"): Promise<ActionResult> {
+  return run(async () => {
+    const owner = await requireUser();
+    if (!isOwner(owner)) throw new ApiError(404, "not_found", "Not found.");
+    if (decision !== "approved" && decision !== "denied") throw new ApiError(400, "bad_request", "The decision must be approved or denied.");
+    if (typeof userId !== "string" || !UUID.test(userId)) throw new ApiError(400, "bad_request", "That account id is not valid.");
+    if (userId === owner.id) throw new ApiError(400, "own_account", "You cannot change your own access.");
+    if (!(await decideAccess(userId, decision))) throw new ApiError(404, "not_found", "That account no longer exists.");
+    revalidatePath("/access");
+    return undefined;
+  });
 }
 
 export async function approveDeviceAction(userCode: string): Promise<ActionResult<{ status: "approved" | "expired" | "not_found" | "already_used" }>> {

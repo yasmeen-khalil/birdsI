@@ -85,6 +85,15 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - The web app at https://birdsi.vercel.app runs this version since 2026-11-03.
 
 
+### Access by approval (2026-11-17)
+
+- A new account starts as pending. It can sign in with GitHub and ask for access on one page, and nothing else: every page of the app sends it back to that page, every API call answers 403 `pending_approval` whether it comes with a browser session or a token, and every server action refuses it.
+- The owner, named by GitHub user id in `BIRDSI_OWNER_GITHUB_IDS`, approves, denies and removes access on the Access page, linked from Settings with the number waiting. To anyone else that page does not exist.
+- Removing access cuts off the terminal tool and the MCP server at once, because a token is checked against its account on every call, and the worker stops reading that account at its next schedule.
+- An account without access can delete itself from the request page.
+- Migration `20261117000000_access.sql` adds the access columns and keeps the access of every account that existed before it. Run it before deploying this version: without the column nobody but the owner gets in.
+- Tests hold the gate in place: every page of the app, every API route, and every server action is checked for it by name.
+
 ### The landing page in plainer words (2026-11-17)
 
 - The landing page says what birdsI does in fewer words: a new headline and introduction, shorter section text, and a second sign-in button at the end of the page. The section numbers and the "One page per app" label are gone.

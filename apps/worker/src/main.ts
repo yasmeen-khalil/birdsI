@@ -1,5 +1,5 @@
 import { hostname } from "node:os";
-import { lastJobFinishedAt, claimJob, completeJob, enqueueJob, failExhaustedStaleJobs, failJob, heartbeat, JobLostError, jobActive, purgeOldSnapshots, purgeStaleWorkers, reposDueForSync, sweepDeviceLogins, updateScan, userIdsWithConnections, workerSeen, type JobRow } from "@birdsi/db";
+import { approvedUserIds, lastJobFinishedAt, claimJob, completeJob, enqueueJob, failExhaustedStaleJobs, failJob, heartbeat, JobLostError, jobActive, purgeOldSnapshots, purgeStaleWorkers, reposDueForSync, sweepDeviceLogins, updateScan, userIdsWithConnections, workerSeen, type JobRow } from "@birdsi/db";
 import { loadEngineConfig } from "@birdsi/engine";
 import { runScanJob } from "./scan-job";
 import { runLimitsWatchJob } from "./limits-watch-job";
@@ -56,8 +56,10 @@ async function present(currentJobId: string | null, force = false): Promise<void
  */
 async function scheduleVendorSyncs(): Promise<number> {
   const connected = new Set(await userIdsWithConnections());
-  const hourly = (await reposDueForSync(1, 200)).filter((r) => connected.has(r.owner_user_id));
-  const daily = await reposDueForSync(20, 200);
+  // Only approved accounts are read. An account the owner denied stops being read at the next schedule.
+  const approved = new Set(await approvedUserIds());
+  const hourly = (await reposDueForSync(1, 200)).filter((r) => connected.has(r.owner_user_id) && approved.has(r.owner_user_id));
+  const daily = (await reposDueForSync(20, 200)).filter((r) => approved.has(r.owner_user_id));
   const seen = new Set<string>();
   let queued = 0;
   for (const repo of [...hourly, ...daily]) {

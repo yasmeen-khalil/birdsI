@@ -39,7 +39,8 @@ with markers (migration, kind, name, col) as (
     ('20261018000400 alerts',                    'table',    'alerts',              null),
     ('20261018000400 dates to watch',            'table',    'app_deadlines',       null),
     ('20261027000000 manual entries',            'table',    'app_entries',         null),
-    ('20261027000100 limits watch',              'table',    'limits_watch',        null)
+    ('20261027000100 limits watch',              'table',    'limits_watch',        null),
+    ('20261117000000 access by approval',        'column',   'users',               'access')
 )
 select
   m.migration,

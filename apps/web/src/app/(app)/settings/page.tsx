@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SignOutButton } from "@clerk/nextjs";
 import { ExternalLink, LogOut, Plus } from "lucide-react";
-import { appsAvailable, appsForUser, connectionsForApp, latestDoneScan, projectsForApp, tokensForUser, toScan, untiedConnections, usageForUser } from "@birdsi/db";
+import { accessWaitingCount, appsAvailable, appsForUser, connectionsForApp, latestDoneScan, projectsForApp, tokensForUser, toScan, untiedConnections, usageForUser } from "@birdsi/db";
 import { PROJECT_VENDOR_BY_SLUG, maskEmail } from "@birdsi/shared";
 import { LocalTime } from "@/components/LocalTime";
 import { ConnectAccount, DeleteAccount, DisconnectAccount, DisconnectRepo, EmailToggle, RevokeToken } from "@/components/SettingsControls";
@@ -11,6 +11,7 @@ import { TopBar } from "@/components/shell/TopBar";
 import { initials, plural, repoName, scanName } from "@/components/format";
 import { icon } from "@/components/icon";
 import { appUser, toOption, userRepos } from "@/components/server/data";
+import { isOwner } from "@/lib/access";
 import { connectorCatalog, listConnections } from "@/lib/ops";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -46,6 +47,8 @@ export default async function SettingsPage() {
   }));
   const liveTokens = tokens.filter((t) => !t.revoked_at);
   const login = user.github_login ?? user.email ?? "";
+  const owner = isOwner(user);
+  const waiting = owner ? await accessWaitingCount() : 0;
 
   return (
     <>
@@ -54,6 +57,17 @@ export default async function SettingsPage() {
         <h1 className="t-h1" style={{ paddingBottom: 36 }}>
           Settings
         </h1>
+
+        {owner && (
+          <Section title="Access">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4">
+              <span className="t-body">{waiting === 0 ? "Nobody is waiting for approval" : waiting === 1 ? "1 account is waiting for approval" : `${waiting} accounts are waiting for approval`}</span>
+              <Link className="btn btn-secondary btn-sm" href="/access">
+                Review requests
+              </Link>
+            </div>
+          </Section>
+        )}
 
         <Section title="Account">
           <div className="flex items-center gap-3.5">

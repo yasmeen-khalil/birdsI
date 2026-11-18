@@ -2,15 +2,18 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { eventsAfter, latestDoneScan, repoForUser, reposForUser, scansForRepo, toScan, type RepoRow, type UserRow } from "@birdsi/db";
 import type { ScanEvent, Scan } from "@birdsi/shared";
-import { currentUserRow } from "@/lib/auth";
+import { hasAccess } from "@/lib/access";
+import { signedInUserUngated } from "@/lib/auth";
 import { orNotFound, requireId } from "../guard";
 import type { RepoOption } from "../shell/RepoSwitcher";
 
 /** Server-side reads shared by the app's layouts and pages. Cached per request. */
 
 export const appUser = cache(async (): Promise<UserRow> => {
-  const user = await currentUserRow();
+  const user = await signedInUserUngated();
   if (!user) redirect("/sign-in");
+  // An account that is not approved sees the request page and nothing of the app.
+  if (!hasAccess(user)) redirect("/pending");
   return user;
 });
 

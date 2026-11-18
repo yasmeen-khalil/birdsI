@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { ZodError, type z } from "zod";
 import { ForbiddenError, NotFoundError, userIdForToken, type UserRow, userById } from "@birdsi/db";
-import { currentUserRow } from "./auth";
+import { ACCESS_PENDING_MESSAGE, AccessError, hasAccess } from "./access";
+import { signedInUserUngated } from "./auth";
 import { appUrl } from "./env";
 
 /**
@@ -25,6 +26,7 @@ export function json<T>(body: T, init?: ResponseInit): NextResponse {
 
 export function errorResponse(error: unknown): NextResponse {
   if (error instanceof ApiError) return json({ error: { code: error.code, message: error.message } }, { status: error.status });
+  if (error instanceof AccessError) return json({ error: { code: "pending_approval", message: ACCESS_PENDING_MESSAGE } }, { status: 403 });
   if (error instanceof ZodError) return json({ error: { code: "bad_request", message: "The request did not match the expected shape." } }, { status: 400 });
   // Missing and forbidden look identical so nothing about other users' data leaks.
   if (error instanceof NotFoundError || error instanceof ForbiddenError) return json({ error: { code: "not_found", message: "Not found." } }, { status: 404 });
@@ -32,7 +34,7 @@ export function errorResponse(error: unknown): NextResponse {
   return json({ error: { code: "server_error", message: "birdsI hit an error on its side. Try again in a moment." } }, { status: 500 });
 }
 
-/** Resolves the caller. Throws 401 when nobody is signed in. */
+/** Resolves the caller. Throws 401 when nobody is signed in, and 403 when the account is not approved, whether it came with a token or a session. */
 export async function requireCaller(request: Request): Promise<UserRow> {
   const header = request.headers.get("authorization");
   if (header?.toLowerCase().startsWith("bearer ")) {
@@ -41,10 +43,12 @@ export async function requireCaller(request: Request): Promise<UserRow> {
     if (!userId) throw new ApiError(401, "unauthorized", "This token is not valid. Run birdsi login to sign in again.");
     const user = await userById(userId);
     if (!user) throw new ApiError(401, "unauthorized", "This token is not valid. Run birdsi login to sign in again.");
+    if (!hasAccess(user)) throw new AccessError();
     return user;
   }
-  const user = await currentUserRow();
+  const user = await signedInUserUngated();
   if (!user) throw new ApiError(401, "unauthorized", "Sign in to continue.");
+  if (!hasAccess(user)) throw new AccessError();
   return user;
 }
 

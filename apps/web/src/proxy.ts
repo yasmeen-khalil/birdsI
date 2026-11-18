@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
  * authenticates itself with bearer tokens inside each handler, so it is
  * left alone here.
  */
-const isProtected = createRouteMatcher(["/app(.*)", "/settings(.*)", "/connect(.*)", "/device(.*)", "/github/setup(.*)"]);
+const isProtected = createRouteMatcher(["/app(.*)", "/settings(.*)", "/connect(.*)", "/device(.*)", "/github/setup(.*)", "/pending(.*)", "/access(.*)"]);
 
 export default clerkMiddleware(async (auth, request) => {
   if (isProtected(request)) {
