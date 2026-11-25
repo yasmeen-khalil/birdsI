@@ -615,7 +615,7 @@ export function CockpitSections({ view, repoId }: { view: CockpitView; repoId: s
           <div className="flex flex-col gap-2 t-small c2" style={{ maxWidth: 760 }}>
             <span>
               {map.reader
-                ? `The model (${map.reader.model}) read ${plural(map.reader.filesRead, "file")} in ${plural(map.reader.batches, "pass", "passes")}${map.reader.filesUnchanged > 0 ? `, left ${map.reader.filesUnchanged} unchanged since the previous map` : ""}${map.reader.filesSkipped > 0 ? `, skipped ${map.reader.filesSkipped} as minified or too large` : ""}${map.reader.filesOverBudget > 0 ? `, and ${map.reader.filesOverBudget} wait for the next map, over this map's reading budget` : ""}. ${map.reader.confirmed + map.reader.carried} finds confirmed at their lines, ${map.reader.dropped} dropped.`
+                ? `The model (${map.reader.model}) read ${plural(map.reader.filesRead, "file")} in ${plural(map.reader.batches, "pass", "passes")}${map.reader.filesUnchanged > 0 ? `, left ${map.reader.filesUnchanged} unchanged since the previous map` : ""}${map.reader.filesSkipped > 0 ? `, skipped ${map.reader.filesSkipped} as minified or too large` : ""}${map.reader.filesOverBudget > 0 ? `, and ${map.reader.filesOverBudget} wait for the next map, over this map's reading budget` : ""}. ${plural(map.reader.confirmed + map.reader.carried, "find")} confirmed at their lines, ${map.reader.dropped} dropped.`
                 : "No model read the code: the map is what the rules read."}
             </span>
             {map.scope ? (

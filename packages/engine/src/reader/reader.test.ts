@@ -135,6 +135,28 @@ describe("the model's reading of the fixture app", () => {
     expect(read.services.find((s) => s.slug === "stripe")?.purpose).toBe("used for stripe");
   });
 
+  it("keeps no purpose when the model writes the word null, and carries no such word over", async () => {
+    const { inventory, map, context } = await rulesMap();
+    const models = {
+      available: true,
+      modelId: () => "fake-nano",
+      complete: async (opts: { purpose: string; user: string }) => {
+        if (opts.purpose === "reader") return { finds: [] };
+        if (opts.purpose === "purposes") return { purposes: [...opts.user.matchAll(/^- (\S+) \(/gm)].map((m) => ({ slug: m[1]!, purpose: m[1] === "stripe" ? "null" : `used for ${m[1]}` })) };
+        throw new Error(`unexpected purpose ${opts.purpose}`);
+      },
+    } as unknown as ModelClient;
+    const { map: read } = await readWithModel({ inventory, map, context, models, previous: null, maxInputTokens: 4_000_000, concurrency: 2, emit, signal });
+    expect(read.services.find((s) => s.slug === "stripe")?.purpose).toBeNull();
+    expect(read.services.find((s) => s.purpose && s.slug !== "stripe")?.purpose).toMatch(/^used for /);
+
+    const previous = structuredClone(read);
+    previous.services.find((s) => s.slug === "stripe")!.purpose = "None";
+    const again = await rulesMap();
+    const { map: next } = await readWithModel({ ...again, models: fakeModel([]).models, previous, maxInputTokens: 4_000_000, concurrency: 2, emit, signal });
+    expect(next.services.find((s) => s.slug === "stripe")?.purpose).toBe("used for stripe");
+  });
+
   it("adds the owner's words to the prompts of the reading and the purposes", async () => {
     const { inventory, map, context } = await rulesMap();
     const { models, calls } = fakeModel([]);

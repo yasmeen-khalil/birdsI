@@ -54,6 +54,13 @@ export const MapService = z.object({
 });
 export type MapService = z.infer<typeof MapService>;
 
+/** A service's purpose as the model wrote it, or null when it wrote none. A model sometimes answers with the word null or none instead of a JSON null, and that word is not a purpose. */
+export function modelPurpose(text: string | null | undefined): string | null {
+  const t = text?.trim() ?? "";
+  if (!t || /^(null|none|n\/a|unknown|undefined)\.?$/i.test(t)) return null;
+  return t.slice(0, 200);
+}
+
 /**
  * Where code that reads an env name runs: "shared" code is reached from
  * routes of every deployment, "cron" and "webhook" from those routes (they run

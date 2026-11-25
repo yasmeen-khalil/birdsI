@@ -106,6 +106,12 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - The links at the top of the landing page glide to their section, unless the browser asks for reduced motion.
 - README.md no longer says the repository is private, and its opening no longer calls the docs check the only model call.
 
+### A purpose the model left blank, and plain counts (2026-11-24)
+
+- A service whose purpose the model left blank by writing the word null showed "null" as its purpose on the cockpit (the demo's Vercel line). A purpose that is only null, none, n/a, unknown or undefined is now no purpose: it is not kept, not carried over to the next map, and not shown from a map already stored. A test holds it.
+- The last map's line says "1 find confirmed", not "1 finds", on the cockpit and in the terminal, and the terminal counts files and passes the same way.
+- The page description that search engines and link previews show calls birdsI the cockpit for your apps, not the operations record.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

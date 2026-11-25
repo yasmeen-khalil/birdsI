@@ -5,7 +5,7 @@ import { Confidence, ScanScope, SEVERITY_ORDER, Severity, type Dependency, type 
 import { AppEntry, entryAmountWords, entryMonthlyUsd } from "./entries";
 import { CATEGORY_ORDER, VENDOR_CATEGORY_LABEL, iconUrlFor } from "./icons";
 import { LIMITS_BY_SLUG, checkedLimit, tierFor } from "./limits";
-import { envNeededBy, missingEnv, roleForLabel, Found, MapPublicSurface, MapStoreApp, MapWebhook, ModelFind, ReaderStats, SourceLine, type StoredMap } from "./map";
+import { envNeededBy, missingEnv, modelPurpose, roleForLabel, Found, MapPublicSurface, MapStoreApp, MapWebhook, ModelFind, ReaderStats, SourceLine, type StoredMap } from "./map";
 import { bestFacts, FACT_SOURCE_LABEL, type Vendor } from "./ops";
 import { AdvisorLint, OneSignalNotification, OwedMigration, VercelDeployment, VercelDomain, VercelLogLine, readsInDepth, type ProjectRead, type Reading } from "./reads";
 
@@ -401,7 +401,7 @@ export function cockpitView(input: CockpitInput): CockpitView {
       pricingUrl: s.pricingUrl,
       checkedLimits: s.checkedLimits,
       firstSeen: s.imports[0] ?? s.sources[0] ?? null,
-      purpose: s.purpose,
+      purpose: modelPurpose(s.purpose),
       found: s.found,
       categoryLabel: VENDOR_CATEGORY_LABEL[s.category as keyof typeof VENDOR_CATEGORY_LABEL] ?? s.category,
       icon: iconUrlFor(s.slug),

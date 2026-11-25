@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ModelFind, Prompts, ReaderStats, ScanEvent, ServiceMap } from "@birdsi/shared";
+import { modelPurpose, type ModelFind, type Prompts, type ReaderStats, type ScanEvent, type ServiceMap } from "@birdsi/shared";
 import { isBudget, isOutputLimit } from "../checks/model-findings";
 import { runPool } from "../checks/pool";
 import { isCodeLanguage, isConfigLanguage } from "../inventory/languages";
@@ -190,8 +190,14 @@ export async function readWithModel(input: ReadInput): Promise<ReadResult> {
 }
 
 async function writePurposes(input: ReadInput, map: ServiceMap): Promise<void> {
-  const previous = new Map((input.previous?.services ?? []).filter((s) => s.purpose).map((s) => [s.slug, s.purpose!]));
-  for (const s of map.services) if (!s.purpose && previous.has(s.slug)) s.purpose = previous.get(s.slug)!;
+  const previous = new Map<string, string>();
+  for (const s of input.previous?.services ?? []) {
+    const purpose = modelPurpose(s.purpose);
+    if (purpose) previous.set(s.slug, purpose);
+  }
+  for (const s of map.services) {
+    s.purpose = modelPurpose(s.purpose) ?? previous.get(s.slug) ?? null;
+  }
   const wanting = map.services.filter((s) => !s.purpose && (s.imports.length > 0 || s.sources.length > 0));
   if (wanting.length === 0) return;
   const user = wanting
@@ -204,8 +210,8 @@ async function writePurposes(input: ReadInput, map: ServiceMap): Promise<void> {
     const answer = await input.models.complete({ tier: "nano", purpose: "purposes", system: withOwner(PURPOSES_SYSTEM, input.prompts?.purposes), user: `Services and the lines that use them:\n${user}`, schema: Purposes, jsonSchema: PURPOSES_JSON_SCHEMA, schemaName: "purposes", maxOutputTokens: 4000, signal: input.signal });
     const by = new Map(answer.purposes.map((p) => [p.slug, p.purpose]));
     for (const s of wanting) {
-      const purpose = by.get(s.slug)?.trim();
-      if (purpose) s.purpose = purpose.slice(0, 200);
+      const purpose = modelPurpose(by.get(s.slug));
+      if (purpose) s.purpose = purpose;
     }
   } catch (error) {
     if (input.signal.aborted) return;

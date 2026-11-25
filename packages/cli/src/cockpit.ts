@@ -1,4 +1,5 @@
 import type { AlertsResponse, AppAlert, ChecklistView, CockpitView } from "@birdsi/shared";
+import { plural } from "./format";
 
 /**
  * The cockpit as lines of text, shared by `birdsi cockpit` and the
@@ -109,7 +110,7 @@ export function cockpitLines(v: CockpitView, q: Quote = plain): string[] {
 
   if (map) {
     lines.push(`Services (${v.services.length}): ${v.services.map((s) => `${s.name}${s.plan ? ` [${s.plan}]` : ""}${s.projects ? ` ${s.keyed}/${s.projects} keyed` : ""}${s.found ? " (found by the model)" : ""}`).join(", ")}`);
-    if (map.reader) lines.push(`The model (${map.reader.model}) read ${map.reader.filesRead} files in ${map.reader.batches} passes: ${map.reader.confirmed + map.reader.carried} finds confirmed at their lines, ${map.reader.dropped} dropped, ${map.reader.known} already on the map`);
+    if (map.reader) lines.push(`The model (${map.reader.model}) read ${plural(map.reader.filesRead, "file")} in ${plural(map.reader.batches, "pass", "passes")}: ${plural(map.reader.confirmed + map.reader.carried, "find")} confirmed at their lines, ${map.reader.dropped} dropped, ${map.reader.known} already on the map`);
     for (const s of v.services) if (s.purpose) lines.push(`  ${s.name}: ${s.purpose} (as read by the model)`);
     for (const f of v.alsoFound) lines.push(`Also found by the model, ${f.kind}: ${f.name}, ${f.detail} (${f.at.path}:${f.at.line})`);
     if (v.security) {
