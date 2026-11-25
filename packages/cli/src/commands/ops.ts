@@ -103,7 +103,8 @@ export async function vendorsCommand(options: PrintOptions & { sync?: boolean })
     const stale = result.data.stages.filter((s) => s.freshness === "stale" || s.freshness === "never");
     if (stale.length > 0) {
       println();
-      println(paint.dim(style, `Stages out of date: ${stale.map((s) => s.label.toLowerCase()).join(", ")}. Run birdsi --full to refresh them all.`));
+      const how = stale.some((s) => s.id === "map") ? "Run birdsi in the app's folder to map it again, and the accounts are read after the map." : "Run birdsi vendors --sync to read the accounts again.";
+      println(paint.dim(style, `Stages out of date: ${stale.map((s) => s.label.toLowerCase()).join(", ")}. ${how}`));
     }
     return EXIT.ok;
   } catch (error) {

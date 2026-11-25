@@ -112,6 +112,13 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - The last map's line says "1 find confirmed", not "1 finds", on the cockpit and in the terminal, and the terminal counts files and passes the same way.
 - The page description that search engines and link previews show calls birdsI the cockpit for your apps, not the operations record.
 
+### Running your own copy, and the docs held to the code (2026-11-24)
+
+- `npm run worker` loads `.env.local` from the repository root with Node's `--env-file-if-exists`. It never loaded it before, so a worker started by the README's steps stopped at "SUPABASE_URL and SUPABASE_SECRET_KEY must be set". A variable set in the shell still wins, and a host without the file (Railway) is unchanged.
+- On a new database the owner's own account started pending like any other, and the worker, which schedules approved accounts and does not read `BIRDSI_OWNER_GITHUB_IDS`, never read the owner's apps on its schedule. The owner's sign-in now marks the owner's row approved. A test holds it.
+- `birdsi vendors` no longer tells you to run `birdsi --full`, an option that does not exist. It says to map again when the map is out of date, or to run `birdsi vendors --sync` when only the reads are.
+- README.md, the CLI README and `.env.example` say what the code does. The large model runs the weekly pricing page watch, not verification, which is code. A model key alone sends passages of the code to its provider for the reading. The watch reads the pricing pages, and its model reading is marked as one. Keys only read where the vendor offers such a key, and birdsI only reads with the others. Accounts are read hourly once a key is connected, about daily before. The last 30 maps are kept. Notices are not emailed. "How a map works" lists the model's reading and the check of the map against itself. The setup section adds `NEXT_PUBLIC_APP_URL`, the alert email and demo variables, `supabase link`, the Windows symlink fallback, `BIRDSI_API_URL` for using the terminal with your own copy, and `npx birdsi login` before the first map. The CLI README no longer says the package is not on npm yet.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

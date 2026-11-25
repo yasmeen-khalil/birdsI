@@ -1,6 +1,6 @@
 # birdsI
 
-The cockpit for your apps. birdsI maps each app from its code: the services it runs on, its deployments, crons, webhooks, store apps, migrations and the settings each deployment needs. Then it reads the vendor accounts with keys that only read, and tells you what needs you. Nothing a model says reaches you unverified: the map is read by rules that cite the file and line, every find a model adds is confirmed at its file and line, and the optional docs check must cite the package's own documentation.
+The cockpit for your apps. birdsI maps each app from its code: the services it runs on, its deployments, crons, webhooks, store apps, migrations and the settings each deployment needs. Then it reads the vendor accounts, and only reads, and tells you what needs you. Nothing a model says reaches you as fact: the map is built by rules that cite the file and line, every find a model adds is confirmed at its file and line before it joins the map, the optional docs check must cite the package's own documentation, and everything else a model writes (what a service is for, a failed deployment explained, what a changed pricing page now says) is marked as the model's reading.
 
 Run `npx birdsi` in an app's folder and its cockpit opens: what needs you, the services and dependencies by what each is for with its docs and its key, the live reads of each Vercel project, Supabase project and OneSignal app, the last map and what it checked, security with every finding's severity under an honest scope statement, money as far as it is known (spend read from the accounts, list prices where no spend is read, and what you entered for what no API reports), and the code's crons, webhooks, store apps, migrations and public pages. The Set up page lists what birdsI still needs from you, service by service: the project to declare, the key to make with the exact clicks, what each key lets birdsI read and alert on, and what birdsI may do with it (read only).
 
@@ -9,16 +9,16 @@ Built for the Nebius x NVIDIA Global AI Hackathon, Best Apps and Agents track: t
 ## Try it
 
 - **The demo page**, https://birdsi.vercel.app/demo: the cockpit of the sample app in `samples/corner-bakery` (a bakery's online ordering with a few problems left in on purpose), readable without signing in.
-- **Your own app**: sign in with GitHub at https://birdsi.vercel.app and request access. Once the request is approved, run `npx birdsi` in the app's folder (or from a clone of this repository: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`). The Set up page lists what to connect and what each key lets birdsI read.
+- **Your own app**: sign in with GitHub at https://birdsi.vercel.app and request access. Once the request is approved, run `npx birdsi login` once, then `npx birdsi` in the app's folder (or from a clone of this repository: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`). The Set up page lists what to connect and what each key lets birdsI read.
 - **Inside a coding agent**: `claude mcp add birdsi -- npx -y birdsi mcp`, then ask for the cockpit.
 
 ## What it does
 
-- **The map, from the code.** Every outside service the app uses, found by rules from packages, imports, env names, web addresses and config files, each with the file and line it came from. The service map with it: the env names each deployment needs (by the role names the code compares, such as `APP_ROLE`), the crons and whether their handlers check the secret, the webhooks and the line that verifies each, the store apps, the migrations the repository holds and its public pages. It names env variables and never reads a value. Each map is kept, dated, with its commit. Then the model reads the code for what the rules missed, and every find it makes is confirmed at its file and line before it joins the map, marked as the model's. It also writes what the app uses each service for, in one sentence, marked as its reading. On the next map only the files that changed are read again. Rule-based checks run with it: committed keys, unsafe settings, published vulnerabilities (OSV), packages two or more majors behind, and the map against itself (crons without a handler or a secret check, webhooks without a sender check, an SDK with no key named, env names nothing reads, packages nothing imports, files no route reaches, two services for one job). Every map ends with what it checked and what it did not. When its keys are set, the docs check compares a main package's own current documentation with how the code imports it, and must cite the page.
-- **Apps and their projects.** Each app is a record with the vendor projects it has: one Vercel project per deployment, the Supabase project, the OneSignal app, the Clerk instance, the RevenueCat project, the App Store Connect app, the GitHub repository, and the rest. A key belongs to one project, only reads, is checked with the vendor before it is stored, and is never shown again.
+- **The map, from the code.** Every outside service the app uses, found by rules from packages, imports, env names, web addresses and config files, each with the file and line it came from. The service map with it: the env names each deployment needs (by the role names the code compares, such as `APP_ROLE`), the crons and whether their handlers check the secret, the webhooks and the line that verifies each, the store apps, the migrations the repository holds and its public pages. It names env variables and never reads a value. The last 30 maps of each app are kept, dated, with their commits. Then the model reads the code for what the rules missed, and every find it makes is confirmed at its file and line before it joins the map, marked as the model's. It also writes what the app uses each service for, in one sentence, marked as its reading. On the next map only the files that changed are read again. Rule-based checks run with it: committed keys, unsafe settings, published vulnerabilities (OSV), packages two or more majors behind, and the map against itself (crons without a handler or a secret check, webhooks without a sender check, an SDK with no key named, env names nothing reads, packages nothing imports, files no route reaches, two services for one job). Every map ends with what it checked and what it did not. When its keys are set, the docs check compares a main package's own current documentation with how the code imports it, and must cite the page.
+- **Apps and their projects.** Each app is a record with the vendor projects it has: one Vercel project per deployment, the Supabase project, the OneSignal app, the Clerk instance, the RevenueCat project, the App Store Connect app, the GitHub repository, and the rest. A key belongs to one project, is checked with the vendor before it is stored, and is never shown again. birdsI only reads with it. Where a vendor offers a key that can only read (Supabase, GitHub, Stripe, RevenueCat), the Set up page asks for that. Vercel, OneSignal, Clerk, App Store Connect, Resend and Anthropic offer no such key, so the key could do more than birdsI does with it.
 - **What the accounts say.** With those keys, birdsI reads each project every hour. A Vercel project: its deployments with their state and age, its env names and where each applies (never a value), its crons, its domains, and the error lines of a failed build and of its functions. A Supabase project: whether it is paused, its database size, the security and performance advisors, and which of the app's migrations its database still lacks (from the markers in the app's own `verify.sql`, checked against the database's structure, never its rows). A OneSignal app: its subscriptions, the platforms it sends to, whether mobile push is being dropped for the plan, and its recent messages with their delivery counts. A Clerk instance: its environment and its user and organization counts. A RevenueCat project: its apps and overview metrics, in dollars. An App Store Connect app: the version live, the version in review, a rejected version, the newest build. A GitHub repository: the newest workflow run on the default branch, the open Dependabot, secret scanning and code scanning alerts, and the account's Actions minutes and bill this month. Every part is dated with the address it came from. A part birdsI could not read says why, and is never shown as zero.
-- **The checked limits list.** What each vendor's plans include, what ends them and the next price, read by a person from each vendor's own pricing page, dated and quoted (`packages/shared/src/limits.ts`). A model never reads a pricing page.
-- **The alert stream.** Every hour each app is checked from its map and its reads, and what needs you is stored as one alert per cause: a paused database, a failed production deployment, a cron Vercel does not run, an env name a deployment's code reads that its Vercel project lacks, a migration the database still owes, a plan at 80 or 95 percent of a limit (or a cron more frequent than the plan allows, or mobile push dropped for the plan), a date coming up (a key that expires, a trial that ends, a renewal you entered), a project that could not be read, a pricing page that no longer says what the checked limits list rests on, a failed workflow run on the default branch, a secret or a serious vulnerability GitHub found in the repository, a version App Review rejected, a build that did not process, a Stripe webhook route no enabled endpoint at Stripe points at, an endpoint at Stripe with no route behind it. Each is one sentence: the object, who or what acted, the rule with its numbers, and the result, with where the evidence is. An alert closes by itself when a later read no longer finds its cause. New alerts are emailed through Resend when birdsI has a key for it and you turn email on, and each alert says whether it was emailed. A condition that might happen (a free plan that pauses) is a tracker, never an alert.
+- **The checked limits list.** What each vendor's plans include, what ends them and the next price, read by a person from each vendor's own pricing page, dated and quoted (`packages/shared/src/limits.ts`). Only a person changes the list. Once a week the worker fetches those pages through Tavily and raises an alert when a quoted sentence is gone, and with a model key the large model says what the page appears to say now, marked as the model's reading.
+- **The alert stream.** Every time the accounts are read (every hour once an app has a connected key, about once a day before that), each app is checked from its map and its reads, and what needs you is stored as one alert per cause: a paused database, a failed production deployment, a cron Vercel does not run, an env name a deployment's code reads that its Vercel project lacks, a migration the database still owes, a plan at 80 or 95 percent of a limit (or a cron more frequent than the plan allows, or mobile push dropped for the plan), a date coming up (a key that expires, a trial that ends, a renewal you entered), a project that could not be read, a pricing page that no longer says what the checked limits list rests on, a failed workflow run on the default branch, a secret or a serious vulnerability GitHub found in the repository, a version App Review rejected, a build that did not process, a Stripe webhook route no enabled endpoint at Stripe points at, an endpoint at Stripe with no route behind it. Each is one sentence: the object, who or what acted, the rule with its numbers, and the result, with where the evidence is. An alert closes by itself when a later read no longer finds its cause. New critical and warning alerts are emailed through Resend when birdsI has a key for it and you turn email on (notices are not emailed), and each alert says whether it was emailed. A condition that might happen (a free plan that pauses) is a tracker, never an alert.
 - **Access by approval.** A new account can sign in and ask for access, and nothing else. Until the owner approves it, no page of the app opens, no API call or server action answers, and a token it holds is refused. The owner approves, denies and removes access on the Access page.
 - **Approvals and the record.** Your coding agent proposes a command, you approve it in the browser, it runs on your own computer. Every decision, fact, approval and run lands in an append-only record with its author.
 
@@ -36,7 +36,7 @@ An agent can ask the owner and propose, and only the owner approves, in the brow
 
 Where the model is called, file by file: `packages/engine/src/models/client.ts` is the one door (Token Factory's chat completions with JSON schema output, Anthropic's messages API, retries, the usage ledger). `packages/engine/src/reader/` is the reading of the code after the rules, with its verifier. `packages/engine/src/checks/docs.ts` is the docs check. `packages/engine/src/cockpit/explain.ts` explains a failed deployment. `packages/engine/src/limits/watch.ts` is the weekly watch over the pricing pages. Tavily is called in the docs check and the watch.
 
-Two sizes of model sit behind one door: a small one for reading and the docs check, a large one for verification. On Nebius Token Factory they are NVIDIA Nemotron 3 Nano (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`) and Nemotron 3 Super (`nvidia/nemotron-3-super-120b-a12b`), called through Token Factory's OpenAI-compatible API with its JSON schema output. On Anthropic they are Claude Haiku 4.5 and Claude Opus 5.5. The key you set picks the provider, Nemotron first when both are set, `BIRDSI_PROVIDER` forces one, and `BIRDSI_MODEL_NANO` and `BIRDSI_MODEL_SUPER` override the ids. The small model reads the code after the rules and runs the docs check. The reader, the docs check and the pricing watch let the model think first, with an output budget sized for it, and a pass whose thinking runs past the budget is read again in halves, and the writing calls (a service's purpose, a failed deployment explained) switch thinking off so the budget goes to the answer. Nothing a model says reaches you unverified: a find is confirmed at its line or dropped, and a purpose is marked as the model's reading.
+Two sizes of model sit behind one door: a small one for the reading, the purposes, the docs check and the explainer, and a large one for the weekly pricing page watch. The check of each find is code, not a model: it opens the file and looks for the quoted line. On Nebius Token Factory they are NVIDIA Nemotron 3 Nano (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`) and Nemotron 3 Super (`nvidia/nemotron-3-super-120b-a12b`), called through Token Factory's OpenAI-compatible API with its JSON schema output. On Anthropic they are Claude Haiku 4.5 and Claude Opus 5.5. The key you set picks the provider, Nemotron first when both are set, `BIRDSI_PROVIDER` forces one, and `BIRDSI_MODEL_NANO` and `BIRDSI_MODEL_SUPER` override the ids. The reader, the docs check and the pricing watch let the model think first, with an output budget sized for it, and a pass whose thinking runs past the budget is read again in halves, and the writing calls (a service's purpose, a failed deployment explained) switch thinking off so the budget goes to the answer. A find is confirmed at its line or dropped, and the rest of what a model writes is marked as the model's reading.
 
 ## Repository layout
 
@@ -53,7 +53,7 @@ samples/         corner-bakery, the sample app the demo page maps
 
 ## Setup
 
-Requirements: Node 22 or newer, a Supabase project, a Clerk application (GitHub sign-in). A model key (`NEBIUS_API_KEY` for Nemotron on Nebius Token Factory, or `ANTHROPIC_API_KEY` for Claude) and a Tavily key are optional: together they switch on the docs check. A GitHub App is optional.
+Requirements: Node 22 or newer, a Supabase project, a Clerk application (GitHub sign-in). A model key (`NEBIUS_API_KEY` for Nemotron on Nebius Token Factory, or `ANTHROPIC_API_KEY` for Claude) is optional. With one, the model reads the code after the rules, so numbered passages of the code (keys masked) go to that provider, and it writes the services' purposes and explains a failed deployment. Without one, maps run by rules alone. A Tavily key is optional too: with a model key it switches on the docs check, and on the worker it runs the weekly pricing page watch. A GitHub App is optional.
 
 ```bash
 git clone https://github.com/yasmeen-khalil/birdsI.git
@@ -62,7 +62,9 @@ npm install
 cp .env.example .env.local     # fill in the keys. apps/web/.env.local is a symlink to it
 ```
 
-Database: apply every file under `supabase/migrations/` to your Supabase project, in filename order (paste each into the SQL editor, or `supabase db push`). Then paste `supabase/verify.sql` and run it: every row should say OK.
+`npm install` makes the symlink. Where a system refuses symlinks (some Windows setups), copy `.env.local` into `apps/web/` instead.
+
+Database: apply every file under `supabase/migrations/` to your Supabase project, in filename order (paste each into the SQL editor, or `supabase link` to the project and then `supabase db push`). Then paste `supabase/verify.sql` and run it: every row should say OK.
 
 Run the web app and the worker in two terminals:
 
@@ -70,6 +72,8 @@ Run the web app and the worker in two terminals:
 npm run dev       # http://localhost:3000
 npm run worker    # claims map and read jobs from the queue
 ```
+
+The terminal tool and the MCP server talk to https://birdsi.vercel.app unless told otherwise. To use them with your own copy, set `BIRDSI_API_URL=http://localhost:3000` in the shell, then `npx birdsi login`.
 
 Checks before committing:
 
@@ -84,10 +88,14 @@ See `.env.example` for the full list with comments. The essentials:
 | Variable | Purpose |
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | database, storage, job queue |
-| `BIRDSI_SECRETS_KEY` | encrypts the vendor keys you connect (any long random string) |
+| `BIRDSI_SECRETS_KEY` | encrypts the vendor keys you connect (any random string of 32 or more characters). The same on the web app and the worker, and never changed once keys are stored |
+| `NEXT_PUBLIC_APP_URL` | the web app's public address, used in the terminal's sign-in links and in alert emails |
 | `BIRDSI_OWNER_GITHUB_IDS` | access by approval: the GitHub user ids of the people who approve requests, on the web app |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | sign-in |
-| `NEBIUS_API_KEY` or `ANTHROPIC_API_KEY`, and `TAVILY_API_KEY` | optional: the docs check, skipped without a model key and Tavily |
+| `NEBIUS_API_KEY` or `ANTHROPIC_API_KEY` | optional: the model's reading of the code, the services' purposes and the failed deployment explainer. Passages of the code go to that provider |
+| `TAVILY_API_KEY` | optional: the docs check (with a model key) and, on the worker, the weekly pricing page watch |
+| `RESEND_API_KEY`, `BIRDSI_ALERT_FROM` | optional: alert emails. Resend's shared sender delivers only to the Resend account's own address, so set a sender on a verified domain to email anyone else |
+| `BIRDSI_DEMO_REPO_ID` | optional: the mapped repository whose cockpit `/demo` shows. Empty, `/demo` says no sample app is set up |
 | `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` | optional: reading repositories through the GitHub App |
 
 ### Deploying
@@ -101,6 +109,7 @@ See `.env.example` for the full list with comments. The essentials:
 ```bash
 npx birdsi login          # sign in through the browser
 npx birdsi                # map the app in the current folder, then open its page
+npx birdsi setup          # what birdsI still needs from you: the projects to declare, the keys to make
 npx birdsi cockpit        # the app now: open alerts, each project as last read, the map
 npx birdsi alerts         # the alert stream, the closed alerts and the dates to watch
 npx birdsi inventory      # everything birdsI knows about the app, --json for agents and scripts
@@ -113,7 +122,7 @@ npx birdsi export         # what birdsI knows, as Markdown under .birdsi/
 npx birdsi mcp            # MCP server over stdio for coding agents
 ```
 
-See `packages/cli/README.md` for every command, option and exit code, and the MCP configuration for Claude Code, Cursor and Codex.
+There are more (findings, explain, fixed, dismiss, decide, record, policy, repos, whoami, logout). See `packages/cli/README.md` for every command, option and exit code, and the MCP configuration for Claude Code, Cursor and Codex.
 
 ## How a map works
 
@@ -121,11 +130,12 @@ See `packages/cli/README.md` for every command, option and exit code, and the MC
 2. **Inventory**: every file, honouring `.gitignore`.
 3. **Dependencies**: manifests and lockfiles across npm, PyPI, Go, crates.io, RubyGems, Packagist, Maven, NuGet, Hex and Pub.
 4. **Vendors**: every outside service, from packages, env names, addresses, config files and Stripe Projects.
-5. **Service map**: the import graph from each route, the deployments and the env names each one reaches, crons from `vercel.json`, webhooks, store apps from Capacitor, Xcode, Gradle and Expo config, migrations with `verify.sql` markers, the sitemap, robots and `llms.txt`. Only example env files are read, for names and comments.
-6. **Checks** (Proven): committed keys, repository hygiene, OSV vulnerabilities, versions behind.
-7. **Docs check** (Doc-verified, optional): a main package's own documentation against how the code imports it, cited.
-8. **Rank**: deterministic ordering and de-duplication.
-9. **Read the accounts**: queued after every map, and every hour by the worker.
+5. **Service map**: the import graph from each route, the deployments and the env names each one reaches, crons from `vercel.json`, webhooks, store apps from Capacitor, Xcode, Gradle and Expo config, migrations with `verify.sql` markers, the sitemap, robots and `llms.txt`. Only example env files are read, for names, comments and example values.
+6. **The model's reading** (with a model key): the small model reads the files that changed since the last map for what the rules missed, and each find is confirmed at its file and line before it joins the map. Then it writes what each service is for.
+7. **Checks** (Proven): the map against itself (gaps, redundancies, stale code), committed keys, repository hygiene, OSV vulnerabilities, versions behind.
+8. **Docs check** (Doc-verified, optional): a main package's own documentation against how the code imports it, cited.
+9. **Rank**: deterministic ordering and de-duplication.
+10. **Read the accounts**: queued after every map, then by the worker every hour for an app with a connected key, and about once a day for one without.
 
 The uploaded snapshot is deleted as soon as its map has run. Every step writes to an append-only event log that the web app, the terminal and the MCP server replay live.
 

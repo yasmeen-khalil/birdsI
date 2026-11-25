@@ -1,6 +1,6 @@
 # birdsi
 
-birdsI is the cockpit for your apps. It maps an app from its code (the services it runs on, its deployments, crons, webhooks, store apps, migrations and env names), reads the vendor accounts you connect with keys that only read, and tells you what needs you. Nothing a model says reaches you unverified: the map is read by rules that cite the file and line, every find a model adds is confirmed at its file and line, and the optional docs check must cite the package's own documentation. Rule-based checks run with every map: committed keys, unsafe settings, published vulnerabilities, packages far behind. Every finding carries a confidence class: Proven (a rule or a database found it) or Doc-verified (checked against the package's own current documentation, cited). Judgment marks a model's reading that no rule confirms. birdsI writes no code: your coding agent makes the change, and the next map confirms it. This package is the `birdsi` command-line tool and the birdsI MCP server for coding assistants.
+birdsI is the cockpit for your apps. It maps an app from its code (the services it runs on, its deployments, crons, webhooks, store apps, migrations and env names), reads the vendor accounts you connect, and only reads, and tells you what needs you. Nothing a model says reaches you as fact: the map is built by rules that cite the file and line, every find a model adds is confirmed at its file and line before it joins the map, the optional docs check must cite the package's own documentation, and everything else a model writes is marked as the model's reading. Rule-based checks run with every map: committed keys, unsafe settings, published vulnerabilities, packages far behind. Every finding carries a confidence class: Proven (a rule or a database found it) or Doc-verified (checked against the package's own current documentation, cited). Judgment marks a model's reading that no rule confirms. birdsI writes no code: your coding agent makes the change, and the next map confirms it. This package is the `birdsi` command-line tool and the birdsI MCP server for coding assistants.
 
 ## Install
 
@@ -10,15 +10,15 @@ Run it without installing, in your project folder:
 npx birdsi
 ```
 
-That maps the app in the current folder (about a minute), opens its page, streams progress, and ends with what needs you: alerts, questions, approvals.
+That maps the app in the current folder (about a minute), opens its page, streams progress, and ends with what needs you: alerts, questions, approvals. Sign in first with `birdsi login` (below). A new account can map once the owner of the birdsI it signs in to has approved it.
 
-Until the package is on npm, run it from a clone: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`.
-
-Once it is on npm, you can also install it globally:
+To install it globally:
 
 ```sh
 npm i -g birdsi
 ```
+
+From a clone of the repository: `npm install`, then `npx tsx packages/cli/src/birdsi.ts`.
 
 Requires Node.js 20.9 or later.
 
@@ -97,7 +97,7 @@ Claude Code, in `.claude/settings.json`:
 
 ### `birdsi vendors`
 
-The services the app runs on: what each is, what its account says, the plan's checked limits, and alerts. `--sync` reads the connected accounts first. `--repo owner/name` picks a repository other than the one you mapped last.
+The services the app runs on: what each is, what its account says, the plan's checked limits, and alerts. `--sync` asks for a fresh read of the connected accounts and shows the last read meanwhile, so check again in a minute. `--repo owner/name` picks a repository other than the one you mapped last.
 
 ### `birdsi questions`
 

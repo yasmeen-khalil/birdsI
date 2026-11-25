@@ -36,3 +36,12 @@ export function hasAccess(user: Pick<UserRow, "access" | "github_user_id" | "del
   if (user.deleted_at) return false;
   return user.access === "approved" || isOwner(user, raw);
 }
+
+/**
+ * True when an owner's own row is not approved yet, as on a new database where
+ * every account starts pending. The worker schedules approved rows and never
+ * reads BIRDSI_OWNER_GITHUB_IDS, so the sign-in marks the owner's row approved.
+ */
+export function ownerRowNeedsApproval(user: Pick<UserRow, "access" | "github_user_id" | "deleted_at">, raw: string | undefined | null = process.env["BIRDSI_OWNER_GITHUB_IDS"]): boolean {
+  return user.access !== "approved" && isOwner(user, raw);
+}

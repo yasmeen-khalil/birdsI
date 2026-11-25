@@ -1,7 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { upsertUser, userByClerkId, type UserRow } from "@birdsi/db";
+import { decideAccess, upsertUser, userByClerkId, type UserRow } from "@birdsi/db";
 import { cache } from "react";
-import { AccessError, hasAccess } from "./access";
+import { AccessError, hasAccess, ownerRowNeedsApproval } from "./access";
 
 /**
  * Whoever is signed in, approved or not, with their local row created on
@@ -12,17 +12,22 @@ import { AccessError, hasAccess } from "./access";
 export const signedInUserUngated = cache(async (): Promise<UserRow | null> => {
   const { userId } = await auth();
   if (!userId) return null;
-  const existing = await userByClerkId(userId);
-  if (existing) return existing;
+  const user = (await userByClerkId(userId)) ?? (await createUser(userId));
+  if (!ownerRowNeedsApproval(user)) return user;
+  await decideAccess(user.id, "approved");
+  return { ...user, access: "approved" };
+});
+
+async function createUser(clerkUserId: string): Promise<UserRow> {
   const clerkUser = await currentUser();
   const github = clerkUser?.externalAccounts.find((a) => a.provider.includes("github"));
   return upsertUser({
-    clerkUserId: userId,
+    clerkUserId,
     githubLogin: github?.username ?? null,
     githubUserId: github ? Number.parseInt(github.providerUserId, 10) || null : null,
     email: clerkUser?.primaryEmailAddress?.emailAddress ?? clerkUser?.emailAddresses[0]?.emailAddress ?? null,
   });
-});
+}
 
 /**
  * The signed-in user when their account is approved, null otherwise. To a
