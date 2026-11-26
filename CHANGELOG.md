@@ -123,6 +123,7 @@ A model reads the code again, behind a verifier: rules first with the file and l
 
 - The terminal tool is version 0.2.1, with the counts, the `birdsi vendors` hint and the README above. The hook and MCP settings in the CLI README pin 0.2.1.
 - A `.dockerignore` at the repository root. A worker image built from a working copy no longer takes the host's installed packages, earlier builds or `.env.local` into the build: the packages installed for the host overwrote the ones installed for the image, so the bundler built for the host could not run there. A build from a checkout (Railway) sends the same files as before, every tracked file and nothing else.
+- `integrationStatus()` is gone from the web app. Nothing called it, and its docs check flag read only the Anthropic key, where the check runs on either provider.
 - The web app at https://birdsi.vercel.app and the worker run this version since 2026-11-26, after migration `20261117000000_access.sql`.
 
 ## v3 (2026-10-18, unreleased): the cockpit
