@@ -119,6 +119,12 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - `birdsi vendors` no longer tells you to run `birdsi --full`, an option that does not exist. It says to map again when the map is out of date, or to run `birdsi vendors --sync` when only the reads are.
 - README.md, the CLI README and `.env.example` say what the code does. The large model runs the weekly pricing page watch, not verification, which is code. A model key alone sends passages of the code to its provider for the reading. The watch reads the pricing pages, and its model reading is marked as one. Keys only read where the vendor offers such a key, and birdsI only reads with the others. Accounts are read hourly once a key is connected, about daily before. The last 30 maps are kept. Notices are not emailed. "How a map works" lists the model's reading and the check of the map against itself. The setup section adds `NEXT_PUBLIC_APP_URL`, the alert email and demo variables, `supabase link`, the Windows symlink fallback, `BIRDSI_API_URL` for using the terminal with your own copy, and `npx birdsi login` before the first map. The CLI README no longer says the package is not on npm yet.
 
+### birdsi 0.2.1 and the worker image (2026-11-26)
+
+- The terminal tool is version 0.2.1, with the counts, the `birdsi vendors` hint and the README above. The hook and MCP settings in the CLI README pin 0.2.1.
+- A `.dockerignore` at the repository root. A worker image built from a working copy no longer takes the host's installed packages, earlier builds or `.env.local` into the build: the packages installed for the host overwrote the ones installed for the image, so the bundler built for the host could not run there. A build from a checkout (Railway) sends the same files as before, every tracked file and nothing else.
+- The web app at https://birdsi.vercel.app and the worker run this version since 2026-11-26, after migration `20261117000000_access.sql`.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

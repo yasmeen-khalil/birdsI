@@ -89,7 +89,7 @@ Claude Code, in `.claude/settings.json`:
 {
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "npx -y birdsi@0.2.0 policy check" }] }
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "npx -y birdsi@0.2.1 policy check" }] }
     ]
   }
 }
@@ -181,7 +181,7 @@ Claude Code, `.mcp.json` at the project root:
     "birdsi": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "birdsi@0.2.0", "mcp"]
+      "args": ["-y", "birdsi@0.2.1", "mcp"]
     }
   }
 }
@@ -194,7 +194,7 @@ Cursor, `.cursor/mcp.json`:
   "mcpServers": {
     "birdsi": {
       "command": "npx",
-      "args": ["-y", "birdsi@0.2.0", "mcp"]
+      "args": ["-y", "birdsi@0.2.1", "mcp"]
     }
   }
 }
@@ -205,7 +205,7 @@ Codex, `~/.codex/config.toml`:
 ```toml
 [mcp_servers.birdsi]
 command = "npx"
-args = ["-y", "birdsi@0.2.0", "mcp"]
+args = ["-y", "birdsi@0.2.1", "mcp"]
 ```
 
 A skill that tells an agent when to read birdsI and how to read its facts: `skills/birdsi/SKILL.md` in the repository.

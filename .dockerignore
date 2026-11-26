@@ -1,0 +1,25 @@
+# The worker image builds from what the repository tracks. A build from a
+# checkout sends the same files with or without this list. A build from a
+# working copy leaves out the installed packages (built for the host, not for
+# the image), earlier builds and local secrets.
+.git
+**/node_modules
+**/dist
+**/.next
+**/out
+**/coverage
+**/*.tsbuildinfo
+**/next-env.d.ts
+**/.env
+**/.env.*
+!**/.env.example
+vibe
+internal
+CLAUDE.md
+.githooks/local-patterns
+**/.vercel
+.supabase/.temp
+supabase/.temp
+**/.DS_Store
+**/*.pem
+**/npm-debug.log*

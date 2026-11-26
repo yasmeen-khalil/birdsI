@@ -1,6 +1,6 @@
 {
   "name": "birdsi",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "birdsI from the terminal, the cockpit for your apps: map an app's code, read what needs you, and run the birdsI MCP server for coding agents.",
   "license": "MPL-2.0",
   "author": "yasmeen-khalil",
