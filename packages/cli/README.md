@@ -10,7 +10,7 @@ Run it without installing, in your project folder:
 npx birdsi
 ```
 
-That maps the app in the current folder (about a minute), opens its page, streams progress, and ends with what needs you: alerts, questions, approvals. Sign in first with `birdsi login` (below). A new account can map once the owner of the birdsI it signs in to has approved it.
+That maps the app in the current folder (about a minute), opens its page, streams progress, and ends with what needs you: alerts, questions, approvals. Sign in first with `birdsi login` (below). On https://birdsi.vercel.app any GitHub account can map at once for now. A birdsI that runs by approval lets a new account map once its owner has approved it.
 
 To install it globally:
 

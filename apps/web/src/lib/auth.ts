@@ -1,19 +1,20 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { decideAccess, upsertUser, userByClerkId, type UserRow } from "@birdsi/db";
 import { cache } from "react";
-import { AccessError, hasAccess, ownerRowNeedsApproval } from "./access";
+import { AccessError, approvedAtSignIn, hasAccess } from "./access";
 
 /**
  * Whoever is signed in, approved or not, with their local row created on
  * first sight. Cached per request. Only the sign-in gate itself uses this:
  * the page where a person asks for access, and the checks below. Everything
  * else calls currentUserRow or requireUser, which need an approved account.
+ * The owner's row, and while access is open a pending row, is approved here.
  */
 export const signedInUserUngated = cache(async (): Promise<UserRow | null> => {
   const { userId } = await auth();
   if (!userId) return null;
   const user = (await userByClerkId(userId)) ?? (await createUser(userId));
-  if (!ownerRowNeedsApproval(user)) return user;
+  if (!approvedAtSignIn(user)) return user;
   await decideAccess(user.id, "approved");
   return { ...user, access: "approved" };
 });

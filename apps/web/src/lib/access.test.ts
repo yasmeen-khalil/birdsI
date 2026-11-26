@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UserRow } from "@birdsi/db";
-import { hasAccess, isOwner, ownerIds, ownerRowNeedsApproval } from "./access";
+import { accessIsOpen, approvedAtSignIn, hasAccess, isOwner, ownerIds } from "./access";
 
 const base: UserRow = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -52,13 +52,30 @@ describe("access by approval", () => {
     expect(hasAccess({ ...base, access: "denied", github_user_id: 43 }, "42")).toBe(false);
   });
 
-  it("marks only an owner's own row approved, so the worker reads the owner's apps on a new database", () => {
-    expect(ownerRowNeedsApproval({ ...base, access: "pending" }, "42")).toBe(true);
-    expect(ownerRowNeedsApproval({ ...base, access: "approved" }, "42")).toBe(false);
-    expect(ownerRowNeedsApproval({ ...base, access: "pending" }, "7")).toBe(false);
-    expect(ownerRowNeedsApproval({ ...base, access: "pending" }, "")).toBe(false);
-    expect(ownerRowNeedsApproval({ ...base, access: "pending", github_user_id: null }, "42")).toBe(false);
-    expect(ownerRowNeedsApproval({ ...base, access: "pending", deleted_at: "2026-11-17T00:00:00.000Z" }, "42")).toBe(false);
+  it("marks only an owner's own row approved while access is by approval, so the worker reads the owner's apps on a new database", () => {
+    expect(approvedAtSignIn({ ...base, access: "pending" }, "42", "")).toBe(true);
+    expect(approvedAtSignIn({ ...base, access: "approved" }, "42", "")).toBe(false);
+    expect(approvedAtSignIn({ ...base, access: "pending" }, "7", "")).toBe(false);
+    expect(approvedAtSignIn({ ...base, access: "pending" }, "", "")).toBe(false);
+    expect(approvedAtSignIn({ ...base, access: "pending" }, "7", undefined)).toBe(false);
+    expect(approvedAtSignIn({ ...base, access: "pending", github_user_id: null }, "42", "")).toBe(false);
+    expect(approvedAtSignIn({ ...base, access: "pending", deleted_at: "2026-11-17T00:00:00.000Z" }, "42", "")).toBe(false);
+  });
+
+  it("approves a pending account at sign-in while access is open, and never a denied one", () => {
+    expect(accessIsOpen("open")).toBe(true);
+    expect(accessIsOpen(" Open ")).toBe(true);
+    expect(accessIsOpen("")).toBe(false);
+    expect(accessIsOpen(undefined)).toBe(false);
+    expect(accessIsOpen("approval")).toBe(false);
+    expect(accessIsOpen("true")).toBe(false);
+    expect(approvedAtSignIn({ ...base, access: "pending" }, "7", "open")).toBe(true);
+    const asked: UserRow = { ...base, access: "pending", access_requested_at: "2026-11-17T00:00:00.000Z" };
+    expect(approvedAtSignIn(asked, "7", "open")).toBe(true);
+    expect(approvedAtSignIn({ ...base, access: "denied" }, "7", "open")).toBe(false);
+    expect(approvedAtSignIn({ ...base, access: "approved" }, "7", "open")).toBe(false);
+    expect(approvedAtSignIn({ ...base, access: "pending", deleted_at: "2026-11-17T00:00:00.000Z" }, "7", "open")).toBe(false);
+    expect(approvedAtSignIn({ ...base, access: "pending" }, "7", "approval")).toBe(false);
   });
 });
 

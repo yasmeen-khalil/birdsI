@@ -37,11 +37,23 @@ export function hasAccess(user: Pick<UserRow, "access" | "github_user_id" | "del
   return user.access === "approved" || isOwner(user, raw);
 }
 
+/** BIRDSI_ACCESS=open: an account is approved when it first signs in. Unset or anything else keeps access by approval. */
+export function accessIsOpen(raw: string | undefined | null = process.env["BIRDSI_ACCESS"]): boolean {
+  return raw?.trim().toLowerCase() === "open";
+}
+
 /**
- * True when an owner's own row is not approved yet, as on a new database where
- * every account starts pending. The worker schedules approved rows and never
- * reads BIRDSI_OWNER_GITHUB_IDS, so the sign-in marks the owner's row approved.
+ * True when the sign-in marks this row approved. An owner's own row that is not
+ * approved yet, as on a new database where every account starts pending: the
+ * worker schedules approved rows and never reads BIRDSI_OWNER_GITHUB_IDS. And
+ * while access is open, a pending row. A denied row stays denied either way.
  */
-export function ownerRowNeedsApproval(user: Pick<UserRow, "access" | "github_user_id" | "deleted_at">, raw: string | undefined | null = process.env["BIRDSI_OWNER_GITHUB_IDS"]): boolean {
-  return user.access !== "approved" && isOwner(user, raw);
+export function approvedAtSignIn(
+  user: Pick<UserRow, "access" | "github_user_id" | "deleted_at">,
+  owners: string | undefined | null = process.env["BIRDSI_OWNER_GITHUB_IDS"],
+  access: string | undefined | null = process.env["BIRDSI_ACCESS"],
+): boolean {
+  if (user.deleted_at || user.access === "approved") return false;
+  if (isOwner(user, owners)) return true;
+  return user.access === "pending" && accessIsOpen(access);
 }

@@ -126,6 +126,12 @@ A model reads the code again, behind a verifier: rules first with the file and l
 - `integrationStatus()` is gone from the web app. Nothing called it, and its docs check flag read only the Anthropic key, where the check runs on either provider.
 - The web app at https://birdsi.vercel.app and the worker run this version since 2026-11-26, after migration `20261117000000_access.sql`.
 
+### Open sign-up (2026-11-26)
+
+- `BIRDSI_ACCESS=open` on the web app approves an account when it first signs in with GitHub, so nobody waits for the owner. A pending account is approved at its next sign-in. A denied account stays denied, so the owner can still remove anyone on the Access page. Unset, access stays by approval as before. A test holds both.
+- The live site runs open for now. The spend caps still hold: $5 of model calls per account and $50 across all accounts per 24 hours, and 40 maps per account per day.
+- The privacy policy, effective 26 November 2026, says which of the two the site runs. README.md, the CLI README and `.env.example` describe the setting.
+
 ## v3 (2026-10-18, unreleased): the cockpit
 
 birdsI becomes the cockpit for its owner's apps: one page per app, read from the code and from the vendors' own APIs, and what needs the owner. Built in checkpoints, each with the full chain green.

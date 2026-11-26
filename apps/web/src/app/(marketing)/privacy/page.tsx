@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalList, LegalP, LegalPage, LegalSection } from "@/components/marketing/Legal";
+import { accessIsOpen } from "@/lib/access";
 
 /** Who runs this instance of birdsI. A self-hosted copy names its own operator here. */
 const OPERATOR_NAME = "yasmeen-khalil";
 const OPERATOR_URL = "https://github.com/yasmeen-khalil";
-const EFFECTIVE_DATE = "17 November 2026";
+const EFFECTIVE_DATE = "26 November 2026";
 
 export const metadata: Metadata = { title: "Privacy policy" };
 
@@ -27,7 +28,9 @@ export default function PrivacyPage() {
             "The map keeps file paths, line numbers, short excerpts with secrets masked, and the names of the settings your code reads. It never keeps their values.",
             "Keys you give birdsI for your vendor accounts are stored encrypted and used only to read those accounts.",
             "An AI model reads your code, after fixed rules have built the map, to find what the rules missed. Secrets are masked before any code is sent, and tests, docs and data files are left out. Your code is never used to train models.",
-            "A new account waits for the operator's approval. Until it is approved it can use nothing, and birdsI keeps only its sign-in details and the time it asked.",
+            accessIsOpen()
+              ? "Anyone can sign in with GitHub and use birdsI at once. The operator can remove an account's access at any time."
+              : "A new account waits for the operator's approval. Until it is approved it can use nothing, and birdsI keeps only its sign-in details and the time it asked.",
             "You can disconnect a repository or delete everything from Settings at any time.",
           ]}
         />
